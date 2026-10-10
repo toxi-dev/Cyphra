@@ -213,6 +213,50 @@ def mode_info(driver):
     ''')
 
 
+def mode_windows(driver, fixture_url):
+    value = mode_info(driver)
+    value.update(driver.execute_script('''
+      const {PrivateBrowsingUtils}=ChromeUtils.importESModule('resource://gre/modules/PrivateBrowsingUtils.sys.mjs');
+      const fixture=new URL(arguments[0]);
+      function safeURI(spec){
+        if(!spec)return null;
+        if(['about:blank','about:newtab','about:home'].includes(spec))return spec;
+        try{
+          const uri=new URL(spec);
+          if(uri.protocol===fixture.protocol&&uri.origin===fixture.origin&&!uri.username&&!uri.password)
+            return uri.origin+uri.pathname+(uri.search||uri.hash?' [query-or-fragment-redacted]':'');
+        }catch{}
+        return '<non-fixture-url>';
+      }
+      const windows=[];
+      for(const win of Services.wm.getEnumerator('navigator:browser')){
+        const tabs=[];
+        for(const tab of win.gBrowser?.tabs||[]){
+          const browser=tab.linkedBrowser,contentPID=browser.browsingContext?.currentWindowGlobal?.osPid;
+          tabs.push({uri:safeURI(browser.currentURI?.spec),pendingURI:safeURI(browser.userTypedValue),
+            selected:tab===win.gBrowser.selectedTab,loading:!!browser.webProgress?.isLoadingDocument,
+            contentPID:Number.isSafeInteger(contentPID)?contentPID:null});
+        }
+        windows.push({currentMarionetteWindow:win===window,closed:win.closed,
+          delayedStartupFinished:!!win.gBrowserInit?.delayedStartupFinished,
+          private:PrivateBrowsingUtils.isWindowPrivate(win),tabs});
+      }
+      return {windows,uiDensity:Services.prefs.getIntPref('browser.uidensity',0),
+        externalWindowPreference:Services.prefs.getIntPref('browser.link.open_newwindow.override.external',-1),
+        newWindowPreference:Services.prefs.getIntPref('browser.link.open_newwindow',3)};
+    ''', script_args=[fixture_url]))
+    return value
+
+
+def snapshot_modes(drivers, fixture_url):
+    return {mode: mode_windows(driver, fixture_url) for mode, driver in drivers.items()}
+
+
+def contains_uri(mode, uri, include_pending=False):
+    return any(tab['uri'] == uri or include_pending and tab['pendingURI'] == uri
+               for window in mode['windows'] for tab in window['tabs'])
+
+
 def profile_hashes(profiles):
     values = {}
     for mode, profile in profiles.items():
@@ -326,15 +370,43 @@ def main():
             driver.set_context(driver.CONTEXT_CHROME)
             foreign = bookmark_guids['personal' if mode == 'work' else 'work']
             assert async_call(driver, "const {PlacesUtils}=ChromeUtils.importESModule('resource://gre/modules/PlacesUtils.sys.mjs');return await PlacesUtils.bookmarks.fetch(arguments[0]);", [foreign]) is None
-        subprocess.run([str(launcher), '--work', url + 'work-again'], env=environment, timeout=20, check=True)
-        deadline = time.monotonic() + 10
-        while time.monotonic() < deadline:
-            tabs = drivers['work'].execute_script('return [...gBrowser.tabs].map(tab=>tab.linkedBrowser.currentURI.spec);')
-            if url + 'work-again' in tabs:
-                break
-            time.sleep(.1)
-        assert url + 'work-again' in tabs
-        assert mode_info(drivers['work'])['pid'] == actual['work']['pid'] and mode_info(drivers['personal'])['pid'] == actual['personal']['pid']
+        target = url + 'work-again'
+        # Gecko 157.0.1 disables headless remote clients at nsAppRunner.cpp:5319-5323:
+        # https://hg.mozilla.org/releases/mozilla-release/file/737ec77d798755890b062aab541a90d6c75afd19/toolkit/xre/nsAppRunner.cpp#l5319
+        # Keep both existing browsers headless; this sender must use the real remote client.
+        sender_environment = dict(environment)
+        sender_environment.pop('MOZ_HEADLESS', None)
+        remoting = proof['remoting'] = {'target': target,
+            'nativeChildExitStatus': 'unavailable: the shipped launcher does not wait for its Gecko child'}
+        try:
+            remoting['before'] = snapshot_modes(drivers, url)
+            remoting['ownedEnginePidsBefore'] = fixture_engine_pids(engine)
+            launched = subprocess.run([str(launcher), '--work', target], env=sender_environment, timeout=20)
+            remoting['launcherExitCode'] = launched.returncode
+            assert launched.returncode == 0, 'The shipped launcher could not start the native remoting command.'
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                remoting['after'] = snapshot_modes(drivers, url)
+                assert not contains_uri(remoting['after']['personal'], target, include_pending=True), \
+                    'The Work URL was routed into a Personal window.'
+                if contains_uri(remoting['after']['work'], target):
+                    break
+                time.sleep(.1)
+            assert contains_uri(remoting['after']['work'], target), \
+                'The Work URL was absent from every window in the existing Work process.'
+            for mode, value in remoting['after'].items():
+                assert value['pid'] == actual[mode]['pid'] and value['mode'] == mode and value['edition'] == edition
+                assert Path(value['profile']) == profiles[mode] and value['remote'] == f'cyphra-{edition}-{mode}'
+                assert value['uiDensity'] == (2 if mode == 'work' else 0), 'Remoting changed an isolated profile setting.'
+            remoting['ownedEnginePidsAfter'] = fixture_engine_pids(engine)
+        except Exception:
+            try:
+                remoting['after'] = snapshot_modes(drivers, url)
+                remoting['ownedEnginePidsAfter'] = fixture_engine_pids(engine)
+            except Exception as diagnostic_error:
+                remoting['snapshotError'] = type(diagnostic_error).__name__
+            print('FAIL existing Work process remoting: ' + json.dumps(remoting, sort_keys=True), flush=True)
+            raise
         proof['checks'].append('cookies-local-storage-bookmarks-settings-isolated-and-existing-work-process-remoting')
         print('PASS actual Windows Gecko: default edition/mode, Work/Personal processes, native inherited locks, cookies/storage/bookmarks/settings isolation, remoting and core TLS/sandbox/telemetry policy.', flush=True)
 
