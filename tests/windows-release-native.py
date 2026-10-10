@@ -132,14 +132,58 @@ def profile_lock(path, expected_locked):
 
 
 def fixture_engine_pids(engine):
-    # Output only PIDs from this unique installation. Do not print system
-    # command lines, which can contain unrelated application credentials.
-    environment = dict(public_environment(), CY_NATIVE_ENGINE=str(engine))
-    command = "@(Get-CimInstance Win32_Process -Filter \"Name='librewolf.exe'\" | Where-Object { $_.ExecutablePath -eq $env:CY_NATIVE_ENGINE } | Select-Object -ExpandProperty ProcessId) | ConvertTo-Json -Compress"
-    result = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', command],
-                            env=environment, check=True, capture_output=True, text=True, timeout=15)
-    value = json.loads(result.stdout) if result.stdout.strip() else []
-    return value if isinstance(value, list) else [value]
+    # Query executable paths with limited rights, never process command lines.
+    # Return only this unique installation's engine and its native children.
+    class PROCESSENTRY32W(ctypes.Structure):
+        _fields_ = [('dwSize', ctypes.c_uint32), ('cntUsage', ctypes.c_uint32),
+                    ('th32ProcessID', ctypes.c_uint32), ('th32DefaultHeapID', ctypes.c_size_t),
+                    ('th32ModuleID', ctypes.c_uint32), ('cntThreads', ctypes.c_uint32),
+                    ('th32ParentProcessID', ctypes.c_uint32), ('pcPriClassBase', ctypes.c_int32),
+                    ('dwFlags', ctypes.c_uint32), ('szExeFile', ctypes.c_wchar * 260)]
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel.CreateToolhelp32Snapshot.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
+    kernel.CreateToolhelp32Snapshot.restype = ctypes.c_void_p
+    for function in (kernel.Process32FirstW, kernel.Process32NextW):
+        function.argtypes = [ctypes.c_void_p, ctypes.POINTER(PROCESSENTRY32W)]
+        function.restype = ctypes.c_int
+    kernel.OpenProcess.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
+    kernel.OpenProcess.restype = ctypes.c_void_p
+    kernel.QueryFullProcessImageNameW.argtypes = [ctypes.c_void_p, ctypes.c_uint32,
+                                                ctypes.POINTER(ctypes.c_wchar), ctypes.POINTER(ctypes.c_uint32)]
+    kernel.QueryFullProcessImageNameW.restype = ctypes.c_int
+    kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+    kernel.CloseHandle.restype = ctypes.c_int
+    expected = os.path.normcase(os.path.abspath(engine))
+    expected_name = os.path.basename(expected)
+    snapshot = kernel.CreateToolhelp32Snapshot(0x00000002, 0)  # TH32CS_SNAPPROCESS
+    if snapshot == ctypes.c_void_p(-1).value or snapshot is None:
+        raise RuntimeError(f'The native process snapshot failed (Win32 error {ctypes.get_last_error()}).')
+    pids = []
+    try:
+        entry = PROCESSENTRY32W()
+        entry.dwSize = ctypes.sizeof(entry)
+        available = kernel.Process32FirstW(snapshot, ctypes.byref(entry))
+        while available:
+            if os.path.normcase(entry.szExeFile) == expected_name:
+                process = kernel.OpenProcess(0x1000, False, entry.th32ProcessID)  # PROCESS_QUERY_LIMITED_INFORMATION
+                if process:
+                    try:
+                        image = ctypes.create_unicode_buffer(32768)
+                        length = ctypes.c_uint32(len(image))
+                        if kernel.QueryFullProcessImageNameW(process, 0, image, ctypes.byref(length)) \
+                                and 0 < length.value < len(image) \
+                                and os.path.isabs(image.value) \
+                                and os.path.normcase(os.path.abspath(image.value)) == expected:
+                            pids.append(entry.th32ProcessID)
+                    finally:
+                        kernel.CloseHandle(process)
+            available = kernel.Process32NextW(snapshot, ctypes.byref(entry))
+        error = ctypes.get_last_error()
+        if error != 18:  # ERROR_NO_MORE_FILES; an incomplete enumeration must fail.
+            raise RuntimeError(f'The native process enumeration failed (Win32 error {error}).')
+        return sorted(pids)
+    finally:
+        kernel.CloseHandle(snapshot)
 
 
 def wait_closed(engine):
