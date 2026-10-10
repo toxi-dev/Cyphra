@@ -457,26 +457,46 @@ def main():
         # Check the shipped platform-independent updater on native Windows.
         # Its current version equals this real latest release: no application
         # download or installation is requested by the browser.
+        # GitHub Actions' ephemeral GITHUB_TOKEN is not a user fine-grained PAT.
+        # Seed only this disposable profile's NSS credential fixture; released
+        # configureToken validation stays intact, and finally removes the fixture.
+        proof['githubCredentialFixture'] = 'ephemeral-GITHUB_TOKEN-in-disposable-NSS' if edition == 'team' else 'anonymous'
         updated = async_call(drivers[default], '''
           const {GitHubUpdates}=ChromeUtils.importESModule('resource://cyphra/modules/github-updates.sys.mjs');
-          const info=GitHubUpdates.info(),observed=[];
+          const info=GitHubUpdates.info(),observed=[],query={origin:'chrome://cyphra',httpRealm:'Cyphra GitHub updates'};
+          if((await Services.logins.searchLoginsAsync(query)).length)throw new Error('The disposable updater NSS fixture was not empty.');
+          let summary;
           const observer={observe(subject){try{const channel=subject.QueryInterface(Components.interfaces.nsIHttpChannel),host=channel.URI.host;
             if(!['api.github.com','release-assets.githubusercontent.com'].includes(host))return;
             let auth=false;try{auth=!!channel.getRequestHeader('Authorization')}catch{}observed.push({host,auth});}catch{}}};
           Services.obs.addObserver(observer,'http-on-modify-request');
           try{
-            if(info.requiresToken)await GitHubUpdates.configureToken(arguments[0]);
-            const nss=await Services.logins.searchLoginsAsync({origin:'chrome://cyphra',httpRealm:'Cyphra GitHub updates'});
+            if(info.requiresToken){
+              if(!arguments[0])throw new Error('The ephemeral workflow credential was unavailable.');
+              const login=Components.classes['@mozilla.org/login-manager/loginInfo;1'].createInstance(Components.interfaces.nsILoginInfo);
+              login.init(query.origin,null,query.httpRealm,info.repository,arguments[0],'','');
+              await Services.logins.addLoginAsync(login);
+              Services.prefs.setBoolPref('cyphra.updates.configured',true);
+            }
+            const nss=await Services.logins.searchLoginsAsync(query);
+            const credentialMatched=info.requiresToken?nss.length===1&&nss[0].username===info.repository&&nss[0].password===arguments[0]:nss.length===0;
+            if(!credentialMatched)throw new Error('The disposable updater NSS fixture did not round-trip.');
             const result=await GitHubUpdates.check();
-            return {version:result.currentVersion,repository:result.repository,automatic:result.automatic,available:result.available,
+            summary={version:result.currentVersion,repository:result.repository,automatic:result.automatic,available:result.available,
               checked:!!result.lastCheck,nss:nss.length,api:observed.some(x=>x.host==='api.github.com'),
               apiAuth:observed.some(x=>x.host==='api.github.com'&&x.auth),cdn:observed.some(x=>x.host==='release-assets.githubusercontent.com'),
               leaked:observed.some(x=>x.host!=='api.github.com'&&x.auth),anyAuth:observed.some(x=>x.auth)};
-          }finally{if(info.requiresToken)await GitHubUpdates.forgetToken();Services.obs.removeObserver(observer,'http-on-modify-request');}
+          }finally{
+            try{if(info.requiresToken)await GitHubUpdates.forgetToken();}
+            finally{Services.obs.removeObserver(observer,'http-on-modify-request');}
+          }
+          summary.nssCleared=(await Services.logins.searchLoginsAsync(query)).length===0;
+          if(info.requiresToken&&GitHubUpdates.info().configured)throw new Error('The disposable updater credential remained configured.');
+          return summary;
         ''', [token if edition == 'team' else ''])
         assert updated['version'] == version and updated['repository'] == repository and updated['automatic'] is False
         assert updated['available'] is None and updated['checked'] and updated['api'] and not updated['leaked']
-        assert updated['nss'] == (1 if edition == 'team' else 0) and updated['apiAuth'] == (edition == 'team') and updated['anyAuth'] == (edition == 'team')
+        assert updated['nssCleared'] and updated['nss'] == (1 if edition == 'team' else 0) and updated['apiAuth'] == (edition == 'team') and updated['anyAuth'] == (edition == 'team')
         proof['githubCDNObserved'] = updated['cdn']
         proof['checks'].append('actual-native-windows-github-pinned-manifest-nss-or-anonymous-safe-redirects-no-auto-install')
 
