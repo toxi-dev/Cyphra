@@ -1,0 +1,18 @@
+{
+  "name": "cyphra-gecko-tools",
+  "version": "0.7.0",
+  "private": true,
+  "license": "MPL-2.0",
+  "description": "Build tools for Cyphra's native Gecko distribution; no Node runtime ships",
+  "scripts": {
+    "bundle": "node scripts/bundle-blocker.cjs && node scripts/compile-filters.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "@ghostery/adblocker": "2.18.2",
+    "esbuild": "0.28.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

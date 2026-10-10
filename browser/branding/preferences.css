@@ -1,0 +1,23 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. See https://mozilla.org/MPL/2.0/. */
+
+/* Cyphra supplies its own sync and updates. The corresponding upstream
+ * account/promotion controls cannot enable a working Cyphra service. */
+#category-sync,
+#category-more-from-mozilla,
+#category-experimental,
+#relayIntegrationBox,
+[data-category="paneSync"],
+[data-category="paneMoreFromMozilla"],
+[data-category="paneExperimental"],
+setting-group[groupid="accountDisabled"],
+setting-group[groupid="account"],
+setting-group[groupid="sync"],
+setting-group[groupid="ipprotection"],
+#setting-control-relayIntegration,
+#setting-control-librewolfSync {
+  display: none !important;
+}
+
+/* Keep useful native settings, including certificate management, saved
+ * permissions, proxy configuration, fonts, downloads and containers. */

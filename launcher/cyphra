@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. See https://mozilla.org/MPL/2.0/.
+set -euo pipefail
+# Replaced by the edition-aware builder; never read this value from the caller.
+CYPHRA_EDITION='team'
+cyphra_mode='work'
+[[ "$CYPHRA_EDITION" != 'public' ]] || cyphra_mode='personal'
+cyphra_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+if [[ ${EUID} -eq 0 ]]; then
+    printf '%s\n' 'Run Cyphra as an ordinary desktop user, with the Gecko sandbox enabled.' >&2
+    exit 1
+fi
+if [[ ! -x "$cyphra_dir/runtime/librewolf" ]]; then
+    printf '%s\n' 'The native Gecko engine is missing. Extract the complete Cyphra package.' >&2
+    exit 1
+fi
+cyphra_application="$cyphra_dir/runtime/browser/application.ini"
+if [[ ! -f "$cyphra_application" ]]; then
+    printf '%s\n' 'The Cyphra application identity is missing. Extract the complete Cyphra package.' >&2
+    exit 1
+fi
+cyphra_arguments=()
+for cyphra_argument in "$@"; do
+    case "$cyphra_argument" in
+        --work|-work) cyphra_mode='work'; continue ;;
+        --personal|-personal) cyphra_mode='personal'; continue ;;
+    esac
+    if [[ "$cyphra_argument" == '--private-window' ]]; then
+        cyphra_arguments+=('-private-window')
+        continue
+    fi
+    if [[ "$cyphra_argument" =~ [[:cntrl:]] ]]; then
+        printf '%s\n' 'Cyphra does not accept control characters in addresses.' >&2
+        exit 1
+    fi
+    case "$cyphra_argument" in
+        [Hh][Tt][Tt][Pp]://*|[Hh][Tt][Tt][Pp][Ss]://*) ;;
+        *) printf '%s\n' 'Cyphra accepts HTTP or HTTPS addresses, --work, --personal and --private-window only.' >&2; exit 1 ;;
+    esac
+    cyphra_authority="${cyphra_argument#*://}"
+    cyphra_authority="${cyphra_authority%%[/?#]*}"
+    if [[ -z "$cyphra_authority" || "$cyphra_authority" == *'@'* || ${#cyphra_argument} -gt 16384 ]]; then
+        printf '%s\n' 'Enter an HTTP or HTTPS address without embedded credentials.' >&2
+        exit 1
+    fi
+    cyphra_arguments+=("$cyphra_argument")
+done
+cyphra_profile_root='cyphra'
+[[ "$CYPHRA_EDITION" != 'public' ]] || cyphra_profile_root='cyphra-public'
+cyphra_profile="${XDG_CONFIG_HOME:-${HOME:?}/.config}/$cyphra_profile_root/profile"
+[[ "$cyphra_mode" != 'personal' ]] || cyphra_profile+='-personal'
+export CYPHRA_MODE="$cyphra_mode" CYPHRA_EDITION
+export MOZ_APP_REMOTINGNAME="cyphra-$CYPHRA_EDITION-$cyphra_mode"
+umask 077
+mkdir -p -- "$cyphra_profile"
+# The descriptor stays open in the Gecko process. The local archive updater
+# takes an exclusive lock on the same profile file before replacing app files.
+if ! command -v flock >/dev/null 2>&1; then
+    printf '%s\n' 'Cyphra requires flock from util-linux for safe local updates.' >&2
+    exit 1
+fi
+exec 9>"$cyphra_profile/.cyphra-update.lock"
+if ! flock --shared --nonblock 9; then
+    printf '%s\n' 'Cyphra is being updated. Wait for the local updater to finish.' >&2
+    exit 1
+fi
+exec "$cyphra_dir/runtime/librewolf" -app "$cyphra_application" -profile "$cyphra_profile" "${cyphra_arguments[@]}"

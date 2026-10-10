@@ -1,0 +1,14 @@
+/* MPL-2.0. Immutable installed edition metadata. */
+export const EDITION = Object.freeze({
+  "id": "public",
+  "displayName": "Cyphra",
+  "organization": "",
+  "repository": "toxi-dev/Cyphra",
+  "public": true,
+  "defaultSyncEndpoint": "",
+  "assetPrefix": "Cyphra-Public",
+  "keyId": "cyphra-public-release-2026-01",
+  "updateKeySPKI": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE3vDDnNPl2fNrTboTKQ5pANzu6vVe7+vXa19+FZO99arkBpZeb80VuL59U3mSGdAJ3DrVjEeFN7YslweH/fD6Jw==",
+  "defaultDNS": "system",
+  "defaultMode": "personal"
+});

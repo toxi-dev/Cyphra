@@ -1,0 +1,109 @@
+{
+  "sort": "-last_modified",
+  "schema": {
+    "type": "object",
+    "title": "Certificate",
+    "default": {
+      "issuerName": "",
+      "serialNumber": ""
+    },
+    "properties": {
+      "blockID": {
+        "type": "string",
+        "title": "Internal blocklist id",
+        "pattern": "^c[0-9]+$",
+        "description": "Original block id, eg. c111"
+      },
+      "details": {
+        "type": "object",
+        "title": "Details",
+        "required": [
+          "name",
+          "why"
+        ],
+        "properties": {
+          "bug": {
+            "type": "string",
+            "title": "Bug"
+          },
+          "who": {
+            "type": "string",
+            "title": "Who"
+          },
+          "why": {
+            "type": "string",
+            "title": "Why"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "enabled": {
+        "type": "boolean",
+        "title": "Enabled",
+        "default": true,
+        "description": "blocking rule is enabled."
+      },
+      "subject": {
+        "type": "string",
+        "title": "Subject",
+        "description": "The certificate subject."
+      },
+      "issuerName": {
+        "type": "string",
+        "title": "Issuer name",
+        "description": "The certificate issuer name."
+      },
+      "pubKeyHash": {
+        "type": "string",
+        "title": "Public Key Hash",
+        "description": "The certificate public key hash."
+      },
+      "serialNumber": {
+        "type": "string",
+        "title": "Serial number",
+        "description": "The certificate serial number."
+      }
+    },
+    "description": "A blocked certificate entry.",
+    "additionalProperties": false
+  },
+  "signature": {
+    "ref": "2r9diahsmhuuo26qj6kbh6yxfg",
+    "x5u": "https://content-signature-2.cdn.mozilla.net/g/chains/202402/onecrl.content-signature.mozilla.org-2026-11-25-18-04-25.chain",
+    "mode": "p384ecdsa",
+    "type": "contentsignaturepki",
+    "signature": "QWCusrFRTl-I6FL0GFhoUn67yKel3UuSvOUatEomo3hr9HT1BW0E7-Ix8LTLoUhJSjonhCdg7-ZiGWtD6IBnWTht8EAZuTk2lRdv1QyIgEi2XGajaO9M5U2hN9HVtpI3",
+    "signer_id": "onecrl_202402",
+    "public_key": "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEcFqwsEC0b/zb/f6EhULbG1jRUQCyNv6S0hnG7FxwrHOlP163joodTS8os1sirMqS8yq88RI9VI1DdLrYfHvJLUiXb5pH/ONJ6QmFT7bwuN5v2xVKrid+QRHeI8RiJQ86"
+  },
+  "attachment": {
+    "enabled": false,
+    "required": false
+  },
+  "signatures": [
+    {
+      "ref": "2r9diahsmhuuo26qj6kbh6yxfg",
+      "x5u": "https://content-signature-2.cdn.mozilla.net/g/chains/202402/onecrl.content-signature.mozilla.org-2026-11-25-18-04-25.chain",
+      "mode": "p384ecdsa",
+      "type": "contentsignaturepki",
+      "signature": "QWCusrFRTl-I6FL0GFhoUn67yKel3UuSvOUatEomo3hr9HT1BW0E7-Ix8LTLoUhJSjonhCdg7-ZiGWtD6IBnWTht8EAZuTk2lRdv1QyIgEi2XGajaO9M5U2hN9HVtpI3",
+      "signer_id": "onecrl_202402",
+      "public_key": "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEcFqwsEC0b/zb/f6EhULbG1jRUQCyNv6S0hnG7FxwrHOlP163joodTS8os1sirMqS8yq88RI9VI1DdLrYfHvJLUiXb5pH/ONJ6QmFT7bwuN5v2xVKrid+QRHeI8RiJQ86"
+    }
+  ],
+  "displayFields": [
+    "enabled",
+    "blockID",
+    "issuerName",
+    "subject"
+  ],
+  "id": "onecrl",
+  "last_modified": 1791573429054
+}

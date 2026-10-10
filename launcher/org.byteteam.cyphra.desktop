@@ -1,0 +1,28 @@
+[Desktop Entry]
+# This Source Code Form is subject to the Mozilla Public License, v. 2.0.
+# See https://mozilla.org/MPL/2.0/.
+Version=1.0
+Type=Application
+Name=Cyphra
+GenericName=Web Browser
+Comment=Byte Team native Gecko browser
+Exec=cyphra %U
+Icon=cyphra
+Terminal=false
+Categories=Network;WebBrowser;
+StartupNotify=true
+StartupWMClass=cyphra-team-work
+MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;
+Actions=Work;Personal;Private;
+
+[Desktop Action Work]
+Name=Work Mode
+Exec=cyphra --work
+
+[Desktop Action Personal]
+Name=Personal Mode
+Exec=cyphra --personal
+
+[Desktop Action Private]
+Name=New Private Window
+Exec=cyphra --private-window

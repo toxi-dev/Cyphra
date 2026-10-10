@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src resource:; img-src resource:; form-action https://search.brave.com; base-uri 'none'; object-src 'none'" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#101115" />
+    <title>New tab — Cyphra</title>
+    <link rel="stylesheet" href="resource://cyphra-home/newtab.css" />
+  </head>
+  <body>
+    <main class="home-shell">
+      <header class="topbar">
+        <a class="brand" href="resource://cyphra-home/newtab.xhtml" aria-label="Cyphra home">
+          <img src="resource://cyphra-home/logo.svg" width="22" height="24" alt="" />
+          <strong>Cyphra</strong>
+        </a>
+        <span id="cyphra-home-context" class="profile-context"></span>
+      </header>
+
+      <section class="focus" aria-label="Search">
+        <form class="search" action="https://search.brave.com/search" method="get" aria-label="Web search">
+          <span class="search-leading" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="10.7" cy="10.7" r="6.6"/><path d="m15.8 15.8 4.2 4.2"/></svg>
+          </span>
+          <input id="cyphra-home-search" name="q" type="search" placeholder="Search the web" aria-label="Search the web" autocomplete="off" spellcheck="false" required="required" />
+          <button type="submit" class="search-submit" aria-label="Search" title="Search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.7" cy="10.7" r="6.6"/><path d="m15.8 15.8 4.2 4.2"/></svg>
+          </button>
+        </form>
+
+
+      </section>
+
+      <section class="home-grid">
+        <section id="cyphra-home-pinned-section" class="home-section pins-section" aria-labelledby="bookmarks-heading">
+          <div class="section-heading">
+            <h2 id="bookmarks-heading">Pinned</h2>
+            <button id="cyphra-home-bookmarks" class="quiet-action" type="button">Edit</button>
+          </div>
+          <ul id="cyphra-home-pins" class="pins" hidden="hidden"></ul>
+          <p id="cyphra-home-pins-empty" class="empty-state">Pin bookmarks to the toolbar and they’ll appear here.</p>
+        </section>
+
+        <section id="cyphra-home-briefing-section" class="home-section briefing-section" aria-labelledby="news-heading">
+          <div class="section-heading">
+            <h2 id="news-heading">Security briefing</h2>
+            <button id="cyphra-home-refresh" class="icon-action" type="button" aria-label="Refresh security briefing" title="Refresh security briefing">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8a8 8 0 1 0 1 6M20 3v5h-5"/></svg>
+              <span id="cyphra-home-refresh-label" class="visually-hidden">Refresh</span>
+            </button>
+          </div>
+          <p id="cyphra-home-news-status" class="section-status" role="status" aria-live="polite">News loads only when requested.</p>
+          <ul id="cyphra-home-articles" class="articles" hidden="hidden"></ul>
+          <div id="cyphra-home-news-empty" class="empty-state news-empty">
+            <p>Load current security advisories when you need them.</p>
+          </div>
+          <nav class="publishers" aria-label="News publishers">
+            <a href="https://www.cisa.gov/news-events/cybersecurity-advisories">CISA</a>
+            <a href="https://www.ncsc.gov.uk/section/keep-up-to-date">NCSC</a>
+            <a href="https://portswigger.net/research">PortSwigger Research</a>
+          </nav>
+          <p id="cyphra-home-news-errors" class="news-errors" role="status" hidden="hidden"></p>
+        </section>
+      </section>
+
+      <footer>
+        <span id="cyphra-home-edition">Cyphra</span>
+        <span>Search with Brave</span>
+      </footer>
+    </main>
+  </body>
+</html>

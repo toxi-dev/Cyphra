@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "source": "https://firefox.settings.services.mozilla.com/v1/buckets/security-state/collections/onecrl",
+  "fetched": "2026-10-10T07:53:50Z",
+  "timestamp": 1791573428759,
+  "records": 1895,
+  "enabled": 1250,
+  "files": [
+    {
+      "name": "onecrl.json",
+      "bytes": 819145,
+      "sha256": "b682579cd16f736e260fe731fae1502122a9db0c27b169fed70b96608f113740",
+      "url": "https://firefox.settings.services.mozilla.com/v1/buckets/security-state/collections/onecrl/records"
+    },
+    {
+      "name": "onecrl-metadata.json",
+      "bytes": 3321,
+      "sha256": "b10afeef1babe4fd4ea52ca163a6d6768df9bce611a2b7e6cdd7bc494a68f0ff",
+      "url": "https://firefox.settings.services.mozilla.com/v1/buckets/security-state/collections/onecrl"
+    },
+    {
+      "name": "onecrl-chain.pem",
+      "bytes": 5279,
+      "sha256": "0b50b46b3052c490513fe309dfbaad203726399665de2a95c359c87acd1de308",
+      "url": "https://content-signature-2.cdn.mozilla.net/g/chains/202402/onecrl.content-signature.mozilla.org-2026-11-25-18-04-25.chain"
+    }
+  ],
+  "verification": {
+    "verifier": "Gecko nsIContentSignatureVerifier ContentSignatureProdRoot",
+    "verified": true,
+    "verifiedAt": "2026-10-10T07:51:44Z",
+    "signer": "onecrl.content-signature.mozilla.org",
+    "leafSPKISHA256": "71dc4a465bcc3895bd8b0fd25174407f1149938353d1fe96049b9a868758bb37",
+    "signerValidUntil": "2026-11-25T18:04:25Z",
+    "engine": "157.0",
+    "records": 1895,
+    "timestamp": 1791573428759
+  }
+}

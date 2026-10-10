@@ -1,0 +1,308 @@
+#!/usr/bin/env python3
+"""Install a locally supplied Cyphra Linux archive without changing the profile.
+
+This Source Code Form is subject to the Mozilla Public License, v. 2.0.
+See https://mozilla.org/MPL/2.0/.
+"""
+import argparse
+from contextlib import ExitStack
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import sys
+import tarfile
+import tempfile
+import time
+
+MANIFEST = '.cyphra-install-manifest'
+MAX_EXPANDED = 2 * 1024 * 1024 * 1024
+MAX_FILES = 50000
+# Replaced by the edition-aware builder; caller environment cannot change it.
+CYPHRA_EDITION = 'team'
+
+
+class UpdateError(Exception):
+    pass
+
+
+def check_edition(directory):
+    metadata = json.loads((directory / 'cyphra.json').read_text(encoding='utf-8'))
+    if metadata.get('edition', 'team') != CYPHRA_EDITION:
+        raise UpdateError('This package belongs to a different Cyphra edition. Install editions separately.')
+
+
+def version_tuple(value):
+    if not isinstance(value, str) or not re.fullmatch(r'(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})', value):
+        raise UpdateError('The package has an invalid release version.')
+    return tuple(int(part) for part in value.split('.'))
+
+
+def safe_relative(name):
+    if not name or any(ord(c) < 32 for c in name) or any(c in name for c in '\\:'):
+        raise UpdateError('The package contains an unsafe file path.')
+    parts = name.split('/')
+    if any(not part or part in ('.', '..') or part.endswith(('.', ' ')) for part in parts):
+        raise UpdateError('The package contains an unsafe file path.')
+    return name
+
+
+def read_metadata(directory):
+    try:
+        metadata = json.loads((directory / 'cyphra.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError) as error:
+        raise UpdateError('The installation is missing valid Cyphra release metadata.') from error
+    if metadata.get('name') != 'Cyphra' or metadata.get('engine') != 'Gecko':
+        raise UpdateError('This updater accepts Cyphra Gecko packages only.')
+    version_tuple(metadata.get('version'))
+    return metadata['version']
+
+
+def read_manifest(directory, required=True):
+    file = directory / MANIFEST
+    if not file.exists() and not required:
+        return None
+    if file.is_symlink() or not file.is_file() or file.stat().st_size > 16 * 1024 * 1024:
+        raise UpdateError('The installation-file manifest is missing or invalid.')
+    try:
+        lines = file.read_text(encoding='utf-8').splitlines()
+    except (OSError, UnicodeError) as error:
+        raise UpdateError('The installation-file manifest is unreadable.') from error
+    if len(lines) < 3 or lines[0] != 'Cyphra manifest 1' or not lines[1].startswith('version='):
+        raise UpdateError('The installation-file manifest is invalid.')
+    version = lines[1][8:]
+    version_tuple(version)
+    if version != read_metadata(directory):
+        raise UpdateError('The installation metadata and file manifest versions disagree.')
+    files = {}
+    for line in lines[2:]:
+        if len(line) < 66 or line[64] != ' ' or not re.fullmatch('[0-9a-f]{64}', line[:64]):
+            raise UpdateError('The installation-file manifest is invalid.')
+        relative = safe_relative(line[65:])
+        if relative in files or relative == MANIFEST:
+            raise UpdateError('The installation-file manifest contains duplicate files.')
+        files[relative] = line[:64]
+    return files
+
+
+def extract_archive(archive_path, destination):
+    members = []
+    names = set()
+    total = 0
+    with tarfile.open(archive_path, 'r:gz') as archive:
+        for member in archive:
+            name = member.name.rstrip('/') if member.isdir() else member.name
+            safe_relative(name)
+            if name != 'Cyphra' and not name.startswith('Cyphra/'):
+                raise UpdateError('The archive must contain one Cyphra application directory.')
+            if name in names or not (member.isdir() or member.isfile()):
+                raise UpdateError('The archive contains duplicate paths, links or unsupported file types.')
+            if member.mode & 0o7000:
+                raise UpdateError('The archive contains unsafe file permissions.')
+            total += member.size
+            if total > MAX_EXPANDED or len(names) >= MAX_FILES:
+                raise UpdateError('The archive exceeds the Cyphra package size limit.')
+            names.add(name)
+            members.append(member)
+        # Extraction is explicit: no tar pathname normalization, links, devices,
+        # archive ownership or special permissions are accepted.
+        for member in members:
+            target = destination.joinpath(*member.name.rstrip('/').split('/'))
+            if member.isdir():
+                target.mkdir(parents=True, exist_ok=True)
+                target.chmod(0o755)
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with archive.extractfile(member) as source, target.open('xb') as output:
+                shutil.copyfileobj(source, output, 1024 * 1024)
+                output.flush()
+                os.fsync(output.fileno())
+            target.chmod(0o755 if member.mode & 0o111 else 0o644)
+    application = destination / 'Cyphra'
+    files = read_manifest(application)
+    actual = {entry.relative_to(application).as_posix() for entry in application.rglob('*') if entry.is_file()}
+    if actual != set(files) | {MANIFEST}:
+        raise UpdateError('The archive does not match its installation-file manifest.')
+    for relative, expected in files.items():
+        digest = hashlib.sha256()
+        with (application / relative).open('rb') as source:
+            for block in iter(lambda: source.read(1024 * 1024), b''):
+                digest.update(block)
+        if digest.hexdigest() != expected:
+            raise UpdateError('An application file failed its SHA-256 integrity check: ' + relative)
+    engine = application / 'runtime' / 'librewolf'
+    if not engine.is_file() or not os.access(engine, os.X_OK):
+        raise UpdateError('The new package is missing the native Gecko executable.')
+    with engine.open('rb') as source:
+        if source.read(4) != b'\x7fELF':
+            raise UpdateError('The package does not contain a native Linux Gecko executable.')
+    if not (application / 'cyphra').is_file() or not (application / 'cyphra-update').is_file():
+        raise UpdateError('The package is missing its Cyphra launch or update tool.')
+    return application
+
+
+def running_application(installation):
+    runtime = installation / 'runtime'
+    for process in Path('/proc').iterdir():
+        if not process.name.isdigit():
+            continue
+        try:
+            executable = Path(os.readlink(process / 'exe').removesuffix(' (deleted)'))
+            if executable == runtime or runtime in executable.parents:
+                return True
+        except (OSError, ValueError):
+            continue
+    return False
+
+
+def walk_entries(directory):
+    def fail(error):
+        raise error
+    for parent, directories, files in os.walk(directory, followlinks=False, onerror=fail):
+        for name in directories + files:
+            yield Path(parent) / name
+
+
+def merge_unknown_files(old, new, previous_files):
+    shipped = set(previous_files or ()) | {MANIFEST, 'Uninstall Cyphra.exe'}
+    for entry in sorted(walk_entries(old)):
+        if entry.is_symlink() or not (entry.is_file() or entry.is_dir()):
+            raise UpdateError('The current application folder contains links or unsupported files; move them outside it before updating.')
+        relative = safe_relative(entry.relative_to(old).as_posix())
+        target = new / relative
+        if entry.is_dir():
+            if target.is_file():
+                # Refuse a directory/file collision before modifying the installed
+                # application; unknown contents must not disappear in an upgrade.
+                if any(child.is_file() and child.relative_to(old).as_posix() not in shipped for child in walk_entries(entry)):
+                    raise UpdateError('A saved application-folder file conflicts with the new package: ' + relative)
+            continue
+        if relative in shipped:
+            continue
+        if target.exists():
+            if previous_files is None:
+                continue
+            raise UpdateError('A saved application-folder file conflicts with the new package: ' + relative)
+        if any(parent.is_file() for parent in target.parents if parent != new.parent):
+            raise UpdateError('A saved application-folder file conflicts with the new package: ' + relative)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(entry, target)
+
+
+def fsync_directory(directory):
+    descriptor = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def remove_work_directory(directory):
+    def retry(function, path, error):
+        os.chmod(path, 0o700 if Path(path).is_dir() else 0o600)
+        function(path)
+    shutil.rmtree(directory, onerror=retry)
+
+
+def install_update(archive_path, installation, *, wait_for_close=False):
+    installation = Path(installation).absolute()
+    if installation.is_symlink() or installation.resolve() != installation:
+        raise UpdateError('The installation path must not contain symbolic links.')
+    if not installation.is_dir() or installation.stat().st_uid != os.getuid():
+        raise UpdateError('Update an application folder owned by your desktop account.')
+    if not os.access(installation.parent, os.W_OK):
+        raise UpdateError('The application folder parent is not writable.')
+    current_version = read_metadata(installation)
+    check_edition(installation)
+    previous = read_manifest(installation, required=False)
+    root = 'cyphra-public' if CYPHRA_EDITION == 'public' else 'cyphra'
+    profile_root = Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config'))) / root
+    with ExitStack() as stack:
+        locks = []
+        for name in ('profile', 'profile-personal'):
+            profile = profile_root / name
+            profile.mkdir(parents=True, mode=0o700, exist_ok=True)
+            descriptor = os.open(profile / '.cyphra-update.lock', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+            locks.append(stack.enter_context(os.fdopen(descriptor, 'r+')))
+        deadline = time.monotonic() + (60 if wait_for_close else 0)
+        while True:
+            acquired = []
+            try:
+                for lock in locks:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    acquired.append(lock)
+                if not running_application(installation):
+                    break
+            except BlockingIOError:
+                pass
+            for lock in acquired:
+                fcntl.flock(lock, fcntl.LOCK_UN)
+            if time.monotonic() >= deadline:
+                raise UpdateError('Close every Cyphra window before installing this update. The application was left unchanged.')
+            time.sleep(0.2)
+        work = Path(tempfile.mkdtemp(prefix='.' + installation.name + '-update-', dir=installation.parent))
+        preserve_work = False
+        committed = False
+        try:
+            new = extract_archive(archive_path, work)
+            check_edition(new)
+            new_version = read_metadata(new)
+            if version_tuple(new_version) < version_tuple(current_version):
+                raise UpdateError(f'Downgrade refused: {current_version} is installed and this package is {new_version}.')
+            merge_unknown_files(installation, new, previous)
+            if running_application(installation):
+                raise UpdateError('Cyphra started during the update. Close it and try again; the application was left unchanged.')
+            backup = work / 'previous'
+            os.rename(installation, backup)
+            try:
+                os.rename(new, installation)
+                fsync_directory(installation.parent)
+            except BaseException as activation_error:
+                try:
+                    if installation.exists():
+                        os.rename(installation, new)
+                    os.rename(backup, installation)
+                    fsync_directory(installation.parent)
+                except BaseException as rollback_error:
+                    preserve_work = True
+                    raise UpdateError('The new application could not be activated and the previous folder could not be restored. '
+                                      f'The previous application remains at {backup}. Your profile was not changed. '
+                                      'Restore that folder to the installation location before launching Cyphra.') from rollback_error
+                raise activation_error
+            committed = True
+            # The temporary directory now contains the previous application. Its
+            # unknown files have been copied; profile data is outside both trees.
+        finally:
+            if not preserve_work:
+                try:
+                    remove_work_directory(work)
+                except OSError:
+                    if committed:
+                        print('Cyphra was updated, but its old application backup could not be removed: ' + str(work / 'previous'), file=sys.stderr)
+                    else:
+                        print('The pending update folder could not be removed: ' + str(work), file=sys.stderr)
+        return current_version, new_version
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--archive', required=True, type=Path, help='A locally supplied Cyphra-<version>-linux-x64.tar.gz')
+    parser.add_argument('--install', type=Path, default=Path(__file__).resolve().parent)
+    parser.add_argument('--wait-for-close', action='store_true', help='Wait up to 60 seconds for Cyphra to close')
+    args = parser.parse_args()
+    try:
+        if os.geteuid() == 0:
+            raise UpdateError('Run the updater as the desktop account that owns Cyphra, without sudo.')
+        before, after = install_update(args.archive.resolve(strict=True), args.install, wait_for_close=args.wait_for_close)
+    except (UpdateError, OSError, tarfile.TarError, EOFError) as error:
+        print('Cyphra update failed: ' + str(error), file=sys.stderr)
+        return 1
+    print(f'Cyphra {before} → {after}. Your profile, settings, bookmarks and sign-ins were preserved.')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

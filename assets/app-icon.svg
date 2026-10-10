@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="512" height="512"
+     viewBox="0 0 512 512">
+
+  <!-- Transparent canvas. Black + white only. -->
+  <path
+    d="M256 42
+       L411 105
+       V226
+       C411 326 351 403 256 463
+       C161 403 101 326 101 226
+       V105
+       Z"
+    fill="#0b0d10"
+    stroke="#f4f6f8"
+    stroke-width="18"
+    stroke-linejoin="round"/>
+
+  <!-- Optically centered C -->
+  <path
+    d="M343 186
+       C323 165 297 154 268 154
+       C209 154 170 198 170 256
+       C170 314 209 358 268 358
+       C297 358 323 347 343 326"
+    fill="none"
+    stroke="#f4f6f8"
+    stroke-width="42"
+    stroke-linecap="square"
+    stroke-linejoin="miter"/>
+</svg>

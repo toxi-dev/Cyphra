@@ -1,0 +1,11 @@
+/* This Source Code Form is subject to the Mozilla Public License, v. 2.0.
+ * See https://mozilla.org/MPL/2.0/. */
+#aboutDialog { background: #101216; color: #eef0f3; font: 14px system-ui, sans-serif; }
+#grid { padding: 32px; gap: 28px; }
+#left { width: 112px; height: 112px; }
+#right { gap: 6px; max-width: 350px; }
+#wordmark { font-size: 28px; font-weight: 650; margin: 0; }
+#versionNumber { color: #afb6c0; margin: 0 0 10px; user-select: text; }
+#aboutText, #engineText, #updateText { margin: 0; line-height: 1.5; }
+#engineText, #updateText { color: #b1b8c2; font-size: 12px; }
+#licenseLink { color: #c5d0df; margin: 10px 0 0; text-decoration: underline; cursor: pointer; }

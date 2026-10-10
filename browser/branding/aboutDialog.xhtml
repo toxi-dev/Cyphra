@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!-- This Source Code Form is subject to the Mozilla Public License, v. 2.0.
+     See https://mozilla.org/MPL/2.0/. -->
+<?xml-stylesheet href="chrome://global/skin/global.css" type="text/css"?>
+<?xml-stylesheet href="chrome://browser/content/aboutDialog.css" type="text/css"?>
+<window xmlns:html="http://www.w3.org/1999/xhtml"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        id="aboutDialog" icon="cyphra" windowtype="Browser:About" title="About Cyphra"
+        role="dialog" aria-describedby="aboutText" width="560" height="300">
+  <script src="chrome://browser/content/utilityOverlay.js"/>
+  <script src="chrome://browser/content/aboutDialog.js"/>
+  <hbox id="grid" align="center">
+    <image id="left" src="chrome://branding/content/icon128.png"/>
+    <vbox id="right" flex="1">
+      <label id="wordmark" value="Cyphra"/>
+      <label id="versionNumber" value="@@CYPHRA_VERSION@@"/>
+      <description id="aboutText">A private browser for Byte Team.</description>
+      <description id="engineText">Gecko engine 157.0</description>
+      <description id="updateText">Install team releases from Cyphra Settings → Updates.</description>
+      <label id="licenseLink" is="text-link" value="Open-source licenses and source credits"/>
+    </vbox>
+  </hbox>
+  <keyset><key keycode="VK_ESCAPE" id="escapeKey"/></keyset>
+</window>

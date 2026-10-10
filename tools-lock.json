@@ -1,0 +1,10 @@
+{
+  "rcedit": {
+    "version": "2.0.0",
+    "url": "https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe",
+    "bytes": 1360384,
+    "sha256": "3e7801db1a5edbec91b49a24a094aad776cb4515488ea5a4ca2289c400eade2a",
+    "source": "https://github.com/electron/rcedit/tree/v2.0.0",
+    "license": "MIT"
+  }
+}

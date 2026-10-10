@@ -1,0 +1,25 @@
+[Unit]
+Description=Cyphra encrypted sync vault store
+After=network.target
+
+[Service]
+Type=simple
+User=cyphra-sync
+Group=cyphra-sync
+UMask=0077
+ExecStart=/usr/bin/python3 /opt/cyphra-sync/cyphra_sync.py --data-dir /var/lib/cyphra-sync --invite-file /etc/cyphra-sync/invitation --port 9087
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/cyphra-sync
+RestrictAddressFamilies=AF_INET AF_UNIX
+LockPersonality=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

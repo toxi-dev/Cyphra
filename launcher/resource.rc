@@ -1,0 +1,41 @@
+// This Source Code Form is subject to the Mozilla Public License, v. 2.0.
+// See https://mozilla.org/MPL/2.0/.
+#include <windows.h>
+#include "cyphra-version.h"
+#ifndef CYPHRA_VERSION_MAJOR
+#error The builder must supply the Cyphra release version.
+#endif
+1 ICON "assets/icon.ico"
+1 RT_MANIFEST "launcher/windows.manifest"
+1 VERSIONINFO
+ FILEVERSION CYPHRA_VERSION_MAJOR,CYPHRA_VERSION_MINOR,CYPHRA_VERSION_PATCH,0
+ PRODUCTVERSION CYPHRA_VERSION_MAJOR,CYPHRA_VERSION_MINOR,CYPHRA_VERSION_PATCH,0
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE 0x0L
+BEGIN
+ BLOCK "StringFileInfo"
+ BEGIN
+  BLOCK "040904B0"
+  BEGIN
+#ifdef CYPHRA_PUBLIC_EDITION
+   VALUE "CompanyName", "Cyphra\0"
+#else
+   VALUE "CompanyName", "Byte Team\0"
+#endif
+   VALUE "FileDescription", "Cyphra native Gecko browser launcher\0"
+   VALUE "FileVersion", CYPHRA_VERSION_STRING
+   VALUE "InternalName", "Cyphra\0"
+   VALUE "LegalCopyright", "Copyright 2026 Cyphra contributors\0"
+   VALUE "OriginalFilename", "Cyphra.exe\0"
+   VALUE "ProductName", "Cyphra\0"
+   VALUE "ProductVersion", CYPHRA_VERSION_STRING
+  END
+ END
+ BLOCK "VarFileInfo"
+ BEGIN
+  VALUE "Translation", 0x0409, 1200
+ END
+END

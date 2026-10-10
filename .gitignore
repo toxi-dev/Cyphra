@@ -1,0 +1,24 @@
+node_modules/
+cache/
+build/
+dist/
+.venv/
+artifacts/
+__pycache__/
+*.log
+.env*
+
+# Local Cyphra maintenance / one-off patch helpers
+/cyphra-polish-*.patch
+/cyphra-phase*.patch
+/apply-cyphra-polish.sh
+/setup-cyphra-repo.sh
+
+# Local one-off Cyphra migration/remodel scripts
+/cyphra-phase*-*.sh
+
+# Local Windows resource-editing tool
+/tools/
+
+# Generated icon intermediates
+/assets/.icon-build/
