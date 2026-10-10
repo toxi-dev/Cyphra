@@ -18,7 +18,7 @@ from edition_metadata import edition_config, dist_path
 
 ROOT = Path(__file__).resolve().parent.parent
 DIRECTORIES = ('assets', 'browser', 'docs', 'launcher', 'installer', 'scripts', 'tests', 'editions')
-FILES = ('.gitignore', '.github/workflows/source-checks.yml', 'LICENSE', 'CHANGELOG.md', 'README.md', 'THIRD_PARTY_NOTICES.md', 'engine-lock.json',
+FILES = ('.gitignore', '.github/workflows/source-checks.yml', '.github/workflows/windows-release-native.yml', 'LICENSE', 'CHANGELOG.md', 'README.md', 'THIRD_PARTY_NOTICES.md', 'engine-lock.json',
          'cyphra.json', 'tools-lock.json', 'package.json', 'package-lock.json', 'requirements-test.txt',
          'server/cyphra_sync.py', 'server/cyphra-sync.service')
 EXCLUDED_DIRECTORIES = {'build', 'cache', 'node_modules', '.venv', 'dist',
