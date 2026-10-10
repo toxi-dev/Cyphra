@@ -55,9 +55,9 @@ def qualify(edition, version):
         metadata['version'] = '0.6.0'
         metadata_path.write_text(json.dumps(metadata))
         profile = scratch / 'profile'
-        profile.mkdir(mode=0o755)
+        profile.mkdir(mode=0o700)
         configuration, cache = profile / 'config', profile / 'cache'
-        configuration.mkdir(); cache.mkdir()
+        configuration.mkdir(mode=0o700); cache.mkdir(mode=0o700)
         if os.getuid() == 0:
             for directory in (profile, configuration, cache):
                 os.chown(directory, 65534, 65534)
@@ -86,7 +86,7 @@ def qualify(edition, version):
                 if process.poll() is not None:
                     raise RuntimeError('Native Gecko exited during release qualification startup.')
                 time.sleep(.1)
-        driver = Marionette(host='127.0.0.1', port=port, socket_timeout=60)
+        driver = Marionette(host='127.0.0.1', port=port, socket_timeout=720)
         driver.start_session(); driver.set_context(driver.CONTEXT_CHROME); driver.timeout.script = 660
         initial = async_call(driver, '''
           const {GitHubUpdates}=ChromeUtils.importESModule('resource://cyphra/modules/github-updates.sys.mjs');
@@ -163,7 +163,7 @@ def qualify(edition, version):
         print(f'PASS {edition}: last-minute tampering refused, disposable credentials removed; no installation or GitHub changes.', flush=True)
     finally:
         if driver:
-            try: driver.quit()
+            try: driver.execute_script('Services.startup.quit(Components.interfaces.nsIAppStartup.eForceQuit);')
             except Exception: pass
         if process and process.poll() is None:
             try:
@@ -175,9 +175,10 @@ def qualify(edition, version):
 
 
 def main():
+    metadata = json.loads((ROOT / 'cyphra.json').read_text())
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--edition', choices=['team', 'public', 'both'], default='both')
-    parser.add_argument('--version', default='0.7.0')
+    parser.add_argument('--edition', choices=['team', 'public', 'both'], default=metadata.get('edition', 'team'))
+    parser.add_argument('--version', default=metadata['version'])
     arguments = parser.parse_args()
     for edition in (['team', 'public'] if arguments.edition == 'both' else [arguments.edition]):
         qualify(edition, arguments.version)

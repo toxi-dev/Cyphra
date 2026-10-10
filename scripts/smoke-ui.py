@@ -25,6 +25,8 @@ MODE = os.environ.get('CYPHRA_TEST_MODE', METADATA['defaultMode'])
 assert MODE in ('work', 'personal'), 'CYPHRA_TEST_MODE must be work or personal.'
 STAGE = ROOT / 'build/linux/Cyphra' if EDITION == 'team' else ROOT / 'build/public/linux/Cyphra'
 ENGINE_VERSION = json.loads((ROOT / 'engine-lock.json').read_text())['geckoVersion']
+COMPOSITOR = os.environ.get('CYPHRA_TEST_COMPOSITOR') or shutil.which('xcompmgr')
+assert COMPOSITOR and Path(COMPOSITOR).is_file(), 'Native popup qualification requires xcompmgr (or CYPHRA_TEST_COMPOSITOR path).'
 scratch = Path(tempfile.mkdtemp(prefix='cyphra-ui-native-'))
 child = None
 driver = None
@@ -110,7 +112,7 @@ def settings_tab(title):
     button('#cyphra-settings-content [role="tab"]', title)
 
 def setting(label):
-    return script('return [...document.querySelectorAll("#cyphra-settings-content label")].find(node=>node.textContent.trim()===arguments[0])?.querySelector("input,select");', label)
+    return script('return [...document.querySelectorAll("#cyphra-settings-content label")].find(node=>(node.firstChild?.nodeType===Node.TEXT_NODE?node.firstChild.textContent.trim():node.textContent.trim())===arguments[0])?.querySelector("input,select");', label)
 
 def toolbox_state():
     return script('const {DevToolsShim}=ChromeUtils.importESModule("chrome://devtools-startup/content/DevToolsShim.sys.mjs"); const box=DevToolsShim.getToolboxForTab(gBrowser.selectedTab);return {ready:!!box?.isReady,tool:box?.currentToolId};')
@@ -144,6 +146,7 @@ try:
     (profile / 'user.js').write_text(f'user_pref("marionette.port",{port});\nuser_pref("browser.sessionstore.resume_from_crash",false);\n')
     environment = dict(os.environ)
     environment['CYPHRA_MODE'] = MODE
+    environment['CYPHRA_TEST_COMPOSITOR'] = COMPOSITOR
     for key in list(environment):
         if key.startswith('MOZ_DISABLE_'): del environment[key]
     environment['MOZ_CRASHREPORTER_DISABLE'] = '1'
@@ -158,7 +161,7 @@ try:
     command = ['xvfb-run','-a','-s','-screen 0 1440x940x24',str(runtime / 'librewolf'),'-app',str(runtime / 'browser/application.ini'),'-no-remote','-profile',str(profile),'--marionette','-remote-allow-system-access','--width','1440','--height','940']
     # Native GTK popup rendering needs a desktop window manager. It runs only
     # on this private Xvfb display and exits with the browser test.
-    command[5:5] = ['sh', '-c', 'openbox --config-file /etc/xdg/openbox/rc.xml >/dev/null 2>&1 & cyphra_test_wm=$!; "$@"; cyphra_test_result=$?; kill "$cyphra_test_wm" 2>/dev/null; exit "$cyphra_test_result"', 'cyphra-ui-desktop']
+    command[4:4] = ['sh', '-c', 'openbox --config-file /etc/xdg/openbox/rc.xml >/dev/null 2>&1 & cyphra_test_wm=$!; "$CYPHRA_TEST_COMPOSITOR" -n >/dev/null 2>&1 & cyphra_test_compositor=$!; "$@"; cyphra_test_result=$?; kill "$cyphra_test_wm" "$cyphra_test_compositor" 2>/dev/null; exit "$cyphra_test_result"', 'cyphra-ui-desktop']
     if os.getuid() == 0: command = ['runuser','-u','nobody','--'] + command
     def launch():
         global child, driver
@@ -246,7 +249,38 @@ try:
         open_panel('cyphra-tools','cyphra-tools-panel'); button('.cyphra-page-tools button',title)
         wait(lambda: toolbox_state()['ready'] and toolbox_state()['tool']==tool,'native '+tool,timeout=45)
     driver.execute_async_script('const done=arguments[arguments.length-1];const {DevToolsShim}=ChromeUtils.importESModule("chrome://devtools-startup/content/DevToolsShim.sys.mjs");DevToolsShim.getToolboxForTab(gBrowser.selectedTab).destroy().then(()=>done(true)).catch(error=>done({error:String(error)}));')
-    print('PASS: real JSON, UTF-8 Base64, URL conversion and SHA-256; invalid input reports errors, output clears, closing clears input; native Inspector and Network monitor open.',flush=True)
+    print('PASS: real JSON, UTF-8 Base64, URL conversion and SHA-256; invalid input reports errors, output clears, closing clears input; native Inspector, Network monitor and Console open.',flush=True)
+    # These controls are identical in both editions. The public run also
+    # qualifies native page-source, page-information and screenshot workflows.
+    if EDITION == 'public':
+        driver.set_context(driver.CONTEXT_CONTENT)
+        fixture_tab = driver.current_window_handle
+        old_tabs = set(driver.window_handles)
+        driver.set_context(driver.CONTEXT_CHROME)
+        open_panel('cyphra-tools','cyphra-tools-panel')
+        button('.cyphra-page-tools button','Page source')
+        wait(lambda: script('return gBrowser.selectedBrowser.currentURI.spec;').startswith('view-source:'), 'native page source tab')
+        source_tab = wait(lambda: list(set(driver.window_handles)-old_tabs), 'native page source content handle')[0]
+        driver.switch_to_window(source_tab)
+        driver.set_context(driver.CONTEXT_CONTENT)
+        wait(lambda: 'Native tools fixture' in script('return document.body?.textContent || "";'), 'real page source text')
+        driver.set_context(driver.CONTEXT_CHROME)
+        script('gBrowser.removeTab(gBrowser.selectedTab);')
+        driver.switch_to_window(fixture_tab)
+        normal_window = driver.current_chrome_window_handle
+        old_windows = set(driver.chrome_window_handles)
+        open_panel('cyphra-tools','cyphra-tools-panel')
+        button('.cyphra-page-tools button','Page information')
+        page_info = wait(lambda: list(set(driver.chrome_window_handles)-old_windows), 'native page information window')[0]
+        driver.switch_to_window(page_info)
+        wait(lambda: script('return document.documentURI;') == 'chrome://browser/content/pageinfo/pageInfo.xhtml', 'native page information document')
+        driver.close_chrome_window(); driver.switch_to_window(normal_window)
+        open_panel('cyphra-tools','cyphra-tools-panel')
+        button('.cyphra-page-tools button','Screenshot')
+        wait(lambda: script('const {ScreenshotsUtils}=ChromeUtils.importESModule("moz-src:///browser/components/screenshots/ScreenshotsUtils.sys.mjs");return ScreenshotsUtils.getUIPhase(gBrowser.selectedBrowser);') == 1, 'native screenshot selection overlay')
+        script('const {ScreenshotsUtils}=ChromeUtils.importESModule("moz-src:///browser/components/screenshots/ScreenshotsUtils.sys.mjs");ScreenshotsUtils.cancel(gBrowser.selectedBrowser,"Escape");')
+        wait(lambda: script('const {ScreenshotsUtils}=ChromeUtils.importESModule("moz-src:///browser/components/screenshots/ScreenshotsUtils.sys.mjs");return ScreenshotsUtils.getUIPhase(gBrowser.selectedBrowser);') == 0, 'native screenshot overlay closes')
+        print('PASS: Tools opens actual source text, native Page information and native screenshot selection UI.',flush=True)
     open_panel('cyphra-settings','cyphra-settings-panel')
     assert script('return [...document.querySelectorAll(".cyphra-settings-tabs button")].map(n=>n.textContent);') == ['General','Home','Data','Privacy','DNS','Device sync','Updates']
     settings_tab('General')
@@ -254,7 +288,7 @@ try:
     assert tabs[0] == {'selected':'true','tabIndex':0,'panel':False} and all(row == {'selected':'false','tabIndex':-1,'panel':True} for row in tabs[1:])
     script('arguments[0].click();',setting('Ask where to save downloads'))
     assert script('return Services.prefs.getBoolPref("browser.download.useDownloadDir");') is True
-    script('const node=[...document.querySelectorAll("#cyphra-settings-content label")].find(n=>n.textContent.trim()==="Toolbar density").querySelector("select");node.value="0";node.dispatchEvent(new Event("change",{bubbles:true}));')
+    script('const node=arguments[0];node.value="0";node.dispatchEvent(new Event("change",{bubbles:true}));',setting('Toolbar density'))
     assert script('return Services.prefs.getIntPref("browser.uidensity");') == 0
     settings_tab('Privacy'); script('arguments[0].click();',setting('Keep browsing history'))
     assert script('return Services.prefs.getBoolPref("places.history.enabled");') is True

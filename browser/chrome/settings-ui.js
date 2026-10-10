@@ -158,7 +158,7 @@ var CyphraSettings = (() => {
     function refreshDNS() {
       const info = dnsAPI().info(); resolver.value = info.selection; customURI.value = info.selection === 'custom' ? info.uri : '';
       showCustom();
-      dnsInfo.textContent = info.selection === 'system' ? 'Using this device’s system DNS settings. DNS transport is controlled by the operating system.' : 'Encrypted DNS: ' + info.uri;
+      dnsInfo.textContent = info.mode === 5 ? 'Using this device’s system DNS settings. DNS transport is controlled by the operating system.' : info.encryptedOnly ? 'Encrypted DNS: ' + info.uri : 'Native DNS settings allow system fallback. Select and save an explicit DNS choice above.';
     }
     const sync = group('Device sync');
     sync.append(element('p', {}, 'Manually sync bookmarks, selected preferences and site Shield exceptions. Data is encrypted before it reaches your server.'));

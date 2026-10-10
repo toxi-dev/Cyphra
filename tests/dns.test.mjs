@@ -34,6 +34,9 @@ test('DNS choices require explicit system mode or a complete credential-free HTT
   assert.equal(DNS.configure({selection:'system'}).mode,5);
   assert.equal(values.get('network.trr.uri'),'');
   assert.equal(DNS.configure({selection:'custom',uri:'https://resolver.example/dns-query'}).mode,3);
+  assert.equal(DNS.configure({selection:'custom',uri:'https://dns.toxitechnetwork.org/dns-query'}).selection,'custom');
+  values.set('cyphra.dns.selection','quad9');
+  assert.equal(DNS.info().selection,'toxitech','A stale choice must not misreport the active resolver.');
   const saved=[...values]; assert.throws(()=>DNS.configure({selection:'custom',uri:'http://unsafe.example/dns-query'}));
   assert.deepEqual([...values],saved);
 });

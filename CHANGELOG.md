@@ -11,3 +11,5 @@ First separate public edition, based on the Cyphra Gecko implementation.
 - Separate anonymous GitHub updates, public release signing key and installation location.
 - Verified Gecko 157.0.1 engine and authenticated offline Mozilla OneCRL snapshot.
 - Preserved native browser tools, Brave-only search, local filtering and optional manual security news.
+- Fixed native System DNS diagnostics and retained custom resolver labels after saving.
+- Fixed Inspector/Network/Console tool selection and cleanup after page navigation.

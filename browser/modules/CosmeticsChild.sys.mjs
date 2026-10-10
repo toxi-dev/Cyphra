@@ -6,7 +6,7 @@ const MAX_NODES = 20000;
 
 export class CyphraCosmeticsChild extends JSWindowActorChild {
   async handleEvent(event) {
-    if (event.type !== 'DOMContentLoaded' || !event.isTrusted) return;
+    if (this._destroyed || event.type !== 'DOMContentLoaded' || !event.isTrusted) return;
     const document = this.document;
     if (!document || event.target !== document || !/^https?:$/.test(document.location.protocol)) return;
     if (this._document === document) return;
@@ -15,7 +15,7 @@ export class CyphraCosmeticsChild extends JSWindowActorChild {
     this._ids = new Set();
     this.collect(document);
     await this.refresh();
-    if (this.document !== document) return;
+    if (this._destroyed || this.document !== document) return;
     const MutationObserver = this.contentWindow?.MutationObserver;
     if (MutationObserver) {
       this._observer = new MutationObserver(records => {
@@ -61,11 +61,13 @@ export class CyphraCosmeticsChild extends JSWindowActorChild {
   }
 
   scheduleRefresh() {
-    if (this._timer || !this._document) return;
-    this._timer = this.contentWindow.setTimeout(() => {
-      this._timer = null;
-      this.refresh();
-    }, 150);
+    if (this._destroyed || this._timer || !this._document) return;
+    try {
+      this._timer = this.contentWindow.setTimeout(() => {
+        this._timer = null;
+        this.refresh();
+      }, 150);
+    } catch { /* The content window can disappear during navigation. */ }
   }
 
   async refresh() {
@@ -104,9 +106,16 @@ export class CyphraCosmeticsChild extends JSWindowActorChild {
   }
 
   didDestroy() {
-    this._observer?.disconnect();
-    try { if (this._timer) this.contentWindow?.clearTimeout(this._timer); } catch {}
+    this._destroyed = true;
+    this._queued = false;
     this._document = null;
+    try { this._observer?.disconnect(); } catch {}
+    try { if (this._timer) this.contentWindow?.clearTimeout(this._timer); } catch {}
+    this._observer = null;
+    this._timer = null;
+    this._style = null;
+    this._sheet = null;
+    this._css = null;
     this._classes?.clear();
     this._ids?.clear();
   }

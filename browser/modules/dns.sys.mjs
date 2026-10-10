@@ -20,7 +20,14 @@ export const DNS = Object.freeze({
   info() {
     const mode = Services.prefs.getIntPref('network.trr.mode', 5);
     const uri = Services.prefs.getStringPref('network.trr.uri', '');
-    const selection = mode === 5 ? 'system' : Object.entries(DNS_PROVIDERS).find(([, value]) => value === uri)?.[0] || 'custom';
+    let selection = mode === 5 ? 'system' : Object.entries(DNS_PROVIDERS).find(([, value]) => value === uri)?.[0] || 'custom';
+    const saved = Services.prefs.getStringPref('cyphra.dns.selection', '');
+    if (mode === 3) {
+      try {
+        const configured = validateDNSChoice({ selection: saved, uri });
+        if (configured.mode === mode && configured.uri === uri) selection = saved;
+      } catch { /* Legacy or manually edited preferences derive from actual DNS. */ }
+    }
     return { selection, mode, uri: mode === 5 ? '' : uri, encryptedOnly: mode === 3 };
   },
   configure(choice) {
@@ -85,6 +92,7 @@ export function readResponse(bytes, id) {
 export async function testDNS(win, hostname) {
   const config = DNS.info();
   if (config.mode === 5) return testSystemDNS(win, hostname);
+  if (config.mode !== 3) throw new Error('Save a DNS choice before testing this advanced DNS mode.');
   const endpoint = validateDNSChoice({selection:'custom',uri:config.uri}).uri;
   const id = win.crypto.getRandomValues(new Uint16Array(1))[0];
   const query = makeQuery(hostname, id);
@@ -124,7 +132,10 @@ async function testSystemDNS(win, hostname) {
         win.clearTimeout(timeout); if (settled) return; settled = true;
         if (!Components.isSuccessCode(status)) { reject(new Error('System DNS could not resolve this hostname.')); return; }
         const addresses = [];
-        try { while (record.hasMore() && addresses.length < 32) addresses.push(record.getNextAddrAsString()); }
+        try {
+          const addressRecord = record.QueryInterface(Components.interfaces.nsIDNSAddrRecord);
+          while (addressRecord.hasMore() && addresses.length < 32) addresses.push(addressRecord.getNextAddrAsString());
+        }
         catch (error) { reject(error); return; }
         if (!addresses.length) { reject(new Error('System DNS returned no addresses.')); return; }
         resolve({hostname:query.host,addresses,milliseconds:Math.round(win.performance.now()-start),endpoint:'System DNS'});

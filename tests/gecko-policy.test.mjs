@@ -546,3 +546,23 @@ test('trusted active background exceptions do not bypass telemetry or persist bl
     privacy.forgetContext(43);assert.deepEqual(privacy.recentBlocks(43),[]);
   } finally {local.dispose();}
 });
+
+test('navigation teardown clears cosmetic identifiers even after the content realm dies', async () => {
+  globalThis.JSWindowActorChild = class {};
+  const { CyphraCosmeticsChild } = await import('../browser/modules/CosmeticsChild.sys.mjs');
+  delete globalThis.JSWindowActorChild;
+  const actor = new CyphraCosmeticsChild();
+  actor._document = {};
+  actor._classes = new Set(['private-page-class']);
+  actor._ids = new Set(['private-page-id']);
+  let timers = 0;
+  actor.contentWindow = { setTimeout() { timers++; return 1; }, clearTimeout() { throw new Error('dead content realm'); } };
+  actor.scheduleRefresh();
+  actor._observer = new Proxy({}, { get() { throw new Error('dead observer realm'); } });
+  actor._queued = true;
+  assert.doesNotThrow(() => actor.didDestroy());
+  assert.equal(actor._classes.size + actor._ids.size, 0);
+  assert.equal(actor._document, null);
+  actor.scheduleRefresh();
+  assert.equal(timers, 1, 'A queued query must not schedule work after navigation teardown.');
+});
