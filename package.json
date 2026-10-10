@@ -1,6 +1,6 @@
 {
   "name": "cyphra-gecko-tools",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "license": "MPL-2.0",
   "description": "Build tools for Cyphra's native Gecko distribution; no Node runtime ships",

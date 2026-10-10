@@ -111,6 +111,33 @@ try:
     driver.set_context(driver.CONTEXT_CONTENT)
     print('Home content initial:', json.dumps(driver.execute_script('return {uri:document.documentURI,text:document.body.innerText.slice(-600)};')), flush=True)
     wait(lambda: driver.execute_script('return document.getElementById("cyphra-home-pins").children.length;'), 'native bookmark rendering')
+    # XHTML is parsed as XML: an unqualified <svg> can exist without painting.
+    rendering = driver.execute_async_script('''
+      const done=arguments[arguments.length-1];
+      (async()=>{
+        const icons=['.search-leading svg','.search-submit svg','#cyphra-home-refresh svg'].map(selector=>{
+          const icon=document.querySelector(selector);
+          if (!icon || !(icon instanceof SVGSVGElement)) return {selector,rendered:false};
+          const box=icon.getBBox(),rect=icon.getBoundingClientRect(),style=getComputedStyle(icon);
+          return {selector,namespace:icon.namespaceURI,
+            rendered:box.width>0&&box.height>0&&rect.width>0&&rect.height>0
+              &&style.display!=='none'&&style.visibility==='visible'&&Number(style.opacity)>0
+              &&style.stroke!=='none'&&parseFloat(style.strokeWidth)>0,
+            geometry:{width:box.width,height:box.height}};
+        });
+        const logo=document.querySelector('.brand img');
+        await logo.decode();
+        const canvas=document.createElement('canvas');canvas.width=24;canvas.height=24;
+        const context=canvas.getContext('2d');context.drawImage(logo,0,0,24,24);
+        const pixels=context.getImageData(0,0,24,24).data;
+        let paintedPixels=0;for(let i=3;i<pixels.length;i+=4) if(pixels[i]>0) paintedPixels++;
+        done({icons,logo:{loaded:logo.complete&&logo.naturalWidth>0&&logo.naturalHeight>0,paintedPixels}});
+      })().catch(error=>done({error:String(error)}));
+    ''')
+    assert 'error' not in rendering, rendering
+    assert len(rendering['icons']) == 3 and all(icon.get('rendered') and icon['namespace'] == 'http://www.w3.org/2000/svg' for icon in rendering['icons']), rendering
+    assert rendering['logo']['loaded'] and rendering['logo']['paintedPixels'] > 0, rendering
+    print('PASS: both search magnifiers and briefing refresh have native SVG geometry; the unchanged logo paints.', json.dumps(rendering), flush=True)
     state = driver.execute_script('return {scripts:document.scripts.length,bridge:typeof window.cyphra,search:document.querySelector("form").action,submit:document.querySelector(".search-submit").textContent.trim(),icon:!!document.querySelector(".search-submit svg"),pins:[...document.querySelectorAll("#cyphra-home-pins a")].map(a=>({title:a.textContent,url:a.href})),news:document.getElementById("cyphra-home-articles").children.length,status:document.getElementById("cyphra-home-news-status").textContent};')
     assert state['scripts'] == 0 and state['bridge'] == 'undefined' and state['search'] == 'https://search.brave.com/search' and not state['submit'] and state['icon'], state
     assert any(pin['url'] == 'https://example.com/team' for pin in state['pins']), state
@@ -142,7 +169,8 @@ try:
     driver.execute_script('SidebarController.hide();')
     driver.set_context(driver.CONTEXT_CONTENT)
     if LIVE_NEWS:
-        driver.find_element('id','cyphra-home-refresh').click()
+        # Exercise the SVG target inside the button, including actor delegation.
+        driver.find_element('css selector','#cyphra-home-refresh svg').click()
         wait(lambda: driver.execute_script('return document.getElementById("cyphra-home-news-status").textContent.startsWith("Last refreshed ");'), 'actual RSS refresh', timeout=40)
         news = driver.execute_script('return {articles:[...document.querySelectorAll("#cyphra-home-articles a")].map(a=>({title:a.querySelector(".article-title").textContent,url:a.href})),status:document.getElementById("cyphra-home-news-status").textContent,errors:document.getElementById("cyphra-home-news-errors").textContent,scripts:document.scripts.length};')
         assert news['articles'] and len(news['articles']) <= 8 and news['scripts'] == 0, news

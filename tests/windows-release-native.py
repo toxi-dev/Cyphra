@@ -371,7 +371,6 @@ def main():
         assert (application / 'Cyphra.exe').is_file() and engine.is_file()
         installed = json.loads((application / 'cyphra.json').read_text())
         assert installed['edition'] == edition and installed['version'] == version
-        proof['checks'].append('silent-actual-installer-native-edition-identity')
 
         server = HTTPServer(('127.0.0.1', 0), Page)
         thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
@@ -383,6 +382,43 @@ def main():
         subprocess.run([str(launcher), url + 'default'], env=environment, timeout=20, check=True)
         drivers[default] = connect(ports[default])
         assert mode_info(drivers[default])['mode'] == default
+        driver = drivers[default]
+        try:
+            driver.set_context(driver.CONTEXT_CONTENT)
+            driver.navigate('resource://cyphra-home/newtab.xhtml')
+            rendering = proof['homeIconRendering'] = async_call(driver, '''
+              const selectors=['.search-leading svg','.search-submit svg','#cyphra-home-refresh svg'];
+              const icons=selectors.map(selector=>{
+                const icon=document.querySelector(selector);
+                if(!icon||!(icon instanceof SVGSVGElement))return {selector,namespace:icon?.namespaceURI||null,rendered:false};
+                const geometry=icon.getBBox(),box=icon.getBoundingClientRect(),style=getComputedStyle(icon);
+                return {selector,namespace:icon.namespaceURI,
+                  rendered:geometry.width>0&&geometry.height>0&&box.width>0&&box.height>0
+                    &&style.display!=='none'&&style.visibility==='visible'&&Number(style.opacity)>0
+                    &&style.stroke!=='none'&&parseFloat(style.strokeWidth)>0,
+                  geometry:{width:geometry.width,height:geometry.height},box:{width:box.width,height:box.height}};
+              });
+              const logo=document.querySelector('.brand img');
+              await logo.decode();
+              const box=logo.getBoundingClientRect(),style=getComputedStyle(logo);
+              const canvas=document.createElement('canvas');canvas.width=24;canvas.height=24;
+              const context=canvas.getContext('2d');context.drawImage(logo,0,0,24,24);
+              const pixels=context.getImageData(0,0,24,24).data;
+              let paintedPixels=0;for(let index=3;index<pixels.length;index+=4)if(pixels[index]>0)paintedPixels++;
+              return {iconCount:document.querySelectorAll('svg').length,icons,
+                logo:{loaded:logo.complete&&logo.naturalWidth>0&&logo.naturalHeight>0,paintedPixels,
+                  rendered:box.width>0&&box.height>0&&style.display!=='none'&&style.visibility==='visible'&&Number(style.opacity)>0,
+                  box:{width:box.width,height:box.height}}};
+            ''')
+            assert rendering['iconCount'] == 3 and len(rendering['icons']) == 3 \
+                and all(icon.get('rendered') and icon['namespace'] == 'http://www.w3.org/2000/svg' \
+                        for icon in rendering['icons']), 'The native Home SVG icons did not render.'
+            assert rendering['logo']['loaded'] and rendering['logo']['rendered'] \
+                and rendering['logo']['paintedPixels'] > 0, 'The native Home logo did not decode and paint.'
+            driver.navigate(url + 'default')
+        finally:
+            driver.set_context(driver.CONTEXT_CHROME)
+        proof['checks'].append('silent-actual-installer-native-edition-identity')
         other = 'personal' if default == 'work' else 'work'
         assert async_call(drivers[default], "return await ChromeUtils.importESModule('resource://cyphra/modules/modes.sys.mjs').Modes.open(arguments[0]);", [other])['opened'] == other
         drivers[other] = connect(ports[other])

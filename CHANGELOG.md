@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1 — 10 October 2026
+
+- Fixed the new-tab magnifying-glass and refresh icons in XHTML.
+- Native rendering checks verify SVG geometry and the existing logo.
+- Added hosted Windows qualification of real install, isolated modes, anonymous GitHub checks, reinstall and uninstall.
+
 ## 0.7.0 — 10 October 2026
 
 First separate public edition, based on the Cyphra Gecko implementation.

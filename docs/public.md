@@ -6,8 +6,8 @@ An independent, open-source Gecko browser for Windows and Linux. Cyphra has no C
 
 Download a complete package from [Cyphra releases](https://github.com/toxi-dev/Cyphra/releases).
 
-- Windows x64: run `Cyphra-Public-0.7.0-win-x64.exe`, or extract the entire Windows ZIP and run `Cyphra.exe`.
-- Linux x64: extract `Cyphra-Public-0.7.0-linux-x64.tar.gz`, then run `./Cyphra/cyphra` as your desktop account. GTK/NSS desktop libraries, Python 3.9+ and util-linux `flock` are required.
+- Windows x64: run `Cyphra-Public-0.7.1-win-x64.exe`, or extract the entire Windows ZIP and run `Cyphra.exe`.
+- Linux x64: extract `Cyphra-Public-0.7.1-linux-x64.tar.gz`, then run `./Cyphra/cyphra` as your desktop account. GTK/NSS desktop libraries, Python 3.9+ and util-linux `flock` are required.
 
 The public edition installs separately from Cyphra Team and does not use its profiles, sync server, update credentials, or releases.
 
@@ -47,7 +47,7 @@ python3 scripts/build-linux.py --edition public
 python3 scripts/build-source.py --edition public
 ```
 
-Output is in `dist/0.7.0/public/`. The release signer requires the separately held maintainer key; no private signing key is present here.
+Output is in `dist/0.7.1/public/`. The release signer requires the separately held maintainer key; no private signing key is present here.
 
 ## Privacy and licenses
 
