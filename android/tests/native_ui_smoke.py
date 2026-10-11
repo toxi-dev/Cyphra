@@ -20,10 +20,17 @@ def nodes():
     return list(ET.fromstring(shell('cat /sdcard/cyphra-window.xml')).iter('node'))
 
 def click(label):
-    for node in nodes():
-        if node.get('text','').casefold()==label.casefold() or node.get('content-desc')==label or node.get('hint')==label:
-            x1,y1,x2,y2=map(int,re.findall(r'\d+',node.get('bounds')))
-            shell(f'input tap {(x1+x2)//2} {(y1+y2)//2}');time.sleep(.4);return
+    for attempt in range(2):
+        tree=nodes()
+        for node in tree:
+            if node.get('text','').casefold()==label.casefold() or node.get('content-desc')==label or node.get('hint')==label:
+                x1,y1,x2,y2=map(int,re.findall(r'\d+',node.get('bounds')))
+                shell(f'input tap {(x1+x2)//2} {(y1+y2)//2}');time.sleep(.4);return
+        if attempt==0:
+            bounds=[tuple(map(int,re.findall(r'\d+',n.get('bounds')))) for n in tree]
+            width=max(b[2] for b in bounds);height=max(b[3] for b in bounds)
+            shell(f'input swipe {width//2} {int(height*.75)} {width//2} {int(height*.35)} 300')
+            time.sleep(.3)
     raise AssertionError('Native control missing: '+label)
 
 def ready():
