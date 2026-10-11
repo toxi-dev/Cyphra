@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--edition', choices=('team','public'), required=True)
-    parser.add_argument('--version', default='0.1.0')
-    parser.add_argument('--version-code', type=int, default=2)
+    parser.add_argument('--version', default='0.1.1')
+    parser.add_argument('--version-code', type=int, default=3)
     parser.add_argument('--dist', type=Path, required=True)
     parser.add_argument('--key', type=Path, required=True)
     args = parser.parse_args()

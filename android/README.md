@@ -1,6 +1,6 @@
 # Cyphra for Android
 
-The Android application uses native Java chrome and pinned Mozilla GeckoView **157.0.20261005135250** (Gecko 157.0.1). It contains no Chromium, Electron or Android WebView runtime. Android version **0.1.0** is independent of the desktop version.
+The Android application uses native Java chrome and pinned Mozilla GeckoView **157.0.20261005135250** (Gecko 157.0.1). It contains no Chromium, Electron or Android WebView runtime. Android version **0.1.1** is independent of the desktop version.
 
 The public APK installs independently of the desktop browser:
 
@@ -12,11 +12,11 @@ Android 10/API 29 or later is required. The universal APK contains arm64-v8a, ar
 
 ## Profiles and browsing
 
-Work and Personal have separate app-private Gecko profiles, cookies, local storage, bookmarks, ordinary tabs and settings. Android runs **one profile at a time**: switching closes the current Gecko runtime, waits for its exit and restores the other profile. This avoids conflicts in GeckoView's package-wide helper services. Private tabs are never saved to history or restored; Android screenshots are blocked while a private tab is selected. Work disables Android Recents screenshots and starts with history recording off.
+Work and Personal have separate app-private Gecko profiles, cookies, local storage, bookmarks, ordinary tabs and settings. Android runs **one profile at a time**: switching closes the current Gecko runtime, waits for its exit and restores the other profile. This avoids conflicts in GeckoView's package-wide helper services. The last selected ordinary tab and native Home tabs are restored after restart; browsing sessions saved by 0.1.0 remain compatible. Private tabs are never saved to history or restored; Android screenshots are blocked while a private tab is selected. Work disables Android Recents screenshots and starts with history recording off.
 
 Work uses stricter request filtering, HTTPS-only mode, fingerprint resistance and disabled WebGL. Personal uses balanced filtering, cookie partitioning and WebGL compatibility. Core TLS validation and telemetry policy remain enforced. Work may need per-site Shields exceptions for sites that depend on third-party scripts.
 
-Cyphra Shields uses the bundled, authenticated EasyList/EasyPrivacy snapshot and shows actual cancelled requests. Native tracking events are displayed separately to avoid counting a cancellation twice. Site exceptions do not enable known telemetry endpoints. The home screen is native and offline; security-reading links open only when selected. Brave Search is the only search provider. Tabs, bookmarks, downloads, desktop-site requests, website permission dialogs and local JSON/Base64/URL/SHA-256 tools are included.
+Cyphra Shields uses the bundled, authenticated EasyList/EasyPrivacy snapshot and shows actual cancelled requests. Native tracking events are displayed separately to avoid counting a cancellation twice. The dark native Shields sheet updates counters in place so live traffic does not reset its controls or scroll position. Site exceptions do not enable known telemetry endpoints. The home screen is native and offline; security-reading links open only when selected. Brave Search is the only search provider. Tabs, bookmarks, downloads, desktop-site requests, website permission dialogs and local JSON/Base64/URL/SHA-256 tools are included.
 
 ## DNS, sync and updates
 
@@ -41,6 +41,6 @@ Release signing configuration is an external, owner-readable JSON file with `sto
 
 Cyphra initializes no analytics, account or crash-upload SDK. Gecko reporting preferences are set before browsing and critical values are read back before navigation is enabled. The request blocker verifies its local snapshot before allowing navigation. Optional update/sync requests run only when selected. Android and other installed applications have their own network behavior outside Cyphra's control.
 
-This first mobile release does not port the desktop offline OneCRL maintenance system or desktop developer inspector. Passkeys/WebAuthn are disabled in this initial Android release so the APK can exclude GeckoView’s proprietary Google Play FIDO SDK dependency. It disables remote Safe Browsing lookups and DRM component downloads; it does not claim a phishing/malware reputation feed or protected-video compatibility. Endpoint blocking cannot stop every tracking technique. See the release validation report for actual emulator checks and their physical-device limits.
+This mobile release does not port the desktop offline OneCRL maintenance system or desktop developer inspector. Passkeys/WebAuthn are disabled so the APK can exclude GeckoView’s proprietary Google Play FIDO SDK dependency. It disables remote Safe Browsing lookups and DRM component downloads; it does not claim a phishing/malware reputation feed or protected-video compatibility. Endpoint blocking cannot stop every tracking technique. See the release validation report for actual emulator checks and their physical-device limits.
 
 Cyphra source and Gecko retain MPL-2.0; bundled filters retain their notices and CC-BY-SA-3.0 attribution. Native engine source revision is `737ec77d798755890b062aab541a90d6c75afd19`: [Mozilla source](https://hg.mozilla.org/releases/mozilla-release/rev/737ec77d798755890b062aab541a90d6c75afd19). GeckoView Java source is available beside the pinned artifact at [Mozilla Maven](https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/157.0.20261005135250/). AndroidX components use Apache-2.0. Matching source, notices and checksums must accompany distributed APKs.

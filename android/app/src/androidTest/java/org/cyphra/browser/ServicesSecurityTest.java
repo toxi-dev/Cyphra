@@ -29,6 +29,8 @@ public final class ServicesSecurityTest extends Instrumentation {
         JSONObject proof = new JSONObject();
         try {
             nativeCheck("mode-bound bookmarks, tabs and history", this::testModeBoundBookmarksTabsAndHistory, checks);
+            nativeCheck("ordinary tab selection, native home and legacy session compatibility", this::testOrdinaryTabSelectionAndLegacySessionStorage, checks);
+            nativeCheck("Android permission results stay bound to their original website request", this::testAndroidPermissionCallbacksStayBound, checks);
             nativeCheck("pinned P-256 manifest, tamper and cross-edition refusal", this::testPinnedSignedManifestAndCrossEditionRefusal, checks);
             nativeCheck("repository API and GitHub asset CDN allowlists", this::testOnlyRepositoryApiAndGitHubAssetCdnAllowed, checks);
             nativeCheck("Android Keystore credentials encrypted and bound to mode", this::testCredentialsAreEncryptedAndBoundToMode, checks);
@@ -136,6 +138,95 @@ public final class ServicesSecurityTest extends Instrumentation {
         personal.clearHistory(); assertEquals(0, personal.history().length());
         rejects(() -> new BrowserStore(target, "other", BuildConfig.EDITION));
         rejects(() -> work.addBookmark("Script", "javascript:alert(1)"));
+    }
+
+    public void testOrdinaryTabSelectionAndLegacySessionStorage() throws Exception {
+        BrowserStore store = new BrowserStore(target, "work", BuildConfig.EDITION);
+        // Existing releases stored either URL strings or title/URL objects,
+        // without a selected-tab preference. They still open the first tab.
+        target.getSharedPreferences("cyphra-data-work", Context.MODE_PRIVATE).edit()
+            .putString("tabs", new JSONArray().put("https://example.org/legacy")
+                .put(new JSONObject().put("url", "about:blank").put("title", "New tab")).toString())
+            .remove("tabs-selected").commit();
+        assertEquals(2, store.tabs().length()); assertEquals(0, store.selectedTab());
+
+        JSONArray input = new JSONArray()
+            .put(new JSONObject().put("url", "https://example.org/first").put("title", "First"))
+            .put("javascript:alert(1)")
+            .put(new JSONObject().put("url", "https://example.org/private").put("private", true))
+            .put(new JSONObject().put("url", "about:blank").put("title", "New tab"))
+            .put("https://example.org/last");
+        store.saveTabs(input, 3);
+        BrowserStore reopened = new BrowserStore(target, "work", BuildConfig.EDITION);
+        assertEquals(3, reopened.tabs().length()); assertEquals(1, reopened.selectedTab());
+        assertEquals("about:blank", reopened.tabs().getJSONObject(reopened.selectedTab()).getString("url"));
+        assertFalse(reopened.tabs().toString().contains("example.org/private"));
+        assertEquals(0, new BrowserStore(target, "personal", BuildConfig.EDITION).tabs().length());
+
+        store.saveTabs(input, 999); assertEquals(2, store.selectedTab());
+        store.saveTabs(input, -1); assertEquals(0, store.selectedTab());
+        store.saveTabs(new JSONArray(), 4); assertEquals(0, store.tabs().length()); assertEquals(0, store.selectedTab());
+    }
+
+    public void testAndroidPermissionCallbacksStayBound() throws Exception {
+        Throwable[] failure={null};
+        runOnMainSync(()->{try{checkAndroidPermissionCallbacksStayBound();}catch(Throwable error){failure[0]=error;}});
+        if(failure[0] instanceof Exception)throw (Exception)failure[0];
+        if(failure[0]!=null)throw new AssertionError("Native permission callback check failed.",failure[0]);
+    }
+    private void checkAndroidPermissionCallbacksStayBound() throws Exception {
+        String denied=null;
+        for(String permission:new String[]{android.Manifest.permission.CAMERA,android.Manifest.permission.RECORD_AUDIO,
+            android.Manifest.permission.ACCESS_FINE_LOCATION,android.Manifest.permission.ACCESS_COARSE_LOCATION})
+            if(target.checkSelfPermission(permission)!=android.content.pm.PackageManager.PERMISSION_GRANTED){denied=permission;break;}
+        if(denied==null)fail("Permission checks require one denied runtime permission in the disposable test profile.");
+        WebPrompts prompts=new WebPrompts(new PermissionTestActivity(target),session->"https://example.org/");
+        PermissionDecision original=new PermissionDecision(),overlap=new PermissionDecision();
+        seedPermissionRequest(prompts,original,denied);
+        prompts.onAndroidPermissionsRequest(null,new String[]{denied},overlap);
+        assertEquals(1,overlap.rejections);assertEquals(0,overlap.grants);
+        assertTrue(permissionField(prompts,"permissionCallback")==original);
+        assertEquals(0,original.rejections);assertEquals(0,original.grants);
+
+        prompts.dismissPending();
+        assertEquals(1,original.rejections);assertTrue((Boolean)permissionField(prompts,"androidPermissionInFlight"));
+        PermissionDecision nextPage=new PermissionDecision();
+        prompts.onAndroidPermissionsRequest(null,new String[]{denied},nextPage);
+        assertEquals(1,nextPage.rejections);assertEquals(0,nextPage.grants);
+        prompts.onRequestPermissionsResult(72,new int[]{android.content.pm.PackageManager.PERMISSION_GRANTED});
+        assertEquals(0,original.grants);assertEquals(0,nextPage.grants);
+        assertFalse((Boolean)permissionField(prompts,"androidPermissionInFlight"));
+        assertEquals(null,permissionField(prompts,"permissionCallback"));assertEquals(null,permissionField(prompts,"requestedAndroidPermissions"));
+
+        PermissionDecision forgedResult=new PermissionDecision();
+        seedPermissionRequest(prompts,forgedResult,denied);
+        prompts.onRequestPermissionsResult(71,new int[]{android.content.pm.PackageManager.PERMISSION_GRANTED});
+        assertTrue(permissionField(prompts,"permissionCallback")==forgedResult);
+        prompts.onRequestPermissionsResult(72,new int[]{android.content.pm.PackageManager.PERMISSION_GRANTED});
+        assertEquals(1,forgedResult.rejections);assertEquals(0,forgedResult.grants);
+        assertFalse((Boolean)permissionField(prompts,"androidPermissionInFlight"));
+
+        PermissionDecision emptyResult=new PermissionDecision();
+        seedPermissionRequest(prompts,emptyResult,denied);
+        prompts.onRequestPermissionsResult(72,new int[0]);
+        assertEquals(1,emptyResult.rejections);assertEquals(0,emptyResult.grants);
+    }
+    private static final class PermissionTestActivity extends Activity {
+        PermissionTestActivity(Context context){attachBaseContext(context);}
+    }
+    private static final class PermissionDecision implements org.mozilla.geckoview.GeckoSession.PermissionDelegate.Callback {
+        int grants,rejections;
+        @Override public void grant(){grants++;}
+        @Override public void reject(){rejections++;}
+    }
+    private static Object permissionField(WebPrompts prompts,String name) throws Exception {
+        java.lang.reflect.Field field=WebPrompts.class.getDeclaredField(name);field.setAccessible(true);return field.get(prompts);
+    }
+    private static void seedPermissionRequest(WebPrompts prompts,PermissionDecision decision,String permission) throws Exception {
+        for(String name:new String[]{"permissionCallback","requestedAndroidPermissions","androidPermissionInFlight"}){
+            java.lang.reflect.Field field=WebPrompts.class.getDeclaredField(name);field.setAccessible(true);
+            field.set(prompts,"permissionCallback".equals(name)?decision:"requestedAndroidPermissions".equals(name)?new String[]{permission}:true);
+        }
     }
 
     public void testPinnedSignedManifestAndCrossEditionRefusal() throws Exception {

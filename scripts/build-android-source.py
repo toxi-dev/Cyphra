@@ -15,7 +15,7 @@ ROOT=Path(__file__).resolve().parents[1]
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--edition',choices=('team','public'),required=True)
-    parser.add_argument('--version',default='0.1.0')
+    parser.add_argument('--version',default='0.1.1')
     parser.add_argument('--dist',type=Path,required=True)
     args=parser.parse_args()
     if not args.version or any(c not in '0123456789.' for c in args.version):raise ValueError('Invalid version.')

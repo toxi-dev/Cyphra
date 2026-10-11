@@ -14,6 +14,8 @@ public final class WebPrompts implements GeckoSession.PromptDelegate,GeckoSessio
     private final Activity activity;
     private final java.util.function.Function<GeckoSession,String> sessionURL;
     private GeckoSession.PermissionDelegate.Callback permissionCallback;
+    private boolean androidPermissionInFlight;
+    private String[] requestedAndroidPermissions;
     private FilePrompt filePrompt;
     private GeckoResult<PromptResponse> fileResult;
     private final ArrayList<Dialog> dialogs=new ArrayList<>();
@@ -75,7 +77,13 @@ public final class WebPrompts implements GeckoSession.PromptDelegate,GeckoSessio
         Set<String> permitted=new HashSet<>(Arrays.asList(android.Manifest.permission.CAMERA,android.Manifest.permission.RECORD_AUDIO,android.Manifest.permission.ACCESS_FINE_LOCATION,android.Manifest.permission.ACCESS_COARSE_LOCATION));
         for(String permission:permissions)if(!permitted.contains(permission)){callback.reject();return;}
         boolean all=true;for(String permission:permissions)if(activity.checkSelfPermission(permission)!=PackageManager.PERMISSION_GRANTED)all=false;
-        if(all){callback.grant();return;}if(permissionCallback!=null)permissionCallback.reject();permissionCallback=callback;activity.requestPermissions(permissions,72);
+        if(all){callback.grant();return;}
+        // Android supplies one result for this request code. A second page must
+        // never replace the callback while the first OS dialog is still open.
+        if(androidPermissionInFlight){callback.reject();return;}
+        permissionCallback=callback;requestedAndroidPermissions=permissions.clone();androidPermissionInFlight=true;
+        try{activity.requestPermissions(requestedAndroidPermissions.clone(),72);}
+        catch(Exception error){permissionCallback=null;requestedAndroidPermissions=null;androidPermissionInFlight=false;callback.reject();}
     }
     @Override public GeckoResult<Integer> onContentPermissionRequest(GeckoSession session,ContentPermission perm){
         if(perm.permission==PERMISSION_AUTOPLAY_INAUDIBLE)return GeckoResult.fromValue(ContentPermission.VALUE_ALLOW);
@@ -94,6 +102,19 @@ public final class WebPrompts implements GeckoSession.PromptDelegate,GeckoSessio
         if(result!=Activity.RESULT_OK||data==null){pending.complete(prompt.dismiss());return;}ArrayList<Uri> uris=new ArrayList<>();if(data.getClipData()!=null)for(int i=0;i<data.getClipData().getItemCount();i++)uris.add(data.getClipData().getItemAt(i).getUri());else if(data.getData()!=null)uris.add(data.getData());
         try{pending.complete(uris.isEmpty()?prompt.dismiss():prompt.confirm(activity,uris.toArray(new Uri[0])));}catch(Exception e){pending.complete(prompt.dismiss());}
     }
-    void onRequestPermissionsResult(int request,int[] results){if(request!=72||permissionCallback==null)return;boolean allowed=results.length>0;for(int result:results)if(result!=PackageManager.PERMISSION_GRANTED)allowed=false;if(allowed)permissionCallback.grant();else permissionCallback.reject();permissionCallback=null;}
-    void dismissPending(){if(permissionCallback!=null){permissionCallback.reject();permissionCallback=null;}if(fileResult!=null){fileResult.complete(filePrompt.dismiss());fileResult=null;}for(Dialog d:new ArrayList<>(dialogs))d.cancel();dialogs.clear();}
+    void onRequestPermissionsResult(int request,int[] results){
+        if(request!=72||!androidPermissionInFlight)return;
+        GeckoSession.PermissionDelegate.Callback pending=permissionCallback;String[] requested=requestedAndroidPermissions;
+        permissionCallback=null;requestedAndroidPermissions=null;androidPermissionInFlight=false;
+        if(pending==null)return; // A navigation already rejected this website request.
+        boolean allowed=requested!=null&&requested.length>0&&results!=null&&results.length==requested.length;
+        if(allowed)for(int i=0;i<requested.length;i++)if(results[i]!=PackageManager.PERMISSION_GRANTED||activity.checkSelfPermission(requested[i])!=PackageManager.PERMISSION_GRANTED)allowed=false;
+        if(allowed)pending.grant();else pending.reject();
+    }
+    void dismissPending(){
+        if(permissionCallback!=null){GeckoSession.PermissionDelegate.Callback pending=permissionCallback;permissionCallback=null;pending.reject();}
+        // Keep the OS request occupied until its result arrives. Otherwise that
+        // stale result could be mistaken for a new page's permission decision.
+        if(fileResult!=null){fileResult.complete(filePrompt.dismiss());fileResult=null;}for(Dialog d:new ArrayList<>(dialogs))d.cancel();dialogs.clear();
+    }
 }

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="CyphraTheme" parent="CyphraBaseTheme">
+        <item name="android:windowSplashScreenBackground">#101113</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_logo</item>
+    </style>
+</resources>

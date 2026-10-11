@@ -40,6 +40,7 @@ public final class BrowserStore {
     public JSONArray bookmarks() { return read("bookmarks"); }
     public JSONArray history() { return read("history"); }
     public JSONArray tabs() { return read("tabs"); }
+    public int selectedTab() { return preferences.getInt("tabs-selected", 0); }
 
     public synchronized void addBookmark(String title, String url) {
         requireWebURL(url);
@@ -87,17 +88,30 @@ public final class BrowserStore {
 
     /** Session URLs only; cookies and logins belong to the isolated Gecko profile. */
     public void saveTabs(JSONArray input) {
+        saveTabs(input, selectedTab());
+    }
+
+    /** Save the ordinary tab list and its selected index in the same transaction. */
+    public synchronized void saveTabs(JSONArray input, int selectedIndex) {
         JSONArray result = new JSONArray();
+        int selected = 0;
         for (int i = 0; i < input.length() && result.length() < 100; i++) {
             Object value = input.opt(i);
-            if (value instanceof String && ("about:blank".equals(value) || isWebURL((String) value))) result.put(value);
+            Object accepted = null;
+            if (value instanceof String && ("about:blank".equals(value) || isWebURL((String) value))) accepted = value;
             else if (value instanceof JSONObject) {
                 JSONObject item = (JSONObject) value;
                 String url = item.optString("url");
-                if ("about:blank".equals(url) || isWebURL(url)) result.put(entry(item.optString("title"), url));
+                if (!item.optBoolean("private", false) && ("about:blank".equals(url) || isWebURL(url))) accepted = entry(item.optString("title"), url);
+            }
+            if (accepted != null) {
+                if (i <= selectedIndex) selected = result.length();
+                result.put(accepted);
             }
         }
-        write("tabs", result);
+        JSONArray bounded = bounded(result);
+        selected = Math.min(selected, Math.max(0, bounded.length() - 1));
+        commit(preferences.edit().putString("tabs", bounded.toString()).putInt("tabs-selected", selected));
     }
 
     private JSONArray read(String key) {
@@ -110,6 +124,9 @@ public final class BrowserStore {
     }
 
     private void write(String key, JSONArray value) {
+        commit(preferences.edit().putString(key, bounded(value).toString()));
+    }
+    private static JSONArray bounded(JSONArray value) {
         // Keep the newest entries when unusually long URLs reach the data cap;
         // never write a collection that the bounded reader would later discard.
         JSONArray bounded = new JSONArray(); int length = 2;
@@ -120,7 +137,7 @@ public final class BrowserStore {
             if (length + added > MAX_DATA_CHARS) break;
             bounded.put(item); length += added;
         }
-        commit(preferences.edit().putString(key, bounded.toString()));
+        return bounded;
     }
     private static void commit(SharedPreferences.Editor edit) {
         if (!edit.commit()) throw new IllegalStateException("Cyphra could not save this profile. Check the device's available storage.");

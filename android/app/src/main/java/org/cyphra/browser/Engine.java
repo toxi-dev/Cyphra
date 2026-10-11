@@ -140,14 +140,14 @@ public final class Engine {
         runtime.getWebExtensionController().ensureBuiltIn("resource://android/assets/shields/",EXTENSION_ID).accept(value->{
             extension=value;
             extension.setMessageDelegate(messages,"cyphra");
-            // Without this call private tabs would silently lose extension protection.
-            runtime.getWebExtensionController().setAllowedInPrivateBrowsing(extension,true).accept(v->{
-                if(v.metaData==null||!v.metaData.allowedInPrivateBrowsing){fail("Private-tab protection did not apply.");return;}
-                extension=v;extension.setMessageDelegate(messages,"cyphra");
-                privateReady=true;
-                for(GeckoSession session:pageUrls.keySet())attachMessages(session);
-                maybeReady();
-            },e->fail("Private-tab protection could not be enabled."));
+            // Private tabs must have this permission before browsing is enabled.
+            // Gecko returns the live permission in ensureBuiltIn's metadata.
+            // Its permission setter always reloads active extensions, including
+            // when already allowed. Retain the same verified startup gate while
+            // avoiding that extra engine/filter restart on subsequent launches.
+            if(value.metaData!=null&&value.metaData.allowedInPrivateBrowsing)privateProtectionReady(value);
+            else runtime.getWebExtensionController().setAllowedInPrivateBrowsing(extension,true)
+                .accept(this::privateProtectionReady,e->fail("Private-tab protection could not be enabled."));
         },e->fail("The bundled request blocker could not be installed."));
         ui.postDelayed(()->{if(!ready&&!failed)fail("Local protection did not finish starting.");},45000);
     }
@@ -160,6 +160,14 @@ public final class Engine {
     public boolean workMode(){return work;}
     public File profileDirectory(){return profile;}
     public File configurationFile(){return config;}
+
+    private void privateProtectionReady(WebExtension value){
+        if(value.metaData==null||!value.metaData.allowedInPrivateBrowsing){fail("Private-tab protection did not apply.");return;}
+        extension=value;extension.setMessageDelegate(messages,"cyphra");
+        privateReady=true;
+        for(GeckoSession session:pageUrls.keySet())attachMessages(session);
+        maybeReady();
+    }
 
     /**
      * Mobile Gecko child-service names are package-wide. Before switching modes,

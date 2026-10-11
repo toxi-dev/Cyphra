@@ -39,11 +39,12 @@ public abstract class MainActivity extends Activity {
     private ProgressBar loading;
     private ImageButton back, forward, shield;
     private Tab current;
+    private Tab lastOrdinary;
     private WebPrompts prompts;
     private String pendingUrl;
     private boolean ready, fullScreen;
-    private AlertDialog activeShield;
-    private LinearLayout shieldBody;
+    private boolean tabsRestored;
+    private ShieldsPanel activeShield;
     private File pendingInstall;
     private UpdateClient.Offer pendingOffer;
     private boolean shuttingDown;
@@ -131,10 +132,10 @@ public abstract class MainActivity extends Activity {
         JSONArray stored=store.tabs();
         for(int i=0;i<stored.length()&&tabs.size()<20;i++){
             JSONObject entry=stored.optJSONObject(i);String url=entry==null?stored.optString(i):entry.optString("url");
-            if(BrowserStore.isWebURL(url)){Tab tab=new Tab(false);tab.url=url;tab.title=entry==null?host(url):entry.optString("title",host(url));tabs.add(tab);}
+            if(BrowserStore.isWebURL(url)||"about:blank".equals(url)){Tab tab=new Tab(false);tab.url=url;tab.title="about:blank".equals(url)?"New tab":entry==null?host(url):entry.optString("title",host(url));tabs.add(tab);}
         }
         if(tabs.isEmpty())tabs.add(new Tab(false));
-        Tab initial=tabs.get(0);
+        Tab initial=tabs.get(Math.max(0,Math.min(store.selectedTab(),tabs.size()-1)));
         // Choose the incoming destination before opening Gecko. Loading a saved
         // URI and then another URI during startup can reorder native load events.
         if(BrowserStore.isWebURL(pendingUrl)){
@@ -142,7 +143,7 @@ public abstract class MainActivity extends Activity {
             else if(tabs.size()<20){initial=new Tab(false);initial.url=pendingUrl;tabs.add(initial);}
             else initial.url=pendingUrl;
         }
-        pendingUrl=null;select(initial);
+        pendingUrl=null;tabsRestored=true;select(initial);
     }
     private void prepare(Tab tab){prepare(tab,true);}
     private void prepare(Tab tab,boolean open){
@@ -207,12 +208,12 @@ public abstract class MainActivity extends Activity {
     private void selectPopup(Tab tab){
         prompts.dismissPending();
         if(current!=null&&current.session!=null)current.session.setActive(false);
-        current=tab;showGecko();gecko.setSession(tab.session);tab.session.setActive(true);refreshButtons();saveTabs();
+        current=tab;if(!tab.privateTab)lastOrdinary=tab;showGecko();gecko.setSession(tab.session);tab.session.setActive(true);refreshButtons();saveTabs();
     }
     private void select(Tab tab){
         prompts.dismissPending();
         if(current!=null&&current.session!=null)current.session.setActive(false);
-        current=tab;tabCount.setText(Integer.toString(tabs.size()));
+        current=tab;if(!tab.privateTab)lastOrdinary=tab;tabCount.setText(Integer.toString(tabs.size()));
         address.setText("about:blank".equals(tab.url)?"":tab.url);
         if("about:blank".equals(tab.url))showHomeView();else{
             boolean fresh=tab.session==null;prepare(tab);showGecko();gecko.setSession(tab.session);tab.session.setActive(true);
@@ -234,6 +235,7 @@ public abstract class MainActivity extends Activity {
     }
     private void close(Tab tab){
         if(tab.session!=null)tab.session.close();tabs.remove(tab);if(tabs.isEmpty())tabs.add(new Tab(false));
+        if(lastOrdinary==tab)lastOrdinary=null;
         if(current==tab)select(tabs.get(Math.max(0,tabs.size()-1)));tabCount.setText(Integer.toString(tabs.size()));saveTabs();
     }
     private void showGecko(){content.removeAllViews();if(gecko.getParent()!=null)((android.view.ViewGroup)gecko.getParent()).removeView(gecko);content.addView(gecko,new FrameLayout.LayoutParams(-1,-1));}
@@ -271,7 +273,15 @@ public abstract class MainActivity extends Activity {
         if(Build.VERSION.SDK_INT>=33)setRecentsScreenshotEnabled(!workMode()&&(current==null||!current.privateTab));
         if(tabCount!=null)tabCount.setText(Integer.toString(Math.max(1,tabs.size())));
     }
-    private void saveTabs(){if(store==null)return;JSONArray saved=new JSONArray();for(Tab tab:tabs)if(!tab.privateTab){JSONObject o=new JSONObject();try{o.put("url",tab.url);o.put("title",tab.title);}catch(JSONException ignored){}saved.put(o);}store.saveTabs(saved);}
+    private void saveTabs(){
+        if(store==null||!tabsRestored)return;
+        JSONArray saved=new JSONArray();int selected=0;
+        for(Tab tab:tabs)if(!tab.privateTab){
+            if(tab==lastOrdinary)selected=saved.length();
+            JSONObject o=new JSONObject();try{o.put("url",tab.url);o.put("title",tab.title);}catch(JSONException ignored){}saved.put(o);
+        }
+        store.saveTabs(saved,selected);
+    }
     private void backAction(){if(fullScreen&&current!=null&&current.session!=null){current.session.exitFullScreen();return;}if(current!=null&&current.canBack&&current.session!=null){current.session.goBack();return;}if(current!=null&&!current.url.equals("about:blank")){showHome();return;}moveTaskToBack(true);}
     private void showTabs(){
         LinearLayout body=column();row(body,"New tab","",()->{newTab(false,null);dismissDialog(body);});row(body,"New private tab","Not saved to history or restored",()->{newTab(true,null);dismissDialog(body);});
@@ -303,17 +313,19 @@ public abstract class MainActivity extends Activity {
         if(history&&entries.length()>0)row(body,"Clear history","",()->{store.clearHistory();dismissDialog(body);showSaved(true);});dialog(history?"History":"Bookmarks",body);
     }
     private void bookmark(){if(current==null||!BrowserStore.isWebURL(current.url)){toast("Open a website to save it.");return;}if(current.privateTab){toast("Bookmarks are disabled in private tabs.");return;}store.addBookmark(current.title,current.url);toast("Bookmark saved in "+mode()+".");}
-    private void showShields(){if(engine==null){toast("Protections are starting.");return;}shieldBody=column();activeShield=dialog("Cyphra Shields",shieldBody);activeShield.setOnDismissListener(d->{activeShield=null;shieldBody=null;});renderShields();}
+    private void showShields(){
+        if(engine==null){toast("Protections are starting.");return;}
+        if(activeShield!=null&&activeShield.isShowing()){renderShields();return;}
+        activeShield=new ShieldsPanel(this,workMode(),value->{
+            String site=current==null?"":host(current.url);if(site.isEmpty())return;
+            engine.setShieldsForHost(site,value);renderShields();if(current!=null&&current.session!=null)current.session.reload();
+        },()->activeShield=null);
+        renderShields();activeShield.show();
+    }
     private void renderShields(){
-        if(shieldBody==null)return;shieldBody.removeAllViews();String site=current==null?"":host(current.url);Engine.Stats stats=current==null||current.session==null?null:engine.snapshot(current.session);
-        TextView domain=text(site.isEmpty()?"No website in this tab":site,20,TEXT);domain.setPadding(dp(16),dp(12),dp(16),dp(16));shieldBody.addView(domain);
-        if(!site.isEmpty()){Switch enabled=new Switch(this);enabled.setText("Shields for this site");enabled.setTextColor(TEXT);enabled.setPadding(dp(16),dp(8),dp(16),dp(8));enabled.setChecked(engine.shieldsEnabled(site));enabled.setOnCheckedChangeListener((v,value)->{engine.setShieldsForHost(site,value);if(current!=null&&current.session!=null)current.session.reload();});shieldBody.addView(enabled);}
-        TextView count=text(Integer.toString(stats==null?0:stats.blocked),44,TEXT);count.setTypeface(Typeface.create("sans-serif-light",Typeface.NORMAL));count.setPadding(dp(16),dp(8),dp(16),0);shieldBody.addView(count);
-        row(shieldBody,"Requests blocked in this page",stats==null?"No page requests recorded":"Ads, trackers and telemetry: actual cancellations",null);
-        if(stats!=null){row(shieldBody,"Telemetry blocked",Integer.toString(stats.telemetry),null);row(shieldBody,"Native tracking protection events",Integer.toString(stats.nativeBlocked)+" · counted separately",null);
-            if(!stats.hosts.isEmpty()){section(shieldBody,"Blocked destinations");for(String destination:stats.hosts)row(shieldBody,destination,"",null);}}
-        row(shieldBody,"DNS",engine.dnsChoice().equals("system")?"System DNS":engine.dnsUri(),null);
-        row(shieldBody,workMode()?"Work defaults":"Personal defaults",workMode()?"Stricter filtering · WebGL off":"Balanced filtering · WebGL available",null);
+        if(activeShield==null||engine==null)return;String site=current==null?"":host(current.url);
+        Engine.Stats stats=current==null||current.session==null?null:engine.snapshot(current.session);
+        activeShield.render(site,stats,engine.shieldsEnabled(site),engine.dnsChoice(),engine.dnsUri(),current!=null&&current.privateTab);
     }
     private void siteInfo(){
         if(current==null||!BrowserStore.isWebURL(current.url)){toast("Open a website first.");return;}String info=current.url;
@@ -391,13 +403,25 @@ public abstract class MainActivity extends Activity {
         }catch(Exception error){output.setText("Could not process this input: "+error.getMessage());}}));d.show();
     }
     private void download(WebResponse response){
-        if(response.body==null)return;String path=Uri.parse(response.uri).getLastPathSegment();String name=path==null||path.isEmpty()?"download":path.replaceAll("[^a-zA-Z0-9._-]","_");if(name.length()>100)name=name.substring(0,100);final String filename=name;
-        new AlertDialog.Builder(this).setTitle("Save download?").setMessage(filename+"\n\n"+host(response.uri)).setPositiveButton("Save",(d,w)->busy("Saving download…",()->{
-            ContentValues values=new ContentValues();values.put(MediaStore.Downloads.DISPLAY_NAME,filename);values.put(MediaStore.Downloads.MIME_TYPE,"application/octet-stream");values.put(MediaStore.Downloads.RELATIVE_PATH,Environment.DIRECTORY_DOWNLOADS+"/Cyphra");values.put(MediaStore.Downloads.IS_PENDING,1);
-            Uri dest=getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values);if(dest==null)throw new IOException("Could not create download.");
-            try(InputStream in=response.body;OutputStream out=getContentResolver().openOutputStream(dest)){if(out==null)throw new IOException("Could not write download.");byte[] b=new byte[32768];int n;while((n=in.read(b))!=-1)out.write(b,0,n);}catch(Exception e){getContentResolver().delete(dest,null,null);throw e;}
-            ContentValues finished=new ContentValues();finished.put(MediaStore.Downloads.IS_PENDING,0);getContentResolver().update(dest,finished,null,null);return filename;
-        },value->toast("Saved to Downloads/Cyphra."))).setNegativeButton("Cancel",(d,w)->{try{response.body.close();}catch(IOException ignored){}}).setOnCancelListener(d->{try{response.body.close();}catch(IOException ignored){}}).show();
+        if(response.body==null)return;
+        DownloadPolicy.Metadata metadata=DownloadPolicy.derive(response.uri,response.headers.get("Content-Disposition"),response.headers.get("Content-Type"));
+        boolean[] accepted={false};
+        AlertDialog confirmation=new AlertDialog.Builder(this).setTitle("Save download?").setMessage(metadata.filename+"\n\n"+host(response.uri)).setPositiveButton("Save",(d,w)->{
+            accepted[0]=true;
+            busy("Saving download…",()->{
+                Uri dest=null;
+                try(InputStream in=response.body){
+                    ContentValues values=new ContentValues();values.put(MediaStore.Downloads.DISPLAY_NAME,metadata.filename);values.put(MediaStore.Downloads.MIME_TYPE,metadata.mimeType);values.put(MediaStore.Downloads.RELATIVE_PATH,Environment.DIRECTORY_DOWNLOADS+"/Cyphra");values.put(MediaStore.Downloads.IS_PENDING,1);
+                    dest=getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values);if(dest==null)throw new IOException("Could not create download.");
+                    try(OutputStream out=getContentResolver().openOutputStream(dest)){if(out==null)throw new IOException("Could not write download.");byte[] b=new byte[32768];int n;while((n=in.read(b))!=-1)out.write(b,0,n);out.flush();}
+                    ContentValues finished=new ContentValues();finished.put(MediaStore.Downloads.IS_PENDING,0);
+                    if(getContentResolver().update(dest,finished,null,null)!=1)throw new IOException("Could not finish saving download.");
+                    return metadata.filename;
+                }catch(Exception e){if(dest!=null)try{getContentResolver().delete(dest,null,null);}catch(Exception ignored){}throw e;}
+            },value->toast("Saved to Downloads/Cyphra."));
+        }).setNegativeButton("Cancel",null).create();
+        confirmation.setOnDismissListener(d->{if(!accepted[0])try{response.body.close();}catch(IOException ignored){}});
+        confirmation.show();
     }
     private interface Task{Object run() throws Exception;}
     private void busy(String label,Task task,java.util.function.Consumer<Object> done){
@@ -429,7 +453,7 @@ public abstract class MainActivity extends Activity {
         if(shuttingDown||engine==null)return;shuttingDown=true;ready=false;saveTabs();prompts.dismissPending();
         engine.shutdownGracefully(()->{finishAndRemoveTask();android.os.Process.killProcess(android.os.Process.myPid());});
     }
-    @Override protected void onDestroy(){try{unregisterReceiver(modeReceiver);}catch(Exception ignored){}if(engine!=null){engine.setListener(null);if(!shuttingDown)shutdownProfile();}if(prompts!=null)prompts.dismissPending();jobs.shutdown();super.onDestroy();}
+    @Override protected void onDestroy(){if(activeShield!=null)activeShield.dismiss();try{unregisterReceiver(modeReceiver);}catch(Exception ignored){}if(engine!=null){engine.setListener(null);if(!shuttingDown)shutdownProfile();}if(prompts!=null)prompts.dismissPending();jobs.shutdown();super.onDestroy();}
     @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==52){if(getPackageManager().canRequestPackageInstalls())installUpdate();}else prompts.onActivityResult(request,result,data);}
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);prompts.onRequestPermissionsResult(request,results);}
 }

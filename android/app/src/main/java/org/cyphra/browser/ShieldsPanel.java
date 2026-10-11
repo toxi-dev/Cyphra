@@ -1,0 +1,165 @@
+/* This Source Code Form is subject to the Mozilla Public License, v. 2.0. */
+package org.cyphra.browser;
+
+import android.app.Activity;
+import android.app.Dialog;
+import android.content.Context;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
+import android.text.TextUtils;
+import android.view.Gravity;
+import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
+import android.view.WindowInsets;
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.Switch;
+import android.widget.TextView;
+import java.util.List;
+import java.util.function.Consumer;
+
+/** A native sheet whose controls and scroll position survive live statistics updates. */
+final class ShieldsPanel {
+    private final Activity activity;
+    private final Dialog dialog;
+    private final Consumer<Boolean> onToggle;
+    private final TextView domain, total, totalDetail, filters, strict, telemetry, nativeEvents;
+    private final TextView switchDetail, destinations, dnsName, dnsEndpoint;
+    private final LinearLayout siteControl;
+    private final Switch siteSwitch;
+    private boolean updating;
+
+    ShieldsPanel(Activity activity, boolean work, Consumer<Boolean> onToggle, Runnable onDismiss) {
+        this.activity=activity;this.onToggle=onToggle;
+        dialog=new Dialog(activity);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setOnDismissListener(ignored->onDismiss.run());
+
+        LinearLayout sheet=column();
+        GradientDrawable background=new GradientDrawable();
+        background.setColor(MainActivity.PANEL);
+        background.setCornerRadii(new float[]{dp(22),dp(22),dp(22),dp(22),0,0,0,0});
+        sheet.setBackground(background);
+        sheet.setPadding(dp(20),dp(10),dp(20),dp(18));
+        sheet.setOnApplyWindowInsetsListener((view,insets)->{
+            if(Build.VERSION.SDK_INT>=30){
+                android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());
+                view.setPadding(dp(20)+bars.left,dp(10),dp(20)+bars.right,dp(18)+bars.bottom);
+            }else view.setPadding(dp(20)+insets.getSystemWindowInsetLeft(),dp(10),dp(20)+insets.getSystemWindowInsetRight(),dp(18)+insets.getSystemWindowInsetBottom());
+            return insets;
+        });
+        View handle=new View(activity);
+        GradientDrawable handleShape=new GradientDrawable();handleShape.setColor(MainActivity.LINE);handleShape.setCornerRadius(dp(2));handle.setBackground(handleShape);
+        LinearLayout.LayoutParams handleLayout=new LinearLayout.LayoutParams(dp(32),dp(3));
+        handleLayout.gravity=Gravity.CENTER_HORIZONTAL;handleLayout.bottomMargin=dp(9);sheet.addView(handle,handleLayout);
+
+        LinearLayout heading=new LinearLayout(activity);heading.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView shield=new ImageView(activity);shield.setImageDrawable(new IconDrawable("shield",MainActivity.TEXT));
+        heading.addView(shield,new LinearLayout.LayoutParams(dp(22),dp(22)));
+        TextView title=text("Cyphra Shields",18,MainActivity.TEXT);
+        title.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));title.setPadding(dp(10),0,0,0);title.setAccessibilityHeading(true);
+        heading.addView(title,new LinearLayout.LayoutParams(0,dp(44),1));title.setGravity(Gravity.CENTER_VERTICAL);
+        ImageButton close=new ImageButton(activity);close.setImageDrawable(new IconDrawable("close",MainActivity.MUTED));
+        close.setBackgroundColor(Color.TRANSPARENT);close.setPadding(dp(12),dp(12),dp(12),dp(12));close.setContentDescription("Close Shields");close.setOnClickListener(v->dismiss());
+        heading.addView(close,new LinearLayout.LayoutParams(dp(48),dp(48)));sheet.addView(heading);
+        domain=text("No website in this tab",14,MainActivity.MUTED);domain.setMaxLines(2);domain.setEllipsize(TextUtils.TruncateAt.END);domain.setPadding(0,0,0,dp(14));sheet.addView(domain);
+
+        int usableHeight=activity.getWindow().getDecorView().getHeight();
+        if(usableHeight<=0)usableHeight=activity.getResources().getDisplayMetrics().heightPixels;
+        BoundedScrollView scroll=new BoundedScrollView(activity,Math.max(dp(80),(int)(usableHeight*.85f)-dp(128)));
+        scroll.setFillViewport(false);scroll.setClipToPadding(false);scroll.setVerticalScrollBarEnabled(false);
+        LinearLayout body=column();scroll.addView(body);sheet.addView(scroll,new LinearLayout.LayoutParams(-1,-2));
+
+        siteControl=column();
+        siteSwitch=new Switch(activity);siteSwitch.setText("Shields for this site");siteSwitch.setTextColor(MainActivity.TEXT);siteSwitch.setTextSize(15);
+        siteSwitch.setMinHeight(dp(48));siteSwitch.setSwitchPadding(dp(12));siteControl.addView(siteSwitch,new LinearLayout.LayoutParams(-1,-2));
+        switchDetail=text("",12,MainActivity.MUTED);switchDetail.setPadding(0,0,0,dp(12));siteControl.addView(switchDetail);body.addView(siteControl);
+        siteSwitch.setOnCheckedChangeListener((button,enabled)->{if(!updating)this.onToggle.accept(enabled);});
+        divider(body);
+
+        LinearLayout summary=new LinearLayout(activity);summary.setGravity(Gravity.CENTER_VERTICAL);summary.setPadding(0,dp(12),0,dp(10));
+        total=text("0",42,MainActivity.TEXT);total.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
+        summary.addView(total,new LinearLayout.LayoutParams(-2,-2));
+        LinearLayout description=column();description.setPadding(dp(18),0,0,0);
+        description.addView(text("Requests blocked in this page",14,MainActivity.TEXT));
+        totalDetail=text("No page requests recorded",11,MainActivity.MUTED);totalDetail.setPadding(0,dp(4),0,0);description.addView(totalDetail);
+        summary.addView(description,new LinearLayout.LayoutParams(0,-2,1));body.addView(summary);
+        filters=counter(body,"Ads and trackers");strict=counter(body,"Strict third-party filtering");telemetry=counter(body,"Telemetry blocked");
+        TextView exceptionNote=text("Telemetry blocking stays on when site filtering is off.",11,MainActivity.MUTED);exceptionNote.setPadding(0,dp(6),0,dp(12));body.addView(exceptionNote);
+        divider(body);
+        nativeEvents=counter(body,"Native tracking protection events");
+        TextView nativeNote=text("Gecko events · counted separately from requests above",11,MainActivity.MUTED);nativeNote.setPadding(0,0,0,dp(14));body.addView(nativeNote);
+
+        TextView destinationsTitle=text("Blocked destinations",12,MainActivity.MUTED);destinationsTitle.setAccessibilityHeading(true);body.addView(destinationsTitle);
+        destinations=text("None recorded on this page",12,MainActivity.TEXT);destinations.setTypeface(Typeface.MONOSPACE);destinations.setMaxLines(12);destinations.setEllipsize(TextUtils.TruncateAt.END);destinations.setPadding(0,dp(6),0,dp(14));destinations.setLineSpacing(dp(3),1);body.addView(destinations);
+        divider(body);
+
+        TextView dnsTitle=text("DNS",12,MainActivity.MUTED);dnsTitle.setPadding(0,dp(12),0,0);body.addView(dnsTitle);
+        dnsName=text("",14,MainActivity.TEXT);dnsName.setPadding(0,dp(4),0,0);body.addView(dnsName);
+        dnsEndpoint=text("",12,MainActivity.MUTED);dnsEndpoint.setPadding(0,dp(4),0,0);body.addView(dnsEndpoint);
+        TextView profile=text(work?"Work · stricter filtering · WebGL off":"Personal · balanced filtering · WebGL available",11,MainActivity.MUTED);profile.setPadding(0,dp(18),0,0);body.addView(profile);
+
+        dialog.setContentView(sheet);
+        Window window=dialog.getWindow();
+        if(window!=null){
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            window.setDimAmount(.55f);
+            window.setGravity(Gravity.BOTTOM);
+            window.setNavigationBarColor(MainActivity.PANEL);
+        }
+    }
+
+    void show(){dialog.show();Window window=dialog.getWindow();if(window!=null){window.setLayout(-1,-2);window.getDecorView().requestApplyInsets();}}
+    void dismiss(){dialog.dismiss();}
+    boolean isShowing(){return dialog.isShowing();}
+
+    void render(String site, Engine.Stats stats, boolean enabled, String dnsChoice, String dnsUri, boolean privateTab){
+        boolean website=site!=null&&!site.isEmpty();
+        set(domain,website?site:"No website in this tab");
+        siteControl.setVisibility(website?View.VISIBLE:View.GONE);
+        updating=true;try{if(siteSwitch.isChecked()!=enabled)siteSwitch.setChecked(enabled);}finally{updating=false;}
+        set(switchDetail,enabled?"Site filtering is on.":"Site filtering is off. Telemetry blocking stays on.");
+        set(total,Integer.toString(stats==null?0:stats.blocked));
+        set(totalDetail,stats==null?"No page requests recorded":"Actual cancelled requests");
+        set(filters,Integer.toString(stats==null?0:stats.filters));set(strict,Integer.toString(stats==null?0:stats.strict));
+        set(telemetry,Integer.toString(stats==null?0:stats.telemetry));set(nativeEvents,Integer.toString(stats==null?0:stats.nativeBlocked));
+        set(destinations,destinationText(stats==null?null:stats.hosts));
+        String name;
+        switch(dnsChoice){case "system":name="System DNS";break;case "toxitech":name="Toxitech · encrypted DNS";break;case "quad9":name="Quad9 · encrypted DNS";break;case "cloudflare":name="Cloudflare · encrypted DNS";break;default:name="Custom · encrypted DNS";}
+        set(dnsName,name);set(dnsEndpoint,"system".equals(dnsChoice)?"Uses your Android resolver":dnsUri);
+        Window window=dialog.getWindow();
+        if(window!=null){
+            boolean secure=privateTab||(activity.getWindow().getAttributes().flags&WindowManager.LayoutParams.FLAG_SECURE)!=0;
+            if(secure)window.addFlags(WindowManager.LayoutParams.FLAG_SECURE);else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        }
+    }
+
+    private String destinationText(List<String> hosts){
+        if(hosts==null||hosts.isEmpty())return "None recorded on this page";
+        StringBuilder text=new StringBuilder();int shown=Math.min(6,hosts.size());
+        for(int i=0;i<shown;i++){if(i>0)text.append('\n');text.append(hosts.get(i));}
+        if(hosts.size()>shown)text.append("\n+").append(hosts.size()-shown).append(" more destinations");
+        return text.toString();
+    }
+    private TextView counter(LinearLayout body,String label){
+        LinearLayout row=new LinearLayout(activity);row.setGravity(Gravity.CENTER_VERTICAL);row.setMinimumHeight(dp(34));
+        TextView title=text(label,13,MainActivity.TEXT);title.setPadding(0,dp(7),dp(12),dp(7));row.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        TextView value=text("0",14,MainActivity.TEXT);value.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));value.setGravity(Gravity.END);row.addView(value,new LinearLayout.LayoutParams(-2,-2));body.addView(row);return value;
+    }
+    private void divider(LinearLayout body){View line=new View(activity);line.setBackgroundColor(MainActivity.LINE);body.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));}
+    private LinearLayout column(){LinearLayout view=new LinearLayout(activity);view.setOrientation(LinearLayout.VERTICAL);return view;}
+    private TextView text(String value,int size,int color){TextView view=new TextView(activity);view.setText(value);view.setTextSize(size);view.setTextColor(color);return view;}
+    private static void set(TextView view,String value){if(!TextUtils.equals(view.getText(),value))view.setText(value);}
+    private int dp(int value){return Math.round(value*activity.getResources().getDisplayMetrics().density);}
+    private static final class BoundedScrollView extends ScrollView {
+        private final int maximumHeight;
+        BoundedScrollView(Context context,int maximumHeight){super(context);this.maximumHeight=maximumHeight;}
+        @Override protected void onMeasure(int widthSpec,int heightSpec){super.onMeasure(widthSpec,View.MeasureSpec.makeMeasureSpec(maximumHeight,View.MeasureSpec.AT_MOST));}
+    }
+}

@@ -1,18 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="CyphraTheme" parent="android:style/Theme.Material.NoActionBar">
+    <style name="CyphraBaseTheme" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:windowBackground">#101113</item>
-        <item name="android:windowSplashScreenBackground">#101113</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_logo</item>
         <item name="android:colorAccent">#CAD2DF</item>
         <item name="android:navigationBarColor">#101113</item>
         <item name="android:statusBarColor">#101113</item>
         <item name="android:windowNoTitle">true</item>
     </style>
+    <style name="CyphraTheme" parent="CyphraBaseTheme" />
     <style name="CyphraLaunchTheme" parent="CyphraTheme">
         <item name="android:windowDisablePreview">true</item>
     </style>

@@ -33,7 +33,7 @@ Public GitHub updates do not need a token. Automatic checks default off. A relea
 
 ## Android
 
-Cyphra Android **0.1.0** uses native Android controls and GeckoView, with separate Work/Personal profiles, local Shields, Brave Search, selectable DNS, manual encrypted bookmark sync and verified APK updates. Android 10 or later is required. See [Android installation, build and privacy details](android/README.md). Android releases use `android-v0.1.0` independently of desktop releases.
+Cyphra Android **0.1.1** uses native Android controls and GeckoView, with separate Work/Personal profiles, local Shields, Brave Search, selectable DNS, manual encrypted bookmark sync and verified APK updates. Android 10 or later is required. See [Android installation, build and privacy details](android/README.md). Android releases use `android-v0.1.1` independently of desktop releases.
 
 ## Build
 

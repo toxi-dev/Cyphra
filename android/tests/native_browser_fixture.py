@@ -136,6 +136,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             with LOCK:
                 found = [e for e in RESULTS if not run or e["run"] == run]
             return self.send(found)
+        if parsed.path == "/download":
+            # The opaque URL deliberately has no filename or extension.
+            data = b"Cyphra native download fixture\n"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            suffix = re.sub(r"[^A-Za-z0-9_-]", "_", run)[:64]
+            filename = "cyphra-report" + ("-" + suffix if suffix else "") + ".txt"
+            self.send_header("Content-Disposition", "attachment; filename=\"fallback.txt\"; filename*=UTF-8''" + filename)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
         if parsed.path in ("/normal/probe.js", "/ads/cbr.js", "/third-party/probe.js"):
             return self.send("window.cyphraFixtureDelivered=(window.cyphraFixtureDelivered||[]);window.cyphraFixtureDelivered.push("+json.dumps(parsed.path)+");", "text/javascript")
         if parsed.path == "/":
