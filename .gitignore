@@ -22,3 +22,10 @@ __pycache__/
 
 # Generated icon intermediates
 /assets/.icon-build/
+
+# Android build outputs and machine-local configuration
+android/.gradle/
+android/**/build/
+android/local.properties
+*.jks
+*.keystore

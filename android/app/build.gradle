@@ -1,0 +1,70 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'org.cyphra.browser'
+    compileSdk {
+        version = release(37) { minorApiLevel = 1 }
+    }
+    buildToolsVersion '36.0.0'
+    defaultConfig {
+        applicationId 'org.cyphra.browser'
+        minSdk 29
+        targetSdk 36
+        versionCode providers.gradleProperty('cyphraVersionCode').getOrElse('2').toInteger()
+        versionName providers.gradleProperty('cyphraVersionName').getOrElse('0.1.0')
+        ndk { abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64' }
+        testInstrumentationRunner 'org.cyphra.browser.ServicesSecurityTest'
+    }
+    buildFeatures { buildConfig true; resValues true }
+    testBuildType providers.gradleProperty('cyphraTestBuildType').getOrElse('debug')
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    flavorDimensions += 'edition'
+    productFlavors {
+        create('public') {
+            dimension 'edition'
+            applicationId 'org.cyphra.browser.public'
+            resValue 'string', 'app_name', 'Cyphra'
+            buildConfigField 'boolean', 'TEAM', 'false'
+            buildConfigField 'String', 'EDITION', '"public"'
+            buildConfigField 'String', 'DEFAULT_MODE', '"personal"'
+            buildConfigField 'String', 'DEFAULT_DNS', '"system"'
+            buildConfigField 'String', 'REPOSITORY', '"toxi-dev/Cyphra"'
+            buildConfigField 'String', 'ASSET_PREFIX', '"Cyphra-Public"'
+            buildConfigField 'String', 'UPDATE_KEY_ID', '"cyphra-public-release-2026-01"'
+            buildConfigField 'String', 'UPDATE_KEY_SPKI', '"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE3vDDnNPl2fNrTboTKQ5pANzu6vVe7+vXa19+FZO99arkBpZeb80VuL59U3mSGdAJ3DrVjEeFN7YslweH/fD6Jw=="'
+        }
+    }
+    signingConfigs {
+        release {
+            if (System.getenv('CYPHRA_ANDROID_KEYSTORE')) {
+                storeFile file(System.getenv('CYPHRA_ANDROID_KEYSTORE'))
+                storePassword System.getenv('CYPHRA_ANDROID_STORE_PASSWORD')
+                keyAlias System.getenv('CYPHRA_ANDROID_KEY_ALIAS') ?: 'cyphra-android'
+                keyPassword System.getenv('CYPHRA_ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            debuggable false
+        }
+        debug { applicationIdSuffix '.debug' }
+    }
+    packaging {
+        jniLibs { useLegacyPackaging = true }
+        resources { excludes += ['META-INF/DEPENDENCIES'] }
+    }
+}
+dependencies {
+    implementation('org.mozilla.geckoview:geckoview:157.0.20261005135250') {
+        exclude group: 'com.google.android.gms'
+    }
+    implementation 'androidx.annotation:annotation-experimental:1.6.0'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20260814'
+}

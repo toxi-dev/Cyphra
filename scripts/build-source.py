@@ -17,7 +17,7 @@ import zipfile
 from edition_metadata import edition_config, dist_path
 
 ROOT = Path(__file__).resolve().parent.parent
-DIRECTORIES = ('assets', 'browser', 'docs', 'launcher', 'installer', 'scripts', 'tests', 'editions')
+DIRECTORIES = ('assets', 'browser', 'docs', 'launcher', 'installer', 'scripts', 'tests', 'editions', 'android')
 FILES = ('.gitignore', '.github/workflows/source-checks.yml', '.github/workflows/windows-release-native.yml', 'LICENSE', 'CHANGELOG.md', 'README.md', 'THIRD_PARTY_NOTICES.md', 'engine-lock.json',
          'cyphra.json', 'tools-lock.json', 'package.json', 'package-lock.json', 'requirements-test.txt',
          'server/cyphra_sync.py', 'server/cyphra-sync.service')
@@ -45,7 +45,7 @@ def source_files():
                     raise RuntimeError(f'Source archives must not contain symlinks: {Path(parent) / child}')
             for child in sorted(files):
                 file = Path(parent) / child
-                if child.startswith('.') or file.suffix.lower() in EXCLUDED_SUFFIXES:
+                if child.startswith('.') or child == 'local.properties' or file.suffix.lower() in EXCLUDED_SUFFIXES | {'.jks', '.keystore', '.p12'}:
                     continue
                 if file.is_symlink() or not file.is_file():
                     raise RuntimeError(f'Source archives need regular files: {file}')

@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "updatedAt": "2026-10-03T21:29:52.321Z",
+  "license": "CC-BY-SA-3.0",
+  "licenseSource": "https://easylist.to/pages/licence.html",
+  "attribution": "The EasyList authors (https://easylist.to/)",
+  "files": [
+    {
+      "name": "easylist.txt",
+      "title": "EasyList",
+      "source": "https://easylist.to/easylist/easylist.txt",
+      "bytes": 2085429,
+      "sha256": "dfc74eeba346e35471cfbbdbd5177295584f3a468143fca9061e1cd87b396d74",
+      "license": "CC-BY-SA-3.0"
+    },
+    {
+      "name": "easyprivacy.txt",
+      "title": "EasyPrivacy",
+      "source": "https://easylist.to/easylist/easyprivacy.txt",
+      "bytes": 1507399,
+      "sha256": "ad692870202cf33d7fcf1f5a5c146c86fd584f599049e59fd1504584b7fc0a25",
+      "license": "CC-BY-SA-3.0"
+    }
+  ],
+  "engine": {
+    "format": 1,
+    "name": "engine.bin",
+    "bytes": 5276781,
+    "sha256": "fa1f37827ca284508b6ee3c307b8f40ef62e98dd9d5f5633ce229b38f079318c",
+    "bundleSHA256": "e71f84a9655134165ba81117e09fba19a9b04ed8f42cf84635d841f13ec03008",
+    "sources": {
+      "easylist.txt": "dfc74eeba346e35471cfbbdbd5177295584f3a468143fca9061e1cd87b396d74",
+      "easyprivacy.txt": "ad692870202cf33d7fcf1f5a5c146c86fd584f599049e59fd1504584b7fc0a25"
+    },
+    "config": {
+      "enableHtmlFiltering": false,
+      "loadCSPFilters": false,
+      "loadCosmeticFilters": true,
+      "loadExtendedSelectors": false,
+      "enableMutationObserver": false,
+      "enablePushInjectionsOnNavigationEvents": false
+    },
+    "rules": 107582
+  }
+}

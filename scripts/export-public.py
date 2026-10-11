@@ -43,6 +43,11 @@ def export_public(destination):
     (destination / 'docs/updating.md').write_text((ROOT / 'docs/public-updating.md').read_text())
     for path in [destination / 'tests/fixtures/signed-update-public.json']:
         path.unlink(missing_ok=True)
+    if (ROOT / 'android').is_dir():
+        shutil.rmtree(destination / 'android', ignore_errors=True)
+        android_spec = importlib.util.spec_from_file_location('android_public', ROOT / 'scripts/export-android-public.py')
+        android_exporter = importlib.util.module_from_spec(android_spec); android_spec.loader.exec_module(android_exporter)
+        android_exporter.export_android_public(ROOT, destination / 'android')
     print('Exported public source: ' + str(destination))
     return destination
 

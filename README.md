@@ -31,6 +31,10 @@ Optional sync requires a server you configure and a private pairing code. New va
 
 Public GitHub updates do not need a token. Automatic checks default off. A release must match the pinned public-edition ECDSA signature and package hash/size before installation; checks never install silently. Windows and Linux updates preserve external profiles and refuse downgrades or active installations. The Windows installer is unsigned: the release signature is separate from Windows Authenticode.
 
+## Android
+
+Cyphra Android **0.1.0** uses native Android controls and GeckoView, with separate Work/Personal profiles, local Shields, Brave Search, selectable DNS, manual encrypted bookmark sync and verified APK updates. Android 10 or later is required. See [Android installation, build and privacy details](android/README.md). Android releases use `android-v0.1.0` independently of desktop releases.
+
 ## Build
 
 Use Linux, Node 22+, Python 3.12+, MinGW-w64 and NSIS 3.11+, plus Wine for Windows resource branding. Engine and tool downloads are pinned by SHA-256. Build-only toolchains are not browser runtimes.

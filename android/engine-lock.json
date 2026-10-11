@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "artifact": "org.mozilla.geckoview:geckoview:157.0.20261005135250",
+  "geckoVersion": "157.0.1",
+  "buildId": "20261005135250",
+  "sourceRevision": "737ec77d798755890b062aab541a90d6c75afd19",
+  "aar": {
+    "url": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/157.0.20261005135250/geckoview-157.0.20261005135250.aar",
+    "sha256": "15f1edf3c58abcdaf2783f299b8c19c3a36272d348969106a9009671fef8d268"
+  },
+  "nativeSource": "https://hg.mozilla.org/releases/mozilla-release/rev/737ec77d798755890b062aab541a90d6c75afd19",
+  "javaSource": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/157.0.20261005135250/geckoview-157.0.20261005135250-sources.jar",
+  "abis": ["arm64-v8a", "armeabi-v7a", "x86_64"],
+  "excludedRuntimeGroups": ["com.google.android.gms"],
+  "webAuthnEnabled": false,
+  "upstreamReportingCodePresent": true,
+  "reportingPolicy": "Runtime reporting preferences disabled and critical values read back before browsing; known telemetry requests denied; no crash-upload delegate. Reporting classes have not been compiled out.",
+  "nativePageAlignment": "arm64-v8a and x86_64 LOAD segments verified at 16384 bytes; armeabi-v7a at 4096 bytes. Physical devices remain unqualified."
+}

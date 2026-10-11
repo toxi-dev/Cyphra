@@ -1,0 +1,11 @@
+{
+  "manifest_version": 2,
+  "name": "Cyphra Shields",
+  "description": "Local request blocking and real page statistics. No reporting or remote configuration.",
+  "version": "0.1.0",
+  "browser_specific_settings": {"gecko": {"id": "android-shields@cyphra.org"}},
+  "permissions": ["<all_urls>", "webRequest", "webRequestBlocking", "webNavigation", "tabs", "nativeMessaging", "nativeMessagingFromContent", "geckoViewAddons"],
+  "background": {"scripts": ["vendor/adblock.js", "background.js"]},
+  "content_scripts": [{"matches": ["http://*/*", "https://*/*"], "js": ["content.js"], "run_at": "document_start", "all_frames": false}],
+  "content_security_policy": "script-src 'self'; object-src 'none'; connect-src 'self'"
+}
