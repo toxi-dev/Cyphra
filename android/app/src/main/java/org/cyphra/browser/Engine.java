@@ -140,13 +140,11 @@ public final class Engine {
         runtime.getWebExtensionController().ensureBuiltIn("resource://android/assets/shields/",EXTENSION_ID).accept(value->{
             extension=value;
             extension.setMessageDelegate(messages,"cyphra");
-            // Private tabs must have this permission before browsing is enabled.
-            // Gecko returns the live permission in ensureBuiltIn's metadata.
-            // Its permission setter always reloads active extensions, including
-            // when already allowed. Retain the same verified startup gate while
-            // avoiding that extra engine/filter restart on subsequent launches.
-            if(value.metaData!=null&&value.metaData.allowedInPrivateBrowsing)privateProtectionReady(value);
-            else runtime.getWebExtensionController().setAllowedInPrivateBrowsing(extension,true)
+            // An existing profile's permission flag does not prove its native
+            // blocker connection is live. Gecko reloads here, after attaching
+            // the message delegate, so both fresh and restored profiles must
+            // deliver the same verified rules/configuration handshake.
+            runtime.getWebExtensionController().setAllowedInPrivateBrowsing(extension,true)
                 .accept(this::privateProtectionReady,e->fail("Private-tab protection could not be enabled."));
         },e->fail("The bundled request blocker could not be installed."));
         ui.postDelayed(()->{if(!ready&&!failed)fail("Local protection did not finish starting.");},45000);

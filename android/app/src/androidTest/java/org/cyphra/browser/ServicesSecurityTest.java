@@ -112,6 +112,10 @@ public final class ServicesSecurityTest extends Instrumentation {
         try { action.run(); fail("Security policy accepted an invalid value."); }
         catch (IllegalStateException | IllegalArgumentException expected) {}
     }
+    private void rejectsWithMessage(String message,RunnableChecked action) throws Exception {
+        try { action.run(); fail("Security policy accepted an invalid value."); }
+        catch (IllegalStateException expected) { assertEquals(message,expected.getMessage()); }
+    }
     private interface RunnableChecked { void run() throws Exception; }
     private static void fail(String message) { throw new AssertionError(message); }
     private static void assertTrue(boolean value) { if (!value) fail("Expected true."); }
@@ -281,7 +285,13 @@ public final class ServicesSecurityTest extends Instrumentation {
     }
 
     public void testSavedApkMustPassEveryInstallCheck() throws Exception {
-        UpdateClient client = updater("work");
+        // A fixed older test baseline lets the signed, deliberately non-APK
+        // fixture reach each install boundary after newer Cyphra releases.
+        // verifyPackage still reads the real installed package and certificate.
+        UpdateClient.Config baseline=new UpdateClient.Config(BuildConfig.EDITION,BuildConfig.REPOSITORY,BuildConfig.UPDATE_KEY_ID,
+            BuildConfig.UPDATE_KEY_SPKI,BuildConfig.ASSET_PREFIX,"0.0.0",1,target.getPackageName());
+        UpdateClient client = new UpdateClient(target,new BrowserStore(target,"work",BuildConfig.EDITION),baseline);
+        UpdateClient personal = new UpdateClient(target,new BrowserStore(target,"personal",BuildConfig.EDITION),baseline);
         String envelope = fixtureFile("updater-invalid-apk-" + BuildConfig.EDITION + ".json");
         JSONObject manifest = (JSONObject) invoke(client, "verifyManifest", new Class<?>[]{String.class}, envelope);
         Constructor<UpdateClient.Offer> constructor = UpdateClient.Offer.class.getDeclaredConstructor(JSONObject.class, String.class, String.class, boolean.class);
@@ -292,18 +302,22 @@ public final class ServicesSecurityTest extends Instrumentation {
         if (!folder.isDirectory() && !folder.mkdirs()) throw new IllegalStateException("Test cache could not be created.");
         File file = new File(folder, offer.name);
         File other = new File(target.getCacheDir(), "outside-" + offer.name);
+        String changed="The saved APK changed after verification. Download it again.";
         try {
             try (FileOutputStream output = new FileOutputStream(file)) { output.write('x'); }
             // Matching signed hash and size still cannot turn a non-APK into an
             // Android package, nor bypass installed package/signer policy.
-            rejects(() -> client.verifyForInstall(file, offer));
+            rejectsWithMessage("The APK package or version does not match this installation.",() -> client.verifyForInstall(file, offer));
             try (FileOutputStream output = new FileOutputStream(file)) { output.write('y'); }
-            rejects(() -> client.verifyForInstall(file, offer));
+            rejectsWithMessage(changed,() -> client.verifyForInstall(file, offer));
             try (FileOutputStream output = new FileOutputStream(file)) { output.write(new byte[]{'x','x'}); }
-            rejects(() -> client.verifyForInstall(file, offer));
+            rejectsWithMessage(changed,() -> client.verifyForInstall(file, offer));
+            // Boundary cases use the original correct size/hash, so an invalid
+            // payload cannot hide a missing cache path or mode boundary check.
+            try (FileOutputStream output = new FileOutputStream(file)) { output.write('x'); }
             try (FileOutputStream output = new FileOutputStream(other)) { output.write('x'); }
-            rejects(() -> client.verifyForInstall(other, offer));
-            rejects(() -> updater("personal").verifyForInstall(file, offer));
+            rejectsWithMessage(changed,() -> client.verifyForInstall(other, offer));
+            rejectsWithMessage(changed,() -> personal.verifyForInstall(file, offer));
         } finally { file.delete(); other.delete(); }
     }
 

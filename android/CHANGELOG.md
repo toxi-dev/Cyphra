@@ -5,7 +5,6 @@
 - Dark native Shields sheet with live counters, a readable cancellation breakdown, separate Gecko events and visible DNS settings.
 - Restore the last selected ordinary tab and native Home tabs; private tabs remain excluded.
 - Keep saved tabs intact when Android backgrounds Cyphra during protection startup.
-- Skip redundant private-addon reloads when its permission is already verified.
 - Honor safe download filenames and MIME metadata; report success only after Android publishes the file.
 - Android 12 splash resources use versioned themes for Android 10/11 compatibility.
 - Bind Android permission responses to the original request; reject overlaps and verify actual OS grants.
