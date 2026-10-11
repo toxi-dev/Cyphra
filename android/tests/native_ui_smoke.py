@@ -65,6 +65,7 @@ def main():
     parser.add_argument('--package',required=True)
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--expect-restored',action='store_true')
+    parser.add_argument('--expected-personal-marker',help='Known cookie/storage marker from an earlier upgrade fixture.')
     args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
     adb('reverse','tcp:8765','tcp:8765')
     run='native-'+str(int(time.time()));proof={'package':args.package,'fixture':{},'checks':[]}
@@ -76,7 +77,7 @@ def main():
     subprocess.run(['adb','exec-out','screencap','-p'],stdout=(args.output/'work-shields.png').open('wb'),check=True)
     shell('input keyevent 4')
     personal=fixture(args.package,'personal',run+'-personal',write='PERSONAL_MARKER')
-    expected='PERSONAL_MARKER' if args.expect_restored else None
+    expected=args.expected_personal_marker if args.expected_personal_marker is not None else 'PERSONAL_MARKER' if args.expect_restored else None
     assert personal['storage']['localBefore']==expected and personal['storage']['cookieBefore']==expected,personal
     proof['fixture']['personal']=personal
     assert not shell('pidof '+args.package+':work || true'),'Old Work process did not exit.'

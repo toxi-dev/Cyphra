@@ -128,13 +128,15 @@ def main():
     assert selected_url(session(args.package))=='about:blank'
     proof['checks'].append('Selected native Home tab and the ordinary tab count survive restart')
 
-    new_tab(True);launch(args.package,'personal',urls['private']);await_visit(run+'-private',0)
+    new_tab(True);launch(args.package,'personal',urls['private']);private=await_visit(run+'-private',0)
+    assert all(private['checks'].values()),private
+    assert private['storage']['localBefore'] is None and private['storage']['cookieBefore'] is None,private
     assert_displayed(urls['private']);assert tab_count()==4
     state=session(args.package)
     assert len(state['tabs'])==3 and selected_url(state)=='about:blank',state
     assert urls['private'] not in [tab_url(t) for t in state['tabs']]
     restart(args.package);assert_displayed('about:blank');assert tab_count()==3
-    proof['checks'].append('An active private page is excluded from saved tabs; restart returns to the last selected ordinary Home tab')
+    proof['checks'].append('A private page has isolated cookies/storage and real request filtering; it is excluded from saved tabs and restart returns to the last ordinary Home tab')
 
     restart(args.package,urls['incoming']);assert_displayed(urls['incoming'])
     await_visit(run+'-incoming',0)
