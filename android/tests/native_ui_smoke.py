@@ -21,7 +21,7 @@ def nodes():
 
 def click(label):
     for node in nodes():
-        if node.get('text')==label or node.get('content-desc')==label:
+        if node.get('text','').casefold()==label.casefold() or node.get('content-desc')==label or node.get('hint')==label:
             x1,y1,x2,y2=map(int,re.findall(r'\d+',node.get('bounds')))
             shell(f'input tap {(x1+x2)//2} {(y1+y2)//2}');time.sleep(.4);return
     raise AssertionError('Native control missing: '+label)

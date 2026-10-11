@@ -6,6 +6,7 @@ import importlib.util
 from pathlib import Path
 import shutil
 import stat
+import re
 import tempfile
 import zipfile
 
@@ -34,11 +35,13 @@ def main():
         with zipfile.ZipFile(target,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=6) as archive:
             for path in files:
                 relative=path.relative_to(root).as_posix()
-                if path.is_symlink() or path.suffix.lower() in ('.jks','.keystore','.p12','.pem'):raise ValueError('Unsafe source file.')
+                if path.is_symlink() or path.suffix.lower() in ('.jks','.keystore','.p12'):raise ValueError('Unsafe source file.')
                 info=zipfile.ZipInfo(name[:-4]+'/'+relative,date_time=(1980,1,1,0,0,0));info.create_system=3
                 info.external_attr=(stat.S_IFREG|(0o755 if path.stat().st_mode&0o111 else 0o644))<<16
                 info.compress_type=zipfile.ZIP_DEFLATED
-                archive.writestr(info,path.read_bytes())
+                data=path.read_bytes()
+                if re.search(br'^-----BEGIN (?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY-----$',data,re.M):raise ValueError('Private key in source archive.')
+                archive.writestr(info,data)
         with zipfile.ZipFile(target) as archive:
             if archive.testzip():raise ValueError('Invalid source archive.')
         digest=hashlib.file_digest(target.open('rb'),'sha256').hexdigest()
