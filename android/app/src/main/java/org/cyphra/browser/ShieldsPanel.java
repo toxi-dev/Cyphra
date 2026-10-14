@@ -26,6 +26,7 @@ import java.util.function.Consumer;
 /** A native sheet whose controls and scroll position survive live statistics updates. */
 final class ShieldsPanel {
     private final Activity activity;
+    private final Appearance appearance;
     private final Dialog dialog;
     private final Consumer<Boolean> onToggle;
     private final TextView domain, total, totalDetail, filters, strict, telemetry, nativeEvents;
@@ -34,15 +35,15 @@ final class ShieldsPanel {
     private final Switch siteSwitch;
     private boolean updating;
 
-    ShieldsPanel(Activity activity, boolean work, Consumer<Boolean> onToggle, Runnable onDismiss) {
-        this.activity=activity;this.onToggle=onToggle;
-        dialog=new Dialog(activity);
+    ShieldsPanel(Activity activity, boolean work, Appearance appearance, Consumer<Boolean> onToggle, Runnable onDismiss) {
+        this.activity=activity;this.appearance=appearance;this.onToggle=onToggle;
+        dialog=new Dialog(appearance.dialogContext(activity),appearance.dialogTheme());appearance.applyAccent(dialog.getContext());
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setOnDismissListener(ignored->onDismiss.run());
 
         LinearLayout sheet=column();
         GradientDrawable background=new GradientDrawable();
-        background.setColor(MainActivity.PANEL);
+        background.setColor(appearance.panel);
         background.setCornerRadii(new float[]{dp(22),dp(22),dp(22),dp(22),0,0,0,0});
         sheet.setBackground(background);
         sheet.setPadding(dp(20),dp(10),dp(20),dp(18));
@@ -54,20 +55,20 @@ final class ShieldsPanel {
             return insets;
         });
         View handle=new View(activity);
-        GradientDrawable handleShape=new GradientDrawable();handleShape.setColor(MainActivity.LINE);handleShape.setCornerRadius(dp(2));handle.setBackground(handleShape);
+        GradientDrawable handleShape=new GradientDrawable();handleShape.setColor(appearance.line);handleShape.setCornerRadius(dp(2));handle.setBackground(handleShape);
         LinearLayout.LayoutParams handleLayout=new LinearLayout.LayoutParams(dp(32),dp(3));
         handleLayout.gravity=Gravity.CENTER_HORIZONTAL;handleLayout.bottomMargin=dp(9);sheet.addView(handle,handleLayout);
 
         LinearLayout heading=new LinearLayout(activity);heading.setGravity(Gravity.CENTER_VERTICAL);
-        ImageView shield=new ImageView(activity);shield.setImageDrawable(new IconDrawable("shield",MainActivity.TEXT));
+        ImageView shield=new ImageView(activity);shield.setImageDrawable(new IconDrawable("shield",appearance.text));
         heading.addView(shield,new LinearLayout.LayoutParams(dp(22),dp(22)));
-        TextView title=text("Cyphra Shields",18,MainActivity.TEXT);
+        TextView title=text("Cyphra Shields",18,appearance.text);
         title.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));title.setPadding(dp(10),0,0,0);title.setAccessibilityHeading(true);
         heading.addView(title,new LinearLayout.LayoutParams(0,dp(44),1));title.setGravity(Gravity.CENTER_VERTICAL);
-        ImageButton close=new ImageButton(activity);close.setImageDrawable(new IconDrawable("close",MainActivity.MUTED));
+        ImageButton close=new ImageButton(activity);close.setImageDrawable(new IconDrawable("close",appearance.muted));
         close.setBackgroundColor(Color.TRANSPARENT);close.setPadding(dp(12),dp(12),dp(12),dp(12));close.setContentDescription("Close Shields");close.setOnClickListener(v->dismiss());
         heading.addView(close,new LinearLayout.LayoutParams(dp(48),dp(48)));sheet.addView(heading);
-        domain=text("No website in this tab",14,MainActivity.MUTED);domain.setMaxLines(2);domain.setEllipsize(TextUtils.TruncateAt.END);domain.setPadding(0,0,0,dp(14));sheet.addView(domain);
+        domain=text("No website in this tab",14,appearance.muted);domain.setMaxLines(2);domain.setEllipsize(TextUtils.TruncateAt.END);domain.setPadding(0,0,0,dp(14));sheet.addView(domain);
 
         int usableHeight=activity.getWindow().getDecorView().getHeight();
         if(usableHeight<=0)usableHeight=activity.getResources().getDisplayMetrics().heightPixels;
@@ -76,33 +77,33 @@ final class ShieldsPanel {
         LinearLayout body=column();scroll.addView(body);sheet.addView(scroll,new LinearLayout.LayoutParams(-1,-2));
 
         siteControl=column();
-        siteSwitch=new Switch(activity);siteSwitch.setText("Shields for this site");siteSwitch.setTextColor(MainActivity.TEXT);siteSwitch.setTextSize(15);
+        siteSwitch=new Switch(activity);siteSwitch.setText("Shields for this site");siteSwitch.setTextColor(appearance.text);siteSwitch.setTextSize(appearance.sp(15));appearance.markScaled(siteSwitch);siteSwitch.setThumbTintList(appearance.controlTint());
         siteSwitch.setMinHeight(dp(48));siteSwitch.setSwitchPadding(dp(12));siteControl.addView(siteSwitch,new LinearLayout.LayoutParams(-1,-2));
-        switchDetail=text("",12,MainActivity.MUTED);switchDetail.setPadding(0,0,0,dp(12));siteControl.addView(switchDetail);body.addView(siteControl);
+        switchDetail=text("",12,appearance.muted);switchDetail.setPadding(0,0,0,dp(12));siteControl.addView(switchDetail);body.addView(siteControl);
         siteSwitch.setOnCheckedChangeListener((button,enabled)->{if(!updating)this.onToggle.accept(enabled);});
         divider(body);
 
         LinearLayout summary=new LinearLayout(activity);summary.setGravity(Gravity.CENTER_VERTICAL);summary.setPadding(0,dp(12),0,dp(10));
-        total=text("0",42,MainActivity.TEXT);total.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
+        total=text("0",42,appearance.text);total.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
         summary.addView(total,new LinearLayout.LayoutParams(-2,-2));
         LinearLayout description=column();description.setPadding(dp(18),0,0,0);
-        description.addView(text("Requests blocked in this page",14,MainActivity.TEXT));
-        totalDetail=text("No page requests recorded",11,MainActivity.MUTED);totalDetail.setPadding(0,dp(4),0,0);description.addView(totalDetail);
+        description.addView(text("Requests blocked in this page",14,appearance.text));
+        totalDetail=text("No page requests recorded",11,appearance.muted);totalDetail.setPadding(0,dp(4),0,0);description.addView(totalDetail);
         summary.addView(description,new LinearLayout.LayoutParams(0,-2,1));body.addView(summary);
         filters=counter(body,"Ads and trackers");strict=counter(body,"Strict third-party filtering");telemetry=counter(body,"Telemetry blocked");
-        TextView exceptionNote=text("Telemetry blocking stays on when site filtering is off.",11,MainActivity.MUTED);exceptionNote.setPadding(0,dp(6),0,dp(12));body.addView(exceptionNote);
+        TextView exceptionNote=text("Telemetry blocking stays on when site filtering is off.",11,appearance.muted);exceptionNote.setPadding(0,dp(6),0,dp(12));body.addView(exceptionNote);
         divider(body);
         nativeEvents=counter(body,"Native tracking protection events");
-        TextView nativeNote=text("Gecko events · counted separately from requests above",11,MainActivity.MUTED);nativeNote.setPadding(0,0,0,dp(14));body.addView(nativeNote);
+        TextView nativeNote=text("Gecko events · counted separately from requests above",11,appearance.muted);nativeNote.setPadding(0,0,0,dp(14));body.addView(nativeNote);
 
-        TextView destinationsTitle=text("Blocked destinations",12,MainActivity.MUTED);destinationsTitle.setAccessibilityHeading(true);body.addView(destinationsTitle);
-        destinations=text("None recorded on this page",12,MainActivity.TEXT);destinations.setTypeface(Typeface.MONOSPACE);destinations.setMaxLines(12);destinations.setEllipsize(TextUtils.TruncateAt.END);destinations.setPadding(0,dp(6),0,dp(14));destinations.setLineSpacing(dp(3),1);body.addView(destinations);
+        TextView destinationsTitle=text("Blocked destinations",12,appearance.muted);destinationsTitle.setAccessibilityHeading(true);body.addView(destinationsTitle);
+        destinations=text("None recorded on this page",12,appearance.text);destinations.setTypeface(Typeface.MONOSPACE);destinations.setMaxLines(12);destinations.setEllipsize(TextUtils.TruncateAt.END);destinations.setPadding(0,dp(6),0,dp(14));destinations.setLineSpacing(dp(3),1);body.addView(destinations);
         divider(body);
 
-        TextView dnsTitle=text("DNS",12,MainActivity.MUTED);dnsTitle.setPadding(0,dp(12),0,0);body.addView(dnsTitle);
-        dnsName=text("",14,MainActivity.TEXT);dnsName.setPadding(0,dp(4),0,0);body.addView(dnsName);
-        dnsEndpoint=text("",12,MainActivity.MUTED);dnsEndpoint.setPadding(0,dp(4),0,0);body.addView(dnsEndpoint);
-        TextView profile=text(work?"Work · stricter filtering · WebGL off":"Personal · balanced filtering · WebGL available",11,MainActivity.MUTED);profile.setPadding(0,dp(18),0,0);body.addView(profile);
+        TextView dnsTitle=text("DNS",12,appearance.muted);dnsTitle.setPadding(0,dp(12),0,0);body.addView(dnsTitle);
+        dnsName=text("",14,appearance.text);dnsName.setPadding(0,dp(4),0,0);body.addView(dnsName);
+        dnsEndpoint=text("",12,appearance.muted);dnsEndpoint.setPadding(0,dp(4),0,0);body.addView(dnsEndpoint);
+        TextView profile=text(work?"Work · stricter filtering · WebGL off":"Personal · balanced filtering · WebGL available",11,appearance.muted);profile.setPadding(0,dp(18),0,0);body.addView(profile);
 
         dialog.setContentView(sheet);
         Window window=dialog.getWindow();
@@ -111,11 +112,11 @@ final class ShieldsPanel {
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
             window.setDimAmount(.55f);
             window.setGravity(Gravity.BOTTOM);
-            window.setNavigationBarColor(MainActivity.PANEL);
+            window.setNavigationBarColor(appearance.panel);
         }
     }
 
-    void show(){dialog.show();Window window=dialog.getWindow();if(window!=null){window.setLayout(-1,-2);window.getDecorView().requestApplyInsets();}}
+    void show(){dialog.show();appearance.decorateDialog(dialog,activity);Window window=dialog.getWindow();if(window!=null){window.setLayout(-1,-2);window.getDecorView().requestApplyInsets();}}
     void dismiss(){dialog.dismiss();}
     boolean isShowing(){return dialog.isShowing();}
 
@@ -149,12 +150,12 @@ final class ShieldsPanel {
     }
     private TextView counter(LinearLayout body,String label){
         LinearLayout row=new LinearLayout(activity);row.setGravity(Gravity.CENTER_VERTICAL);row.setMinimumHeight(dp(34));
-        TextView title=text(label,13,MainActivity.TEXT);title.setPadding(0,dp(7),dp(12),dp(7));row.addView(title,new LinearLayout.LayoutParams(0,-2,1));
-        TextView value=text("0",14,MainActivity.TEXT);value.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));value.setGravity(Gravity.END);row.addView(value,new LinearLayout.LayoutParams(-2,-2));body.addView(row);return value;
+        TextView title=text(label,13,appearance.text);title.setPadding(0,dp(7),dp(12),dp(7));row.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        TextView value=text("0",14,appearance.text);value.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));value.setGravity(Gravity.END);row.addView(value,new LinearLayout.LayoutParams(-2,-2));body.addView(row);return value;
     }
-    private void divider(LinearLayout body){View line=new View(activity);line.setBackgroundColor(MainActivity.LINE);body.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));}
+    private void divider(LinearLayout body){View line=new View(activity);line.setBackgroundColor(appearance.line);body.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));}
     private LinearLayout column(){LinearLayout view=new LinearLayout(activity);view.setOrientation(LinearLayout.VERTICAL);return view;}
-    private TextView text(String value,int size,int color){TextView view=new TextView(activity);view.setText(value);view.setTextSize(size);view.setTextColor(color);return view;}
+    private TextView text(String value,int size,int color){TextView view=new TextView(activity);view.setText(value);view.setTextSize(appearance.sp(size));view.setTextColor(color);appearance.markScaled(view);return view;}
     private static void set(TextView view,String value){if(!TextUtils.equals(view.getText(),value))view.setText(value);}
     private int dp(int value){return Math.round(value*activity.getResources().getDisplayMetrics().density);}
     private static final class BoundedScrollView extends ScrollView {

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.2 — 14 October 2026
+
+- Coordinated Graphite, Black, Light and System themes with restrained accents and original logo.
+- Live toolbar density, rail/sidebar widths, bookmarks toolbar and Focus controls.
+- New-tab layouts, section visibility, bookmark/headline limits and link behavior.
+- Appearance controls stay reachable when the rail is hidden; changes persist independently in each profile.
+- Scoped appearance reset keeps browsing data, DNS, privacy, Shield exceptions, sync and update credentials.
+- Security news remains manual; customization loads no remote assets or analytics.
+
 ## 0.7.1 — 10 October 2026
 
 - Fixed the new-tab magnifying-glass and refresh icons in XHTML.

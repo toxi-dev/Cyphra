@@ -3,68 +3,98 @@
   #cyphra-settings-panel, #cyphra-tools-panel {
     --panel-padding: 0 !important;
     --arrowpanel-padding: 0 !important;
-    --arrowpanel-background: #18191c !important;
-    --arrowpanel-color: #e5e6e9 !important;
-    --arrowpanel-border-color: #383a40 !important;
-    --panel-background: #18191c !important;
-    --panel-color: #e5e6e9 !important;
-    color-scheme: dark !important;
+    --arrowpanel-background: var(--cy-surface) !important;
+    --arrowpanel-color: var(--cy-text) !important;
+    --arrowpanel-border-color: var(--cy-line) !important;
+    --panel-background: var(--cy-surface) !important;
+    --panel-color: var(--cy-text) !important;
+    color-scheme: inherit !important;
   }
   #cyphra-settings-content, #cyphra-tools-content {
     box-sizing: border-box !important;
-    background: #18191c !important;
-    color: #e5e6e9 !important;
+    background: var(--cy-surface) !important;
+    color: var(--cy-text) !important;
     font: 12px system-ui,"Segoe UI",sans-serif !important;
   }
-  #cyphra-settings-content { width: 654px !important; max-width: calc(100vw - 32px) !important; padding: 0 !important; }
+  #cyphra-settings-content { width: 730px !important; max-width: calc(100vw - 32px) !important; padding: 0 !important; }
   .cyphra-settings-header, .cyphra-tools-header { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 24px !important; }
-  .cyphra-settings-header { padding: 20px 22px 17px !important; border-bottom: 1px solid #303237 !important; }
+  .cyphra-settings-header { padding: 20px 22px 17px !important; border-bottom: 1px solid var(--cy-line) !important; }
   #cyphra-settings-content h2, #cyphra-tools-content h2 { margin: 0 !important; font-size: 16px !important; font-weight: 600 !important; letter-spacing: -.2px !important; }
-  #cyphra-settings-content .cyphra-settings-context { margin: 5px 0 0 !important; color: #989da8 !important; font-size: 11px !important; }
+  #cyphra-settings-content .cyphra-settings-context { margin: 5px 0 0 !important; color: var(--cy-faint) !important; font-size: 11px !important; }
   #cyphra-settings-content .cyphra-settings-layout { display: grid !important; grid-template-columns: 140px minmax(0,1fr) !important; min-height: 398px !important; }
-  #cyphra-settings-content .cyphra-settings-tabs { display: flex !important; flex-direction: column !important; gap: 3px !important; margin: 0 !important; padding: 14px 10px !important; border-right: 1px solid #303237 !important; background: #151619 !important; }
-  #cyphra-settings-content .cyphra-settings-tabs button { margin: 0 !important; padding: 9px 11px !important; border: 1px solid transparent !important; border-radius: 5px !important; text-align: left !important; font-size: 11px !important; color: #a7acb5 !important; background: transparent !important; }
-  #cyphra-settings-content .cyphra-settings-tabs button:hover { background: #212328 !important; color: #e5e6e9 !important; }
-  #cyphra-settings-content .cyphra-settings-tabs button[aria-selected="true"] { background: #26292f !important; color: #f5f6f8 !important; border-color: #343842 !important; }
+  #cyphra-settings-content .cyphra-settings-tabs { display: flex !important; flex-direction: column !important; gap: 3px !important; margin: 0 !important; padding: 14px 10px !important; border-right: 1px solid var(--cy-line) !important; background: var(--cy-inset) !important; }
+  #cyphra-settings-content .cyphra-settings-tabs button { margin: 0 !important; padding: 9px 11px !important; border: 1px solid transparent !important; border-radius: 5px !important; text-align: left !important; font-size: 11px !important; color: var(--cy-muted) !important; background: transparent !important; }
+  #cyphra-settings-content .cyphra-settings-tabs button:hover { background: var(--cy-raised) !important; color: var(--cy-text) !important; }
+  #cyphra-settings-content .cyphra-settings-tabs button[aria-selected="true"] { background: var(--cy-raised) !important; color: var(--cy-text) !important; border-color: var(--cy-line) !important; }
   #cyphra-settings-content .cyphra-settings-pages { max-height: min(530px,65vh) !important; overflow: auto !important; padding: 21px 23px !important; }
   #cyphra-settings-content fieldset { border: 0 !important; margin: 0 !important; padding: 0 !important; min-width: 0 !important; }
-  #cyphra-settings-content legend { padding: 0 !important; font-size: 14px !important; font-weight: 600 !important; color: #f1f2f4 !important; }
-  #cyphra-settings-content p { margin: 12px 0 !important; font-size: 11px !important; color: #a8adb7 !important; line-height: 1.6 !important; }
-  #cyphra-settings-content h3, #cyphra-tools-content h3 { font-weight: 600 !important; font-size: 11px !important; margin: 21px 0 8px !important; color: #d7dbe1 !important; }
-  #cyphra-settings-content .cyphra-setting-field { display: block !important; margin: 15px 0 !important; color: #cdd0d7 !important; font-size: 11px !important; }
+  #cyphra-settings-content legend { padding: 0 !important; font-size: 14px !important; font-weight: 600 !important; color: var(--cy-text) !important; }
+  #cyphra-settings-content p { margin: 12px 0 !important; font-size: 11px !important; color: var(--cy-muted) !important; line-height: 1.6 !important; }
+  #cyphra-settings-content h3, #cyphra-tools-content h3 { font-weight: 600 !important; font-size: 11px !important; margin: 21px 0 8px !important; color: var(--cy-subtle) !important; }
+  #cyphra-settings-content .cyphra-setting-field { display: block !important; margin: 15px 0 !important; color: var(--cy-subtle) !important; font-size: 11px !important; }
   #cyphra-settings-content input, #cyphra-settings-content select, #cyphra-settings-content textarea {
     box-sizing: border-box !important; display: block !important; width: 100% !important; margin-top: 7px !important; padding: 8px 9px !important;
-    border: 1px solid #3e4149 !important; border-radius: 5px !important; background: #111215 !important; color: #eeeef1 !important; font: inherit !important;
+    border: 1px solid var(--cy-strong) !important; border-radius: 5px !important; background: var(--cy-inset) !important; color: var(--cy-text) !important; font: inherit !important;
   }
-  #cyphra-settings-content input::placeholder { color: #858b97 !important; }
+  #cyphra-settings-content input::placeholder { color: var(--cy-faint) !important; }
   #cyphra-settings-content textarea { height: 76px !important; overflow-wrap: anywhere !important; }
-  #cyphra-settings-content .cyphra-setting-check { display: flex !important; align-items: flex-start !important; gap: 9px !important; margin: 17px 0 !important; line-height: 1.5 !important; color: #c4c8d0 !important; font-size: 11px !important; }
-  #cyphra-settings-content .cyphra-setting-check input { width: 15px !important; height: 15px !important; margin: 1px 0 0 !important; padding: 0 !important; flex: none !important; accent-color: #788bb0 !important; }
+  #cyphra-settings-content .cyphra-setting-check { display: flex !important; align-items: flex-start !important; gap: 9px !important; margin: 17px 0 !important; line-height: 1.5 !important; color: var(--cy-subtle) !important; font-size: 11px !important; }
+  #cyphra-settings-content .cyphra-setting-check input { width: 15px !important; height: 15px !important; margin: 1px 0 0 !important; padding: 0 !important; flex: none !important; accent-color: var(--cy-accent) !important; }
   #cyphra-settings-content button, #cyphra-tools-content button {
-    appearance: none !important; margin: 0 !important; padding: 8px 11px !important; background: #26282d !important; background-image: none !important;
-    color: #e0e3e9 !important; border: 1px solid #3c3f47 !important; border-radius: 5px !important; font: inherit !important;
+    appearance: none !important; margin: 0 !important; padding: 8px 11px !important; background: var(--cy-raised) !important; background-image: none !important;
+    color: var(--cy-subtle) !important; border: 1px solid var(--cy-strong) !important; border-radius: 5px !important; font: inherit !important;
   }
-  #cyphra-settings-content button:hover:enabled, #cyphra-tools-content button:hover:enabled { background: #30333b !important; border-color: #505562 !important; }
+  #cyphra-settings-content button:hover:enabled, #cyphra-tools-content button:hover:enabled { background: var(--cy-hover) !important; border-color: var(--cy-strong) !important; }
   #cyphra-settings-content button:disabled, #cyphra-tools-content button:disabled, #cyphra-settings-content input:disabled { opacity: .45 !important; }
   #cyphra-settings-content .cyphra-setting-actions { display: flex !important; flex-wrap: wrap !important; gap: 7px !important; margin: 12px 0 !important; }
   #cyphra-settings-content .cyphra-setting-actions button { font-size: 10.5px !important; }
-  #cyphra-settings-content .cyphra-setting-summary { padding: 10px 0 !important; border-block: 1px solid #303237 !important; overflow-wrap: anywhere !important; color: #bcc2cc !important; font-size: 10.5px !important; }
-  #cyphra-settings-content .cyphra-installed-version { font-size: 14px !important; color: #eceef2 !important; }
-  #cyphra-settings-content .cyphra-settings-footer { padding: 0 22px !important; border-top: 1px solid #303237 !important; min-height: 42px !important; }
-  #cyphra-settings-content #cyphra-settings-status { margin: 12px 0 !important; font-size: 10.5px !important; color: #dce3ee !important; overflow-wrap: anywhere !important; }
-  #cyphra-settings-content .cyphra-settings-close, #cyphra-tools-content .cyphra-tools-close { display: grid !important; place-items: center !important; width: 26px !important; height: 26px !important; padding: 0 !important; border: 0 !important; background: transparent !important; font-size: 20px !important; font-weight: 400 !important; color: #939aa6 !important; }
+  #cyphra-settings-content .cyphra-setting-summary { padding: 10px 0 !important; border-block: 1px solid var(--cy-line) !important; overflow-wrap: anywhere !important; color: var(--cy-subtle) !important; font-size: 10.5px !important; }
+  #cyphra-settings-content .cyphra-installed-version { font-size: 14px !important; color: var(--cy-text) !important; }
+  #cyphra-settings-content .cyphra-settings-footer { padding: 0 22px !important; border-top: 1px solid var(--cy-line) !important; min-height: 42px !important; }
+  #cyphra-settings-content #cyphra-settings-status { margin: 12px 0 !important; font-size: 10.5px !important; color: var(--cy-subtle) !important; overflow-wrap: anywhere !important; }
+  #cyphra-settings-content .cyphra-settings-close, #cyphra-tools-content .cyphra-tools-close { display: grid !important; place-items: center !important; width: 26px !important; height: 26px !important; padding: 0 !important; border: 0 !important; background: transparent !important; font-size: 20px !important; font-weight: 400 !important; color: var(--cy-faint) !important; }
   #cyphra-settings-content [hidden], #cyphra-tools-content [hidden] { display: none !important; }
-  #cyphra-settings-content :focus-visible, #cyphra-tools-content :focus-visible { outline: 2px solid #8b9dc0 !important; outline-offset: 2px !important; }
+  #cyphra-settings-content :focus-visible, #cyphra-tools-content :focus-visible { outline: 2px solid var(--cy-accent) !important; outline-offset: 2px !important; }
   #cyphra-tools { padding-inline: 7px !important; }
   #cyphra-tools .toolbarbutton-text { display: block !important; font-size: 11px !important; }
   #cyphra-tools-content { width: 442px !important; max-width: calc(100vw - 32px) !important; padding: 20px !important; max-height: 85vh !important; overflow: auto !important; }
   .cyphra-tools-header { margin-bottom: 17px !important; }
-  #cyphra-tools-content p { margin: 9px 0 !important; color: #a4abb7 !important; font-size: 10.5px !important; line-height: 1.5 !important; }
+  #cyphra-tools-content p { margin: 9px 0 !important; color: var(--cy-muted) !important; font-size: 10.5px !important; line-height: 1.5 !important; }
   .cyphra-page-tools { display: grid !important; grid-template-columns: repeat(2, 1fr) !important; gap: 6px !important; }
-  .cyphra-browser-tools { display: flex !important; gap: 7px !important; border-block: 1px solid #303237 !important; padding: 12px 0 !important; margin-top: 13px !important; }
+  .cyphra-browser-tools { display: flex !important; gap: 7px !important; border-block: 1px solid var(--cy-line) !important; padding: 12px 0 !important; margin-top: 13px !important; }
   .cyphra-browser-tools button { flex: 1 !important; }
-  #cyphra-tools-content button[aria-pressed="true"] { background: #293448 !important; border-color: #566889 !important; color: #e8efff !important; }
+  #cyphra-tools-content button[aria-pressed="true"] { background: var(--cy-accent-wash) !important; border-color: var(--cy-strong) !important; color: var(--cy-text) !important; }
   .cyphra-local-tools { display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 6px !important; margin: 9px 0 !important; }
   .cyphra-page-tools button, .cyphra-local-tools button, .cyphra-browser-tools button { font-size: 10.5px !important; }
-  #cyphra-tools-content textarea { box-sizing: border-box !important; width: 100% !important; height: 78px !important; resize: vertical !important; padding: 9px !important; color: #e5e5eb !important; background: #111215 !important; border: 1px solid #3e4149 !important; border-radius: 5px !important; font: 11px ui-monospace, monospace !important; }
+  #cyphra-tools-content textarea { box-sizing: border-box !important; width: 100% !important; height: 78px !important; resize: vertical !important; padding: 9px !important; color: var(--cy-subtle) !important; background: var(--cy-inset) !important; border: 1px solid var(--cy-strong) !important; border-radius: 5px !important; font: 11px ui-monospace, monospace !important; }
+  #cyphra-settings-content .cyphra-theme-choices { display: grid !important; grid-template-columns: repeat(2,minmax(0,1fr)) !important; gap: 9px !important; margin: 10px 0 18px !important; }
+  #cyphra-settings-content .cyphra-theme-choice { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 6px !important; padding: 9px !important; text-align: left !important; background: var(--cy-inset) !important; border-color: var(--cy-line) !important; border-radius: 8px !important; }
+  #cyphra-settings-content .cyphra-theme-choice[aria-pressed="true"] { border-color: var(--cy-accent) !important; box-shadow: 0 0 0 1px var(--cy-accent) !important; }
+  #cyphra-settings-content .cyphra-theme-choice strong { color: var(--cy-text) !important; font-size: 11px !important; font-weight: 600 !important; }
+  #cyphra-settings-content .cyphra-theme-description { color: var(--cy-muted) !important; font-size: 10px !important; }
+  #cyphra-settings-content .cyphra-theme-preview { --preview-bg: #101115; --preview-bar: #202329; --preview-line: #3a404a; display: block !important; height: 58px !important; overflow: hidden !important; border: 1px solid var(--preview-line) !important; border-radius: 4px !important; background: var(--preview-bg) !important; }
+  #cyphra-settings-content .cyphra-theme-preview[data-preview-theme="black"] { --preview-bg: #050505; --preview-bar: #151515; --preview-line: #363636; }
+  #cyphra-settings-content .cyphra-theme-preview[data-preview-theme="light"] { --preview-bg: #f6f7f9; --preview-bar: #e0e5ed; --preview-line: #bac5d4; }
+  #cyphra-settings-content .cyphra-theme-preview-bar { display: flex !important; gap: 5px !important; height: 14px !important; padding: 4px 6px 0 !important; background: var(--preview-bar) !important; }
+  #cyphra-settings-content .cyphra-theme-preview-bar span { display: block !important; width: 35% !important; height: 7px !important; border-radius: 2px 2px 0 0 !important; background: var(--preview-bg) !important; }
+  #cyphra-settings-content .cyphra-theme-preview-bar span + span { width: 23% !important; opacity: .45 !important; }
+  #cyphra-settings-content .cyphra-theme-preview-page { display: flex !important; flex-direction: column !important; align-items: center !important; gap: 7px !important; padding: 10px 15px !important; }
+  #cyphra-settings-content .cyphra-theme-preview-search { width: 78% !important; height: 7px !important; border: 1px solid var(--preview-line) !important; border-radius: 3px !important; }
+  #cyphra-settings-content .cyphra-theme-preview-lines { width: 54% !important; height: 2px !important; background: var(--preview-line) !important; }
+  #cyphra-settings-content .cyphra-accent-choices { display: flex !important; flex-wrap: wrap !important; gap: 6px !important; margin: 10px 0 18px !important; }
+  #cyphra-settings-content .cyphra-accent-choices button { display: flex !important; align-items: center !important; gap: 6px !important; padding: 7px 9px !important; font-size: 10px !important; background: var(--cy-inset) !important; border-color: var(--cy-line) !important; }
+  #cyphra-settings-content .cyphra-accent-choices button[aria-pressed="true"] { border-color: var(--cy-accent) !important; background: var(--cy-accent-wash) !important; }
+  #cyphra-settings-content .cyphra-accent-swatch { display: block !important; width: 10px !important; height: 10px !important; border-radius: 50% !important; background: #a5b4cd !important; }
+  #cyphra-settings-content [data-accent="blue"] .cyphra-accent-swatch { background: #91b4e5 !important; }
+  #cyphra-settings-content [data-accent="teal"] .cyphra-accent-swatch { background: #89c8bd !important; }
+  #cyphra-settings-content [data-accent="amber"] .cyphra-accent-swatch { background: #d3b57c !important; }
+  #cyphra-settings-content [data-accent="rose"] .cyphra-accent-swatch { background: #d3a4b4 !important; }
+  #cyphra-settings-content .cyphra-setting-grid { display: grid !important; grid-template-columns: repeat(2,minmax(0,1fr)) !important; column-gap: 14px !important; }
+  #cyphra-settings-content .cyphra-setting-grid .cyphra-setting-field { margin: 8px 0 !important; }
+  #cyphra-settings-content .cyphra-setting-hint { color: var(--cy-faint) !important; font-size: 10px !important; }
+  @media (max-width: 620px) {
+    #cyphra-settings-content .cyphra-settings-layout { grid-template-columns: 118px minmax(0,1fr) !important; }
+    #cyphra-settings-content .cyphra-settings-pages { padding: 17px 15px !important; }
+    #cyphra-settings-content .cyphra-theme-choices, #cyphra-settings-content .cyphra-setting-grid { grid-template-columns: minmax(0,1fr) !important; }
+  }
 }

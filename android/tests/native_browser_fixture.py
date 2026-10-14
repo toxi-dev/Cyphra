@@ -8,11 +8,13 @@ import json
 import pathlib
 import re
 import threading
+import time
 import urllib.parse
 
 ROOT = pathlib.Path(__file__).resolve().parent
 EVENTS = []
 RESULTS = []
+CONTEXT_PHASES = {}
 LOCK = threading.Lock()
 LOG = pathlib.Path("/tmp/cyphra-native-fixture-requests.jsonl")
 TRACKED = {
@@ -93,6 +95,43 @@ async function webAuthn(method){
 })().catch(error=>{document.getElementById('status').textContent='Fixture error: '+error.name;});
 </script></body></html>'''
 
+DOWNLOAD_DOCUMENT = r'''<!doctype html><html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Cyphra attachment document</title>
+<style>body{font:16px system-ui;padding:24px;line-height:1.6}h1{font-size:22px}</style>
+</head><body><h1>Attachment document retained</h1><p>This document reports its live identity to the loopback fixture.</p>
+<script>
+const token=__TOKEN__, run=__RUN__;let sequence=0;
+async function pulse(){await fetch('/document-state?run='+encodeURIComponent(run),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,sequence:++sequence,url:location.href,title:document.title})});}
+pulse();setInterval(pulse,500);
+</script></body></html>'''
+
+ATTACHMENT_CONTEXT_DOCUMENT = r'''<!doctype html><html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Cyphra live Shields document</title>
+<style>body{font:16px system-ui;padding:24px;line-height:1.6}h1{font-size:22px}</style>
+</head><body><h1>Live attachment protection fixture</h1><p id="state">Starting measured probes.</p>
+<script>
+const token=__TOKEN__, run=__RUN__;let last=-1,busy=false;
+history.replaceState(null,'',location.pathname+location.search+'#live-document');
+function ad(phase){return new Promise(resolve=>{
+ const script=document.createElement('script');let finished=false;
+ function done(value){if(finished)return;finished=true;resolve(value);}
+ script.onload=()=>done('loaded');script.onerror=()=>done('blocked');
+ setTimeout(()=>done('timeout'),6000);script.src='/ads/cbr.js?run='+encodeURIComponent(run+'-p'+phase);document.head.appendChild(script);
+});}
+async function pulse(){
+ if(busy)return;busy=true;
+ try{
+  const {phase}=await(await fetch('/context-control?run='+encodeURIComponent(run),{cache:'no-store'})).json();
+  if(phase!==last){last=phase;navigator.sendBeacon('/api/1/envelope?run='+encodeURIComponent(run+'-p'+phase)+'&sentry_key=fixture','fixture-only');
+   const result={token,phase,url:location.href,ad:await ad(phase)};
+   await fetch('/context-result?run='+encodeURIComponent(run),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(result)});
+   document.getElementById('state').textContent='Measured phase '+phase;
+  }
+ }finally{busy=false;}
+}
+pulse();setInterval(pulse,400);
+</script></body></html>'''
+
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, *_args):
@@ -136,6 +175,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
             with LOCK:
                 found = [e for e in RESULTS if not run or e["run"] == run]
             return self.send(found)
+        if parsed.path == "/api/requests":
+            with LOCK:
+                counts = collections.Counter(e["path"] for e in EVENTS if e["run"] == run)
+            return self.send({"run": run, "counts": dict(counts)})
+        if parsed.path == "/download-document":
+            token = str(time.time_ns())
+            return self.send(DOWNLOAD_DOCUMENT.replace("__TOKEN__", json.dumps(token)).replace("__RUN__", json.dumps(run)), "text/html")
+        if parsed.path == "/attachment-context":
+            return self.send(ATTACHMENT_CONTEXT_DOCUMENT.replace("__TOKEN__", json.dumps(str(time.time_ns()))).replace("__RUN__", json.dumps(run)), "text/html")
+        if parsed.path == "/context-control":
+            with LOCK:
+                phase = CONTEXT_PHASES.get(run, 0)
+            return self.send({"phase": phase})
         if parsed.path == "/download":
             # The opaque URL deliberately has no filename or extension.
             data = b"Cyphra native download fixture\n"
@@ -166,11 +218,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
         payload = self.rfile.read(length)
         parsed = urllib.parse.urlsplit(self.path)
         body = None
-        if parsed.path == "/result":
+        if parsed.path in ("/result", "/document-state", "/context-result", "/context-control"):
             try:
                 body = json.loads(payload)
             except (ValueError, UnicodeError):
                 return self.send({"error": "Invalid result"}, status=400)
+        if parsed.path == "/context-control":
+            phase = body.get("phase") if isinstance(body, dict) else None
+            if type(phase) is not int or phase not in (0, 1, 2):
+                return self.send({"error": "Invalid context phase"}, status=400)
+            run = urllib.parse.parse_qs(parsed.query).get("run", [""])[0][:64]
+            with LOCK:
+                CONTEXT_PHASES[run] = phase
         self.event(body)
         return self.send({"received": True})
 

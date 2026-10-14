@@ -1,6 +1,6 @@
 # Cyphra for Android
 
-The Android application uses native Java chrome and pinned Mozilla GeckoView **157.0.20261005135250** (Gecko 157.0.1). It contains no Chromium, Electron or Android WebView runtime. Android version **0.1.1** is independent of the desktop version.
+The Android application uses native Java chrome and pinned Mozilla GeckoView **157.0.20261005135250** (Gecko 157.0.1). It contains no Chromium, Electron or Android WebView runtime. Android version **0.1.2** is independent of the desktop version.
 
 The public APK installs independently of the desktop browser:
 
@@ -16,7 +16,21 @@ Work and Personal have separate app-private Gecko profiles, cookies, local stora
 
 Work uses stricter request filtering, HTTPS-only mode, fingerprint resistance and disabled WebGL. Personal uses balanced filtering, cookie partitioning and WebGL compatibility. Core TLS validation and telemetry policy remain enforced. Work may need per-site Shields exceptions for sites that depend on third-party scripts.
 
-Cyphra Shields uses the bundled, authenticated EasyList/EasyPrivacy snapshot and shows actual cancelled requests. Native tracking events are displayed separately to avoid counting a cancellation twice. The dark native Shields sheet updates counters in place so live traffic does not reset its controls or scroll position. Site exceptions do not enable known telemetry endpoints. The home screen is native and offline; security-reading links open only when selected. Brave Search is the only search provider. Tabs, bookmarks, downloads, desktop-site requests, website permission dialogs and local JSON/Base64/URL/SHA-256 tools are included.
+Cyphra Shields uses the bundled, authenticated EasyList/EasyPrivacy snapshot and shows actual cancelled requests. Native tracking events are displayed separately to avoid counting a cancellation twice. The native Shields sheet updates counters in place so live traffic does not reset its controls or scroll position. Site exceptions do not enable known telemetry endpoints. The home screen is native and offline; security-reading links open only when selected. Brave Search is the only search provider. Tabs, bookmarks, downloads, desktop-site requests, website permission dialogs and local JSON/Base64/URL/SHA-256 tools are included.
+
+## Appearance
+
+Settings → Appearance and Home → Customize Home open the native customization screen. Its preview shows the selected colors, text size, spacing and toolbar controls. Work and Personal save their choices independently, in both editions.
+
+- Graphite, Black, Light or System themes; System follows Android's light/dark setting.
+- Neutral, Blue, Teal or Amber accents, applied to native controls and selection states.
+- Compact or Comfortable spacing and 90%, 100%, 110% or 125% interface text size. Android's own font-size preference also applies; native controls retain 48dp minimum touch heights.
+- Optional Forward and Reload toolbar buttons. The original Cyphra logo always opens Home; Forward and Reload remain in the menu.
+- Home bookmark visibility, List or Grid layout, a limit of 4, 8 or 12 shortcuts, and security-reading visibility.
+
+Changes apply immediately to native chrome, Home, Shields and dialogs without restarting Gecko or reloading the selected page. They style browser controls; they do not force website colors or change fingerprint protection. Reset appearance restores only these visual preferences. Bookmarks, tabs, cookies, DNS and security settings are kept. Appearance choices are local to the profile and are excluded from sync.
+
+Attachment responses keep the previous document's address and title. Downloads opened from Home leave Home selected, and the attachment URL is excluded from that restored tab. Cancelling or finishing the response closes an otherwise blank download session; a newer navigation is kept intact.
 
 ## DNS, sync and updates
 

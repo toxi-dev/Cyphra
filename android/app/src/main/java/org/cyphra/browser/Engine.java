@@ -49,6 +49,8 @@ public final class Engine {
     private final File profile,config;
     private final WeakHashMap<GeckoSession,String> pageUrls=new WeakHashMap<>();
     private final WeakHashMap<GeckoSession,Stats> statistics=new WeakHashMap<>();
+    private final WeakHashMap<GeckoSession,Stats> previousStatistics=new WeakHashMap<>();
+    private final WeakHashMap<GeckoSession,String> documentIds=new WeakHashMap<>();
     private final HashMap<Integer,WeakReference<GeckoSession>> tabSessions=new HashMap<>();
     private final Set<String> exceptions=new HashSet<>();
     private Listener listener;
@@ -205,8 +207,28 @@ public final class Engine {
         if(extension!=null)session.getWebExtensionController().setMessageDelegate(extension,messages,"cyphra");
     }
     public void onPageStart(GeckoSession session,String uri){
+        if(!previousStatistics.containsKey(session))previousStatistics.put(session,snapshot(session));
         pageUrls.put(session,uri==null?"":uri);statistics.put(session,empty());
         session.getSettings().setUseTrackingProtection(shieldsEnabled(hostOf(uri)));
+        emitStats(session,snapshot(session));
+    }
+    /** An attachment leaves its initiating document, including its actual counters, alive. */
+    public void restoreDocument(GeckoSession session,String uri){
+        String pendingUri=pageUrls.get(session);pageUrls.put(session,uri);Stats previous=previousStatistics.remove(session);
+        Stats pending=snapshot(session);
+        if(previous==null){if(!uri.equals(pendingUri))statistics.put(session,empty());}
+        else{
+            LinkedHashSet<String> hosts=new LinkedHashSet<>(previous.hosts);
+            for(String host:pending.hosts){if(hosts.size()>=32)break;hosts.add(host);}
+            // No new document was committed: native cancellations observed
+            // during the attachment belong to this still-live session/page.
+            statistics.put(session,new Stats(previous.blocked,previous.filters,previous.telemetry,previous.strict,
+                Math.min(1000000,previous.nativeBlocked+pending.nativeBlocked),rules,isReady(),updatedAt,new ArrayList<>(hosts)));
+        }
+        session.getSettings().setUseTrackingProtection(shieldsEnabled(hostOf(uri)));
+        for(Map.Entry<Integer,WeakReference<GeckoSession>> entry:tabSessions.entrySet())if(entry.getValue().get()==session&&port!=null){
+            JSONObject message=new JSONObject();try{message.put("type","restore-document");message.put("tabId",entry.getKey());message.put("url",uri);port.postMessage(message);}catch(JSONException error){fail("The document protection context could not be restored.");}break;
+        }
         emitStats(session,snapshot(session));
     }
     public Stats snapshot(GeckoSession session){Stats found=statistics.get(session);return found==null?empty():found;}
@@ -293,6 +315,12 @@ public final class Engine {
             if("bind".equals(message.optString("type"))&&message.optInt("tabId",-1)>=0&&pageUrls.containsKey(sender.session)){
                 tabSessions.values().removeIf(ref->ref.get()==null||!ref.get().isOpen());
                 tabSessions.put(message.optInt("tabId"),new WeakReference<>(sender.session));
+                // A progress stop and a same-URL bind can both finish an
+                // attachment. A new isolated content world proves a new document.
+                String documentId=message.optString("documentId");
+                if(documentId.matches("[a-f0-9]{32}")&&!documentId.equals(documentIds.get(sender.session))){
+                    documentIds.put(sender.session,documentId);previousStatistics.remove(sender.session);
+                }
                 receiveStats(sender.session,message.optJSONObject("snapshot"));
             }
             return GeckoResult.fromValue(null);

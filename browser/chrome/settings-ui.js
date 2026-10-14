@@ -5,6 +5,7 @@ var CyphraSettings = (() => {
   function install(win) {
     const doc = win.document;
     const edition = win.CyphraEdition || {};
+    const { Appearance, APPEARANCE_PREFERENCES } = ChromeUtils.importESModule('resource://cyphra/modules/appearance.sys.mjs');
     const element = (tag, attrs = {}, text = '') => {
       const node = doc.createElementNS(HTML, tag);
       for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
@@ -95,27 +96,93 @@ var CyphraSettings = (() => {
         input.disabled = Services.prefs.prefIsLocked(pref);
       });
     };
-    const select = (parent, label, pref, values, integer = false) => {
-      const input = field(parent, label, {}, 'select');
-      for (const [value, title] of values) input.append(element('option', { value }, title));
-      input.addEventListener('change', () => integer ? Services.prefs.setIntPref(pref, Number(input.value)) : Services.prefs.setStringPref(pref, input.value));
-      preferenceControls.push(() => {
-        input.value = integer ? Services.prefs.getIntPref(pref) : Services.prefs.getStringPref(pref);
-        input.disabled = Services.prefs.prefIsLocked(pref);
-      });
+    const appearanceControls = [];
+    const appearanceState = () => Appearance.read(win.matchMedia('(prefers-color-scheme: dark)').matches);
+    const saveAppearance = (key, value) => {
+      try { Appearance.set(key, value); status.textContent = 'Appearance saved for this profile.'; }
+      catch (error) { status.textContent = error.message || String(error); }
+      refreshAppearance();
     };
+    const appearanceSelect = (parent, label, key, values) => {
+      const input = field(parent, label, { id: 'cyphra-appearance-' + key }, 'select');
+      for (const [value, title] of values) input.append(element('option', { value }, title));
+      const definition = APPEARANCE_PREFERENCES[key];
+      input.addEventListener('change', () => saveAppearance(key, definition.type === 'integer' ? Number(input.value) : input.value));
+      appearanceControls.push(state => { input.value = String(state[key]); input.disabled = Services.prefs.prefIsLocked(definition.pref); });
+      return input;
+    };
+    const appearanceCheck = (parent, label, key) => {
+      const row = element('label', { class: 'cyphra-setting-check' });
+      const input = element('input', { type: 'checkbox', id: 'cyphra-appearance-' + key });
+      row.append(input, element('span', {}, label)); parent.append(row);
+      input.addEventListener('change', () => saveAppearance(key, input.checked));
+      appearanceControls.push(state => { input.checked = state[key]; input.disabled = Services.prefs.prefIsLocked(APPEARANCE_PREFERENCES[key].pref); });
+    };
+    function refreshAppearance() {
+      const state = appearanceState();
+      for (const apply of appearanceControls) apply(state);
+    }
+    const appearance = group('Appearance');
+    appearance.append(element('p', {}, 'Make this profile your own. Changes appear immediately in browser controls and new tabs.'));
+    appearance.append(element('h3', {}, 'Theme'));
+    const themes = element('div', { class: 'cyphra-theme-choices', role: 'group', 'aria-label': 'Browser theme' });
+    for (const [value, title, description] of [
+      ['graphite', 'Graphite', 'Soft dark surfaces'], ['black', 'Black', 'Deeper neutral blacks'],
+      ['light', 'Light', 'Clear, quiet light surfaces'], ['system', 'System', 'Follow this device’s theme'],
+    ]) {
+      const choice = element('button', { type: 'button', class: 'cyphra-theme-choice', 'data-theme': value, id: 'cyphra-theme-' + value, 'aria-pressed': 'false' });
+      const preview = element('span', { class: 'cyphra-theme-preview', 'aria-hidden': 'true', 'data-preview-theme': value });
+      const bar = element('span', { class: 'cyphra-theme-preview-bar' });
+      bar.append(element('span'), element('span'));
+      const page = element('span', { class: 'cyphra-theme-preview-page' });
+      page.append(element('span', { class: 'cyphra-theme-preview-search' }), element('span', { class: 'cyphra-theme-preview-lines' }));
+      preview.append(bar, page);
+      choice.append(preview, element('strong', {}, title), element('span', { class: 'cyphra-theme-description' }, description));
+      choice.addEventListener('click', () => saveAppearance('theme', value));
+      appearanceControls.push(state => {
+        choice.setAttribute('aria-pressed', String(state.theme === value));
+        choice.disabled = Services.prefs.prefIsLocked(APPEARANCE_PREFERENCES.theme.pref);
+        if (value === 'system') preview.setAttribute('data-preview-theme', state.resolvedTheme === 'black' ? 'graphite' : state.resolvedTheme);
+      });
+      themes.append(choice);
+    }
+    appearance.append(themes, element('h3', {}, 'Accent'));
+    const accents = element('div', { class: 'cyphra-accent-choices', role: 'group', 'aria-label': 'Accent color' });
+    for (const [value, title] of [['slate','Slate'], ['blue','Blue'], ['teal','Teal'], ['amber','Amber'], ['rose','Rose']]) {
+      const choice = element('button', { type: 'button', 'data-accent': value, 'aria-pressed': 'false' });
+      choice.append(element('span', { class: 'cyphra-accent-swatch', 'aria-hidden': 'true' }), element('span', {}, title));
+      choice.addEventListener('click', () => saveAppearance('accent', value));
+      appearanceControls.push(state => {
+        choice.setAttribute('aria-pressed', String(state.accent === value));
+        choice.disabled = Services.prefs.prefIsLocked(APPEARANCE_PREFERENCES.accent.pref);
+      });
+      accents.append(choice);
+    }
+    appearance.append(accents, element('h3', {}, 'Layout'));
+    const layoutControls = element('div', { class: 'cyphra-setting-grid' }); appearance.append(layoutControls);
+    appearanceSelect(layoutControls, 'Toolbar density', 'density', [['1','Compact'], ['0','Comfortable'], ['2','Touch']]);
+    appearanceSelect(layoutControls, 'Tool rail width', 'railWidth', [['36','Slim · 36 px'], ['39','Standard · 39 px'], ['46','Roomy · 46 px']]);
+    appearanceSelect(layoutControls, 'Bookmarks sidebar starting width', 'sidebarWidth', [['200','Narrow · 200 px'], ['260','Standard · 260 px'], ['320','Wide · 320 px'], ['380','Extra wide · 380 px']]);
+    appearanceSelect(layoutControls, 'Bookmarks toolbar', 'bookmarksToolbar', [['never','Hidden'], ['newtab','New tabs only'], ['always','Always visible']]);
+    appearanceCheck(appearance, 'Show the tool rail', 'showRail');
+    appearanceCheck(appearance, 'Focus view — hide the rail and bookmarks toolbar', 'focus');
+    appearance.append(element('p', { class: 'cyphra-setting-hint' }, 'You can still drag the bookmarks sidebar divider. Settings and Tools remain available when the rail is hidden.'));
+    button(appearance, 'Reset appearance and new-tab layout', () => { Appearance.reset(); refreshAppearance(); status.textContent = 'Appearance and new-tab layout reset. Bookmarks and privacy settings are kept.'; }).id = 'cyphra-reset-appearance';
     const general = group('General');
-    general.append(element('p', {}, 'Appearance and downloads for this profile. Changes are saved on this device.'));
-    checkbox(general, 'Show the slim tool rail', 'cyphra.ui.toolRail');
-    checkbox(general, 'Focus view — hide rail and bookmarks toolbar', 'cyphra.ui.focus');
-    select(general, 'Toolbar density', 'browser.uidensity', [['1','Compact'],['0','Comfortable'],['2','Touch']], true);
-    select(general, 'Bookmarks toolbar', 'browser.toolbars.bookmarks.visibility', [['never','Hidden'],['newtab','New tabs only'],['always','Always visible']]);
+    general.append(element('p', {}, 'Download behavior and the remaining browser controls for this profile.'));
     checkbox(general, 'Ask where to save downloads', 'browser.download.useDownloadDir', true);
     button(general, 'All browser settings', () => { panel.hidePopup(); win.openPreferences(); });
     const home = group('Home');
-    home.append(element('p', {}, 'Choose what appears on a new tab. Security headlines refresh only when requested.'));
-    checkbox(home, 'Show pinned sites', 'cyphra.home.showPinned');
-    checkbox(home, 'Show security briefing', 'cyphra.home.showBriefing');
+    home.append(element('p', {}, 'Choose the layout and information on a new tab. These choices do not start news requests.'));
+    appearanceSelect(home, 'Page layout', 'homeLayout', [['balanced','Balanced · two columns'], ['wide','Wide · more room'], ['focused','Focused · one column']]);
+    appearanceCheck(home, 'Show Brave search', 'showSearch');
+    appearanceCheck(home, 'Show pinned bookmarks', 'showPinned');
+    appearanceSelect(home, 'Maximum pinned bookmarks', 'maxPins', [['4','4 bookmarks'], ['8','8 bookmarks'], ['12','12 bookmarks']]);
+    appearanceCheck(home, 'Show security briefing', 'showBriefing');
+    appearanceSelect(home, 'Maximum headlines', 'maxHeadlines', [['4','4 headlines'], ['6','6 headlines'], ['8','8 headlines']]);
+    appearanceCheck(home, 'Show publisher shortcuts', 'showPublishers');
+    appearanceCheck(home, 'Open bookmarks and articles in new tabs', 'openLinksInNewTabs');
+    home.append(element('p', { class: 'cyphra-setting-hint' }, 'Pinned sites come from the bookmarks toolbar. Security headlines refresh only when you request them; private windows never refresh news.'));
     const data = group('Data');
     data.append(element('p', {}, 'Import bookmarks and compatible browser data when you choose. Work and Personal each keep their own profile.'));
     button(data, 'Import browser data…', async () => {
@@ -264,6 +331,7 @@ var CyphraSettings = (() => {
       context.textContent = [mode === 'work' ? 'Work profile' : mode === 'personal' ? 'Personal profile' : '', edition.public ? 'Public edition' : edition.organization || ''].filter(Boolean).join(' · ');
       for (const node of actions) node.disabled = busy;
       for (const apply of preferenceControls) apply();
+      refreshAppearance();
       refreshDNS();
       const info = syncAPI().info(); const privateWindow = isPrivate();
       syncInfo.textContent = privateWindow ? 'Device sync is managed from normal windows.' : info.configured ? `Paired with ${info.endpoint}${info.lastSync ? ' · Last sync: ' + new Date(info.lastSync).toLocaleString() : ''}` : 'This profile is not paired.';
@@ -292,7 +360,17 @@ var CyphraSettings = (() => {
     panel.addEventListener('keydown', event => {
       if (event.key === 'Escape') { event.preventDefault(); panel.hidePopup(); anchor?.focus(); }
     });
-    win.CyphraSettings = { open(target) { anchor = target; status.textContent = ''; refresh(); panel.openPopup(target, 'after_end', 0, 0, false, false); } };
+    const appearanceObserver = { observe: refreshAppearance };
+    for (const name of ['cyphra.ui.', 'cyphra.home.', 'browser.uidensity', 'browser.toolbars.bookmarks.visibility']) Services.prefs.addObserver(name, appearanceObserver);
+    win.addEventListener('unload', () => {
+      for (const name of ['cyphra.ui.', 'cyphra.home.', 'browser.uidensity', 'browser.toolbars.bookmarks.visibility']) Services.prefs.removeObserver(name, appearanceObserver);
+    }, { once: true });
+    win.CyphraSettings = { open(target, category) {
+      anchor = target; status.textContent = ''; refresh();
+      const entry = groups.find(item => item.item.id === 'cyphra-settings-' + category);
+      if (entry) choose(entry);
+      panel.openPopup(target, 'after_end', 0, 0, false, false);
+    } };
   }
   return { install };
 })();

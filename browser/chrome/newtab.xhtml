@@ -5,7 +5,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src resource:; img-src resource:; form-action https://search.brave.com; base-uri 'none'; object-src 'none'" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
     <meta name="theme-color" content="#101115" />
     <title>New tab — Cyphra</title>
     <link rel="stylesheet" href="resource://cyphra-home/newtab.css" />
@@ -17,10 +17,13 @@
           <img src="resource://cyphra-home/logo.svg" width="22" height="24" alt="" />
           <strong>Cyphra</strong>
         </a>
-        <span id="cyphra-home-context" class="profile-context"></span>
+        <div class="topbar-actions">
+          <span id="cyphra-home-context" class="profile-context"></span>
+          <button id="cyphra-home-customize" class="quiet-action" type="button" aria-label="Customize this new tab">Customize</button>
+        </div>
       </header>
 
-      <section class="focus" aria-label="Search">
+      <section id="cyphra-home-search-section" class="focus" aria-label="Search">
         <form class="search" action="https://search.brave.com/search" method="get" aria-label="Web search">
           <span class="search-leading" aria-hidden="true">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="10.7" cy="10.7" r="6.6"/><path d="m15.8 15.8 4.2 4.2"/></svg>
@@ -57,7 +60,7 @@
           <div id="cyphra-home-news-empty" class="empty-state news-empty">
             <p>Load current security advisories when you need them.</p>
           </div>
-          <nav class="publishers" aria-label="News publishers">
+          <nav id="cyphra-home-publishers" class="publishers" aria-label="News publishers">
             <a href="https://www.cisa.gov/news-events/cybersecurity-advisories">CISA</a>
             <a href="https://www.ncsc.gov.uk/section/keep-up-to-date">NCSC</a>
             <a href="https://portswigger.net/research">PortSwigger Research</a>

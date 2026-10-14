@@ -1,5 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. https://mozilla.org/MPL/2.0/ */
+import { applyAppearance } from './appearance.sys.mjs';
 
 const HOME_URI = 'resource://cyphra-home/newtab.xhtml';
 const XHTML_NS = 'http://www.w3.org/1999/xhtml';
@@ -13,30 +14,16 @@ export class CyphraHomeChild extends JSWindowActorChild {
     if (event.type === 'DOMContentLoaded') {
       if (event.target !== document || this._document === document) return;
       this._document = document;
-      try {
-        const state = await this.sendQuery('Cyphra:GetHome');
-
-        if (this.document === document && state) {
-          this.applyLayout(state.layout);
-          const mode = state.context?.mode;
-          document.getElementById('cyphra-home-context').textContent = [mode === 'work' ? 'Work profile' : mode === 'personal' ? 'Personal profile' : '', state.isPrivate ? 'Private window' : ''].filter(Boolean).join(' · ');
-          document.getElementById('cyphra-home-edition').textContent = state.context?.edition || 'Cyphra';
-
-          if (state.layout?.showPinned !== false) {
-            this.renderPins(state.pins);
-          }
-
-          if (state.layout?.showBriefing !== false && state.news) {
-            this.renderNews(state.news, state.isPrivate);
-          }
-        }
-      } catch { this.status('Local shortcuts are unavailable.'); }
+      try { await this.refreshHome(); } catch { this.status('Local shortcuts are unavailable.'); }
       return;
     }
     if (event.type !== 'click' || event.button !== 0) return;
     const button = event.target.closest?.('button');
     if (!button || button.disabled) return;
-    if (button.id === 'cyphra-home-bookmarks') {
+    if (button.id === 'cyphra-home-customize') {
+      event.preventDefault();
+      try { await this.sendQuery('Cyphra:CustomizeHome'); } catch { /* Closing page. */ }
+    } else if (button.id === 'cyphra-home-bookmarks') {
       event.preventDefault();
       try { await this.sendQuery('Cyphra:OpenBookmarks'); } catch { /* Closing page. */ }
     } else if (button.id === 'cyphra-home-refresh') {
@@ -58,6 +45,28 @@ export class CyphraHomeChild extends JSWindowActorChild {
     }
   }
 
+  receiveMessage(message) {
+    if (message.name === 'Cyphra:HomeChanged' && this._document === this.document) {
+      this.refreshHome().catch(() => this.status('Local preferences could not be refreshed.'));
+    }
+  }
+
+  async refreshHome() {
+    const document = this.document;
+    const generation = this._generation = (this._generation || 0) + 1;
+    const state = await this.sendQuery('Cyphra:GetHome');
+    if (this.document !== document || generation !== this._generation || !state) return;
+    this._layout = state.layout || {};
+    this._private = Boolean(state.isPrivate);
+    if (state.appearance) applyAppearance(document, state.appearance);
+    this.applyLayout(state.layout);
+    const mode = state.context?.mode;
+    document.getElementById('cyphra-home-context').textContent = [mode === 'work' ? 'Work profile' : mode === 'personal' ? 'Personal profile' : '', state.isPrivate ? 'Private window' : ''].filter(Boolean).join(' · ');
+    document.getElementById('cyphra-home-edition').textContent = state.context?.edition || 'Cyphra';
+    if (state.layout?.showPinned !== false) this.renderPins(state.pins);
+    if (state.layout?.showBriefing !== false && state.news) this.renderNews(state.news, state.isPrivate);
+  }
+
   element(name, className, text) {
     const element = this.document.createElementNS(XHTML_NS, name);
     if (className) element.className = className;
@@ -72,6 +81,10 @@ export class CyphraHomeChild extends JSWindowActorChild {
     const pinned = this.document.getElementById('cyphra-home-pinned-section');
     const briefing = this.document.getElementById('cyphra-home-briefing-section');
     const grid = this.document.querySelector('.home-grid');
+    this.document.getElementById('cyphra-home-search-section').hidden = layout?.showSearch === false;
+    this.document.documentElement.toggleAttribute('cyphra-home-no-search', layout?.showSearch === false);
+    this.document.getElementById('cyphra-home-publishers').hidden = layout?.showPublishers === false;
+    this.document.documentElement.setAttribute('cyphra-home-layout', ['wide', 'focused'].includes(layout?.layout) ? layout.layout : 'balanced');
 
     pinned.hidden = !showPinned;
     briefing.hidden = !showBriefing;
@@ -84,11 +97,12 @@ export class CyphraHomeChild extends JSWindowActorChild {
   renderPins(pins) {
     const list = this.document.getElementById('cyphra-home-pins');
     list.replaceChildren();
-    for (const pin of (Array.isArray(pins) ? pins : []).slice(0, 12)) {
+    for (const pin of (Array.isArray(pins) ? pins : []).slice(0, this._layout?.maxPins || 12)) {
       const item = this.element('li');
       const link = this.element('a');
       link.href = pin.url;
       link.title = pin.url;
+      if (this._layout?.openLinksInNewTabs) { link.target = '_blank'; link.rel = 'noopener noreferrer'; }
       link.append(this.element('span', 'pin-title', pin.title), this.element('span', 'pin-host', pin.hostname));
       item.append(link); list.append(item);
     }
@@ -102,11 +116,12 @@ export class CyphraHomeChild extends JSWindowActorChild {
     const document = this.document;
     const list = document.getElementById('cyphra-home-articles');
     list.replaceChildren();
-    for (const article of (Array.isArray(news.articles) ? news.articles : []).slice(0, MAX_ARTICLES_SHOWN)) {
+    for (const article of (Array.isArray(news.articles) ? news.articles : []).slice(0, this._layout?.maxHeadlines || MAX_ARTICLES_SHOWN)) {
       const item = this.element('li');
       const link = this.element('a');
       link.href = article.url;
-      link.rel = 'noreferrer';
+      link.rel = 'noopener noreferrer';
+      if (this._layout?.openLinksInNewTabs) link.target = '_blank';
       const meta = this.element('span', 'article-meta');
       meta.append(this.element('span', 'article-source', article.publisher));
       if (article.published) {

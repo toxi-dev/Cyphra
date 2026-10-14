@@ -4,29 +4,24 @@ import { News } from './news.sys.mjs';
 import { headlineText, safeHomeURL } from './news-policy.sys.mjs';
 import { PlacesUtils } from 'resource://gre/modules/PlacesUtils.sys.mjs';
 import { PrivateBrowsingUtils } from 'resource://gre/modules/PrivateBrowsingUtils.sys.mjs';
+import { Appearance } from './appearance.sys.mjs';
 
 const HOME_URI = 'resource://cyphra-home/newtab.xhtml';
 
-function prefBool(name, fallback) {
-  try {
-    return Services.prefs.getBoolPref(name);
-  } catch {
-    return fallback;
-  }
-}
-
-function homeLayout() {
+function homeLayout(appearance) {
   return {
-    showPinned: prefBool('cyphra.home.showPinned', true),
-    showBriefing: prefBool('cyphra.home.showBriefing', true),
+    showSearch: appearance.showSearch, showPinned: appearance.showPinned,
+    showBriefing: appearance.showBriefing, showPublishers: appearance.showPublishers,
+    maxPins: appearance.maxPins, maxHeadlines: appearance.maxHeadlines,
+    openLinksInNewTabs: appearance.openLinksInNewTabs, layout: appearance.homeLayout,
   };
 }
-async function bookmarks() {
+async function bookmarks(maxPins) {
   const pins = [];
   // Only direct toolbar entries, in their native order. No history, favicons,
   // remote lookup, executable bookmarklets or local filesystem links.
   await PlacesUtils.bookmarks.fetch({ parentGuid: PlacesUtils.bookmarks.toolbarGuid }, item => {
-    if (pins.length >= 12 || item.type !== PlacesUtils.bookmarks.TYPE_BOOKMARK) return;
+    if (pins.length >= maxPins || item.type !== PlacesUtils.bookmarks.TYPE_BOOKMARK) return;
     const url = safeHomeURL(item.url?.href);
     if (!url) return;
     const hostname = new URL(url).hostname;
@@ -36,6 +31,14 @@ async function bookmarks() {
 }
 
 export class CyphraHomeParent extends JSWindowActorParent {
+  actorCreated() {
+    this._appearanceObserver = { observe: () => {
+      if (this.manager.documentURI?.spec !== HOME_URI) return;
+      try { this.sendAsyncMessage('Cyphra:HomeChanged'); } catch { /* Closing tab. */ }
+    } };
+    for (const name of ['cyphra.home.', 'cyphra.ui.', 'browser.uidensity']) Services.prefs.addObserver(name, this._appearanceObserver);
+  }
+
   async receiveMessage(message) {
     // A resource page can only use this actor in its own top-level context.
     // The caller cannot supply a feed URL, bookmark query, navigation target,
@@ -48,16 +51,22 @@ export class CyphraHomeParent extends JSWindowActorParent {
     if (!window || window.document.documentElement.getAttribute('windowtype') !== 'navigator:browser') return null;
     const isPrivate = PrivateBrowsingUtils.isWindowPrivate(window);
     if (message.name === 'Cyphra:GetHome') {
-      const layout = homeLayout();
+      if (!this._media) {
+        this._media = window.matchMedia('(prefers-color-scheme: dark)');
+        this._mediaListener = () => { try { this.sendAsyncMessage('Cyphra:HomeChanged'); } catch {} };
+        this._media.addEventListener('change', this._mediaListener);
+      }
+      const appearance = Appearance.read(window.matchMedia('(prefers-color-scheme: dark)').matches);
+      const layout = homeLayout(appearance);
 
       const [news, pins] = await Promise.all([
         layout.showBriefing ? News.state() : Promise.resolve(null),
-        layout.showPinned ? bookmarks().catch(() => []) : Promise.resolve([]),
+        layout.showPinned ? bookmarks(layout.maxPins).catch(() => []) : Promise.resolve([]),
       ]);
 
       const mode = window.CyphraModes?.info().mode;
       const edition = window.CyphraEdition;
-      return { news, pins, isPrivate, layout, context: {
+      return { news, pins, isPrivate, layout, appearance, context: {
         mode: mode === 'work' || mode === 'personal' ? mode : null,
         edition: edition?.displayName || 'Cyphra',
       } };
@@ -70,6 +79,19 @@ export class CyphraHomeParent extends JSWindowActorParent {
       await window.SidebarController.toggle('viewBookmarksSidebar');
       return { opened: window.SidebarController.isOpen };
     }
+    if (message.name === 'Cyphra:CustomizeHome') {
+      const anchor = window.document.getElementById('cyphra-settings-toolbar');
+      if (!anchor || !window.CyphraSettings) return { opened: false };
+      window.CyphraSettings.open(anchor, 'home');
+      return { opened: true };
+    }
     return null;
+  }
+
+  didDestroy() {
+    this._media?.removeEventListener('change', this._mediaListener);
+    if (!this._appearanceObserver) return;
+    for (const name of ['cyphra.home.', 'cyphra.ui.', 'browser.uidensity']) Services.prefs.removeObserver(name, this._appearanceObserver);
+    this._appearanceObserver = null;
   }
 }

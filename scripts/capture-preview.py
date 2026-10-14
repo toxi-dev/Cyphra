@@ -121,7 +121,7 @@ def close_native_input():
 def move_managed_browser_origin(window_tree):
     """Place twm's real browser frame at the desktop origin without resizing it."""
     import re
-    match = re.search(r'(0x[0-9a-f]+) "[^"]*": \("Navigator" "cyphra"\)', window_tree)
+    match = re.search(r'(0x[0-9a-f]+) "[^"]*": \("Navigator" "cyphra(?:-team|-public)?"\)', window_tree)
     if not match:
         raise RuntimeError('The managed native Cyphra window was not found.')
     x11 = ctypes.CDLL('libX11.so.6')
@@ -167,7 +167,7 @@ def child_capture(args):
     if args.engine_only:
         command.append('about:blank')
     with (capture_dir / 'process.log').open('wb') as log:
-        manager = None
+        manager = compositor = None
         if args.wm:
             if args.window_manager == 'twm':
                 config = capture_dir / 'twmrc'
@@ -181,6 +181,11 @@ def child_capture(args):
             time.sleep(.5)
             if manager.poll() is not None:
                 raise RuntimeError('The disposable X11 window manager failed to start: ' + (capture_dir / 'process.log').read_text(errors='replace'))
+        if args.compositor:
+            compositor = subprocess.Popen([str(args.compositor), '-n'], stdout=log, stderr=subprocess.STDOUT, env=environment)
+            time.sleep(.3)
+            if compositor.poll() is not None:
+                raise RuntimeError('The disposable desktop compositor failed to start.')
         browser = subprocess.Popen(command, cwd=scratch, env=environment,
                                    stdout=log, stderr=subprocess.STDOUT)
         try:
@@ -192,7 +197,8 @@ def child_capture(args):
                     ['xwininfo', '-root', '-tree'], capture_output=True, text=True,
                     check=True, timeout=5
                 ).stdout
-                if '"Navigator" "cyphra"' in window_tree and (args.engine_only or ('New tab' in window_tree and 'Cyphra' in window_tree)):
+                cyphra_window = any(f'"Navigator" "{name}"' in window_tree for name in ['cyphra', 'cyphra-team', 'cyphra-public'])
+                if cyphra_window and (args.engine_only or ('New tab' in window_tree and 'Cyphra' in window_tree)):
                     break
                 time.sleep(.25)
             else:
@@ -231,6 +237,13 @@ def child_capture(args):
                 except subprocess.TimeoutExpired:
                     manager.kill()
                     manager.wait(timeout=5)
+            if compositor is not None and compositor.poll() is None:
+                compositor.terminate()
+                try:
+                    compositor.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    compositor.kill()
+                    compositor.wait(timeout=5)
 
 
 def main():
@@ -242,6 +255,7 @@ def main():
     parser.add_argument('--settle', type=float, default=5)
     parser.add_argument('--timeout', type=float, default=30)
     parser.add_argument('--window-manager', choices=['none','twm','openbox'], default='none', help='Window manager for the disposable native desktop.')
+    parser.add_argument('--compositor', type=Path, help='Optional xcompmgr executable for transparent GTK popup captures; test desktop only.')
     parser.add_argument('--engine-only', action='store_true', help='Open about:blank for pristine upstream engine qualification.')
     parser.add_argument('--wm', action='store_true', help='Run the disposable X11 session under twm for native popup input checks.')
     parser.add_argument('--settings', action='store_true', help='Open the native settings panel using a real X11 click before capture.')
@@ -269,6 +283,10 @@ def main():
             parser.error(f'Required X11 capture program is unavailable: {program}')
     if args.wm and not shutil.which(args.window_manager):
         parser.error(f'{args.window_manager} is required for the selected window manager.')
+    if args.compositor:
+        args.compositor = args.compositor.resolve()
+        if not args.compositor.is_file() or not os.access(args.compositor, os.X_OK):
+            parser.error('The requested desktop compositor must be an executable file.')
     args.app = args.app.resolve()
     args.output = args.output.resolve()
     if not (args.app / 'runtime/librewolf').is_file():
@@ -298,6 +316,11 @@ def main():
         helper = scratch / 'capture.py'
         shutil.copyfile(__file__, helper)
         helper.chmod(0o644)
+        if args.compositor:
+            compositor = scratch / 'xcompmgr'
+            shutil.copyfile(args.compositor, compositor); compositor.chmod(0o755)
+        else:
+            compositor = None
         captured = scratch / 'capture/preview.png'
         command = ['xvfb-run', '-a', '-s',
                    f'-screen 0 {args.width}x{args.height}x24 -nolisten tcp',
@@ -308,6 +331,8 @@ def main():
             command.append('--settings')
         if args.wm:
             command.extend(['--window-manager', args.window_manager])
+        if compositor:
+            command.extend(['--compositor', str(compositor)])
         if args.engine_only:
             command.append('--engine-only')
         for x, y in args.click:

@@ -25,7 +25,7 @@ jobs:
           python-version: '3.12'
       - name: Install pinned Marionette driver
         run: python -m pip install --disable-pip-version-check --no-input marionette_driver==3.7.1
-      - name: Qualify the signed Windows release
+      - name: Qualify the signed Windows release and isolated profile customization
         env:
           GH_TOKEN: ${{ github.token }}
           PYTHONUNBUFFERED: '1'

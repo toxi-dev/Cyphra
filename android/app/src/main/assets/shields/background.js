@@ -18,6 +18,7 @@ const TELEMETRY_HOSTS = Object.freeze([
 ]);
 const STRICT_TYPES = new Set(['script', 'sub_frame', 'object', 'ping', 'beacon', 'websocket', 'csp_report']);
 const tabs = new Map();
+const previousTabs = new Map();
 let engine = null;
 let ready = false;
 let work = false;
@@ -51,17 +52,24 @@ function isTelemetryURL(value) {
 }
 
 function fresh(url, navigationId = '') {
-  return {url, navigationId, blocked: 0, filters: 0, telemetry: 0, strict: 0, hosts: new Set(), timer: null};
+  return {url, navigationId, documentId: null, blocked: 0, filters: 0, telemetry: 0, strict: 0, hosts: new Set(), timer: null};
 }
 
 function snapshot(tabId) {
-  const page = tabs.get(tabId);
+  return pageSnapshot(tabs.get(tabId));
+}
+
+function pageSnapshot(page) {
   return {
     ready, rules, updatedAt, host: hostOf(page?.url),
     blocked: page?.blocked || 0, filters: page?.filters || 0,
     telemetry: page?.telemetry || 0, strict: page?.strict || 0,
     hosts: page ? [...page.hosts] : [],
   };
+}
+
+function sameResource(first, second) {
+  return typeof first === 'string' && typeof second === 'string' && first.split('#', 1)[0] === second.split('#', 1)[0];
 }
 
 function notify(tabId) {
@@ -79,6 +87,9 @@ function notify(tabId) {
 function record(details, category) {
   if (details.tabId < 0) return;
   let page = tabs.get(details.tabId);
+  const prior = previousTabs.get(details.tabId);
+  const source = details.frameAncestors?.find(frame => frame.frameId === 0)?.url || details.documentUrl;
+  if(details.type !== 'main_frame' && prior && sameResource(prior.url, source)) page = prior;
   if (!page) {
     page = fresh(details.documentUrl || details.originUrl || details.url);
     tabs.set(details.tabId, page);
@@ -95,7 +106,9 @@ function record(details, category) {
 browser.webNavigation.onBeforeNavigate.addListener(details => {
   if (details.frameId !== 0 || details.tabId < 0) return;
   const old = tabs.get(details.tabId);
+  if(old && !previousTabs.has(details.tabId)) previousTabs.set(details.tabId, old);
   if (old?.timer !== null) clearTimeout(old?.timer);
+  if (old) old.timer = null;
   tabs.set(details.tabId, fresh(details.url));
 });
 
@@ -104,14 +117,21 @@ browser.webRequest.onBeforeRequest.addListener(details => {
     const old = tabs.get(details.tabId);
     // Redirects retain the request ID and the requests already cancelled for it.
     if (!old || old.navigationId !== details.requestId) {
+      if(old?.documentId && !previousTabs.has(details.tabId)) previousTabs.set(details.tabId, old);
       if (old?.timer !== null) clearTimeout(old?.timer);
+      if (old) old.timer = null;
       tabs.set(details.tabId, fresh(details.url, details.requestId));
     } else old.url = details.url;
   }
   // These denials precede exceptions. A website exception cannot enable reporting.
   if (isTelemetryURL(details.url)) { record(details, 'telemetry'); return {cancel: true}; }
   if (!ready) return {cancel: true};
-  const top = tabs.get(details.tabId)?.url;
+  // Subresources carry their actual document/ancestor origin even while a
+  // navigation ends as an attachment and leaves the old document alive.
+  const ancestor = details.frameAncestors?.find(frame => frame.frameId === 0)?.url;
+  const actualDocument = details.frameId === 0 ? details.documentUrl : ancestor;
+  const top = details.type === 'main_frame' ? tabs.get(details.tabId)?.url
+    : actualDocument || tabs.get(details.tabId)?.url;
   const topURL = /^https?:\/\//i.test(top || '') ? top
     : /^https?:\/\//i.test(details.documentUrl || '') ? details.documentUrl
     : details.originUrl || details.url;
@@ -131,7 +151,23 @@ browser.tabs.onRemoved.addListener(tabId => {
   const page = tabs.get(tabId);
   if (page?.timer !== null) clearTimeout(page?.timer);
   tabs.delete(tabId);
+  previousTabs.delete(tabId);
 });
+
+// These events change the live document's URL without replacing its JavaScript
+// world. Verify that world before updating either an active or retained page.
+function updateDocumentURL(details) {
+  if(details.frameId !== 0 || details.tabId < 0) return;
+  const current = tabs.get(details.tabId), prior = previousTabs.get(details.tabId);
+  browser.tabs.sendMessage(details.tabId, {type:'document-context'}, {frameId:0}).then(document => {
+    if(document?.url !== details.url || tabs.get(details.tabId) !== current || previousTabs.get(details.tabId) !== prior) return;
+    const page = prior?.documentId === document.documentId ? prior
+      : current?.documentId === document.documentId ? current : null;
+    if(page) page.url = document.url;
+  }).catch(() => {});
+}
+browser.webNavigation.onHistoryStateUpdated.addListener(updateDocumentURL);
+browser.webNavigation.onReferenceFragmentUpdated.addListener(updateDocumentURL);
 
 function safeTokens(tokens) {
   return Array.isArray(tokens) ? [...new Set(tokens.slice(0, 2048).filter(token =>
@@ -141,7 +177,18 @@ function safeTokens(tokens) {
 browser.runtime.onMessage.addListener((message, sender) => {
   if (sender.id !== browser.runtime.id || !sender.tab || sender.frameId !== 0) return undefined;
   const tabId = sender.tab.id;
-  if (message?.type === 'snapshot') return Promise.resolve({tabId, snapshot: snapshot(tabId)});
+  if (message?.type === 'snapshot' && typeof message.documentId === 'string' && /^[a-f0-9]{32}$/i.test(message.documentId)) {
+    const current = tabs.get(tabId), prior = previousTabs.get(tabId);
+    // An old live document can report while an attachment is pending. Its
+    // isolated-world identity cannot be supplied by the website itself.
+    if(prior?.documentId === message.documentId && !sameResource(sender.url,current?.url)) {
+      prior.url = sender.url;
+      return Promise.resolve({tabId, snapshot:pageSnapshot(prior)});
+    }
+    if(current) { current.url=sender.url;current.documentId=message.documentId; }
+    previousTabs.delete(tabId);
+    return Promise.resolve({tabId, snapshot: snapshot(tabId)});
+  }
   if (message?.type === 'cosmetics' && ready && !disabledHosts.has(hostOf(sender.url))) {
     // No arbitrary URLs or instructions from web pages are accepted.
     const parsed = new URL(sender.url);
@@ -173,6 +220,20 @@ async function start() {
   nativePort = browser.runtime.connectNative('cyphra');
   nativePort.onDisconnect.addListener(() => { ready = false; });
   nativePort.onMessage.addListener(message => {
+    if(message?.type === 'restore-document' && Number.isInteger(message.tabId) && /^https?:\/\//i.test(message.url || '')) {
+      const previous = previousTabs.get(message.tabId);
+      const pending = tabs.get(message.tabId);
+      browser.tabs.sendMessage(message.tabId, {type:'document-context'}, {frameId:0}).then(document => {
+        // A reply to an older download must never overwrite a newer navigation.
+        if(tabs.get(message.tabId) !== pending || previousTabs.get(message.tabId) !== previous) return;
+        if(!previous && pending?.documentId === document?.documentId && pending.url === message.url && document.url === message.url) {notify(message.tabId);return;}
+        if(document?.url !== message.url || !previous || !previous.documentId || previous.documentId !== document.documentId) throw new Error('Document context mismatch');
+        if(pending?.timer !== null) clearTimeout(pending?.timer);
+        previous.timer = null;previous.url = document.url;
+        tabs.set(message.tabId, previous);previousTabs.delete(message.tabId);notify(message.tabId);
+      }).catch(() => nativePort.postMessage({type:'failure'}));
+      return;
+    }
     if (message?.type !== 'configuration' || typeof message.work !== 'boolean' || !Array.isArray(message.disabledHosts)) return;
     work = message.work;
     disabledHosts = new Set(message.disabledHosts.filter(host =>

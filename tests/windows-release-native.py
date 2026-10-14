@@ -257,6 +257,166 @@ def mode_info(driver):
     ''')
 
 
+def wait_script(driver, source, timeout=30):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        value = driver.execute_script(source)
+        if value:
+            return value
+        time.sleep(.1)
+    raise RuntimeError('The shipped Windows appearance controls did not reach their expected state.')
+
+
+def appearance_security(driver):
+    """Compare actual protection/configuration, without reading any credential."""
+    driver.set_context(driver.CONTEXT_CHROME)
+    return driver.execute_script('''
+      const definitions={
+        'network.trr.mode':['int',0],'network.trr.uri':['string',''],'network.trr.custom_uri':['string',''],
+        'cyphra.dns.selection':['string',''],'toolkit.telemetry.enabled':['bool',true],
+        'datareporting.healthreport.uploadEnabled':['bool',true],'privacy.resistFingerprinting':['bool',false],
+        'webgl.disabled':['bool',false],'places.history.enabled':['bool',true],
+        'security.tls.version.min':['int',0],'security.sandbox.content.level':['int',0],
+        'network.cookie.cookieBehavior':['int',0],'dom.security.https_only_mode':['bool',false],
+        'privacy.globalprivacycontrol.enabled':['bool',false],'cyphra.updates.automatic':['bool',true],
+        'cyphra.sync.endpoint':['string',''],
+        'cyphra.privacy.siteModes':['string','{}']
+      },preferences={};
+      for(const [name,[type,fallback]] of Object.entries(definitions)){
+        const getter=type==='int'?'getIntPref':type==='bool'?'getBoolPref':'getStringPref';
+        preferences[name]={value:Services.prefs[getter](name,fallback),locked:Services.prefs.prefIsLocked(name)};
+      }
+      const {AppConstants}=ChromeUtils.importESModule('resource://gre/modules/AppConstants.sys.mjs');
+      const sync=ChromeUtils.importESModule('resource://cyphra/modules/sync.sys.mjs').Sync.info();
+      const update=ChromeUtils.importESModule('resource://cyphra/modules/github-updates.sys.mjs').GitHubUpdates.info();
+      return {preferences,edition:window.CyphraEdition.id,mode:window.CyphraModes.info().mode,
+        defaultShield:window.CyphraPrivacy.defaultMode,
+        compileTelemetry:AppConstants.MOZ_TELEMETRY_REPORTING,compileDataReporting:AppConstants.MOZ_DATA_REPORTING,
+        compileCrashReporter:AppConstants.MOZ_CRASHREPORTER,compileSandbox:AppConstants.MOZ_SANDBOX,
+        sync:{configured:sync.configured,endpoint:sync.endpoint,scope:sync.scope,legacy:sync.legacy,revision:sync.revision},
+        update:{configured:update.configured,automatic:update.automatic,requiresToken:update.requiresToken,repository:update.repository}};
+    ''')
+
+
+def appearance_state(driver):
+    driver.set_context(driver.CONTEXT_CHROME)
+    return driver.execute_script('''
+      const {Appearance}=ChromeUtils.importESModule('resource://cyphra/modules/appearance.sys.mjs');
+      return Appearance.read(window.matchMedia('(prefers-color-scheme: dark)').matches);
+    ''')
+
+
+def set_appearance_controls(driver, mode):
+    """Use installed chrome handlers; the headless runner does not prove pixels."""
+    driver.set_context(driver.CONTEXT_CHROME)
+    wait_script(driver, 'return !!window.CyphraSettings&&!!document.getElementById("cyphra-settings-toolbar")&&!!window.CyphraPrivacy?.ready;')
+    requested = {
+        'theme': 'light' if mode == 'work' else 'black', 'accent': 'teal' if mode == 'work' else 'amber',
+        'density': 2 if mode == 'work' else 0, 'railWidth': 46 if mode == 'work' else 36,
+        'sidebarWidth': 320 if mode == 'work' else 200, 'showRail': False, 'focus': mode == 'work',
+        'bookmarksToolbar': 'newtab' if mode == 'work' else 'always',
+        'homeLayout': 'focused' if mode == 'work' else 'wide', 'showSearch': mode != 'work',
+        'showPinned': True, 'showBriefing': mode != 'work', 'showPublishers': mode != 'work',
+        'maxPins': 4, 'maxHeadlines': 4 if mode == 'work' else 6, 'openLinksInNewTabs': True,
+    }
+    driver.execute_script('''
+      const requested=arguments[0];
+      const theme=document.getElementById('cyphra-theme-'+requested.theme);
+      const accent=document.querySelector('.cyphra-accent-choices [data-accent="'+requested.accent+'"]');
+      if(!theme||theme.disabled||!accent||accent.disabled)throw new Error('The installed theme/accent controls are unavailable.');
+      theme.click();accent.click();
+      for(const [key,value] of Object.entries(requested)){
+        if(['theme','accent'].includes(key))continue;
+        const control=document.getElementById('cyphra-appearance-'+key);
+        if(!control||control.disabled)throw new Error('An installed appearance control is unavailable: '+key);
+        if(control.type==='checkbox'){if(control.checked!==value)control.click();}
+        else {control.value=String(value);control.dispatchEvent(new Event('change',{bubbles:true}));}
+      }
+      const {Appearance}=ChromeUtils.importESModule('resource://cyphra/modules/appearance.sys.mjs');
+      const state=Appearance.read(window.matchMedia('(prefers-color-scheme: dark)').matches);
+      for(const [key,value] of Object.entries(requested))if(state[key]!==value)throw new Error('The installed appearance control did not save: '+key);
+    ''', script_args=[requested])
+    return requested
+
+
+def qualify_home_appearance(driver, requested):
+    driver.set_context(driver.CONTEXT_CONTENT)
+    try:
+        driver.navigate('resource://cyphra-home/newtab.xhtml')
+        wait_script(driver, 'return document.documentElement.hasAttribute("cyphra-theme")&&document.getElementById("cyphra-home-pins").children.length===4;')
+        report = driver.execute_script('''
+          const root=document.documentElement,body=getComputedStyle(document.body),pins=[...document.querySelectorAll('.pins a')];
+          return {theme:root.getAttribute('cyphra-theme'),accent:root.getAttribute('cyphra-accent'),layout:root.getAttribute('cyphra-home-layout'),
+            background:body.backgroundColor,text:body.color,logoFilter:getComputedStyle(document.querySelector('.brand img')).filter,
+            searchHidden:document.getElementById('cyphra-home-search-section').hidden,
+            briefingHidden:document.getElementById('cyphra-home-briefing-section').hidden,
+            publishersHidden:document.getElementById('cyphra-home-publishers').hidden,pins:pins.length,
+            linksProtected:pins.every(link=>link.target==='_blank'&&link.rel.includes('noopener')&&link.rel.includes('noreferrer')),
+            customize:!!document.getElementById('cyphra-home-customize'),scripts:document.scripts.length,
+            searchProvider:document.querySelector('form.search').action};
+        ''')
+        assert report['theme'] == requested['theme'] and report['accent'] == requested['accent']
+        assert report['layout'] == requested['homeLayout'] and report['pins'] == 4
+        for actual, preference in [('searchHidden','showSearch'), ('briefingHidden','showBriefing'), ('publishersHidden','showPublishers')]:
+            assert report[actual] == (not requested[preference]), 'The native Home visibility did not follow the saved choice.'
+        expected = ('rgb(246, 247, 249)', 'rgb(28, 36, 49)', 'invert(1)') if requested['theme'] == 'light' \
+            else ('rgb(5, 5, 5)', 'rgb(243, 243, 243)', 'none')
+        assert (report['background'], report['text'], report['logoFilter']) == expected, \
+            'The native Home palette or original logo did not follow the selected theme.'
+        assert report['linksProtected'] and report['customize'] and report['scripts'] == 0 \
+            and report['searchProvider'] == 'https://search.brave.com/search'
+        # Exercise the installed Home control while this same resource page
+        # stays open. The actor must deliver the update without navigation.
+        driver.set_context(driver.CONTEXT_CHROME)
+        driver.execute_script('''
+          const control=document.getElementById('cyphra-appearance-homeLayout');
+          control.value='balanced';control.dispatchEvent(new Event('change',{bubbles:true}));
+        ''')
+        driver.set_context(driver.CONTEXT_CONTENT)
+        wait_script(driver, 'return document.documentElement.getAttribute("cyphra-home-layout")==="balanced";')
+        driver.set_context(driver.CONTEXT_CHROME)
+        driver.execute_script('''
+          const control=document.getElementById('cyphra-appearance-homeLayout');
+          control.value=arguments[0];control.dispatchEvent(new Event('change',{bubbles:true}));
+        ''', script_args=[requested['homeLayout']])
+        driver.set_context(driver.CONTEXT_CONTENT)
+        wait_script(driver, 'return document.documentElement.getAttribute("cyphra-home-layout")===' + json.dumps(requested['homeLayout']) + ';')
+        report['liveLayoutUpdate'] = True
+        return report
+    finally:
+        driver.set_context(driver.CONTEXT_CHROME)
+
+
+def qualify_appearance_reset(driver, saved, security, bookmark_guid):
+    driver.set_context(driver.CONTEXT_CHROME)
+    result = async_call(driver, '''
+      const button=document.getElementById('cyphra-reset-appearance');
+      if(!button||button.disabled)throw new Error('The installed appearance reset control is unavailable.');
+      button.click();await Promise.resolve();
+      const {Appearance,APPEARANCE_PREFERENCES}=ChromeUtils.importESModule('resource://cyphra/modules/appearance.sys.mjs');
+      const remaining=Object.values(APPEARANCE_PREFERENCES).filter(definition=>
+        !Services.prefs.prefIsLocked(definition.pref)&&Services.prefs.prefHasUserValue(definition.pref)).map(definition=>definition.pref);
+      return {state:Appearance.read(window.matchMedia('(prefers-color-scheme: dark)').matches),remaining};
+    ''')
+    assert not result['remaining'], 'Appearance reset left visual overrides in the native profile.'
+    assert result['state']['theme'] == 'graphite' and result['state']['accent'] == 'slate' \
+        and result['state']['showRail'] and not result['state']['focus'] \
+        and result['state']['showSearch'] and result['state']['showBriefing'] \
+        and result['state']['maxPins'] == 12 and result['state']['homeLayout'] == 'balanced'
+    assert appearance_security(driver) == security, 'Appearance reset changed the native DNS/security/site-exception configuration.'
+    bookmark = async_call(driver, "const {PlacesUtils}=ChromeUtils.importESModule('resource://gre/modules/PlacesUtils.sys.mjs');return await PlacesUtils.bookmarks.fetch(arguments[0]);", [bookmark_guid])
+    assert bookmark and bookmark['guid'] == bookmark_guid, 'Appearance reset deleted a native bookmark.'
+    # Restore through the shipped allowlist so reinstall can check persistence
+    # of nondefault visual choices without weakening any protection preference.
+    driver.execute_script('''
+      const {Appearance}=ChromeUtils.importESModule('resource://cyphra/modules/appearance.sys.mjs');
+      for(const [key,value] of Object.entries(arguments[0]))if(key!=='resolvedTheme')Appearance.set(key,value);
+    ''', script_args=[saved])
+    assert appearance_state(driver) == saved
+    assert appearance_security(driver) == security
+    return {'overridesCleared': True, 'securityPreserved': True, 'bookmarkPreserved': True, 'restoredForReinstall': True}
+
+
 def mode_windows(driver, fixture_url):
     value = mode_info(driver)
     value.update(driver.execute_script('''
@@ -450,6 +610,56 @@ def main():
             driver.set_context(driver.CONTEXT_CHROME)
             foreign = bookmark_guids['personal' if mode == 'work' else 'work']
             assert async_call(driver, "const {PlacesUtils}=ChromeUtils.importESModule('resource://gre/modules/PlacesUtils.sys.mjs');return await PlacesUtils.bookmarks.fetch(arguments[0]);", [foreign]) is None
+
+        appearance = proof['appearance'] = {}
+        appearance_saved, appearance_protection = {}, {}
+        for mode in ['work', 'personal']:
+            driver = drivers[mode]
+            driver.set_context(driver.CONTEXT_CHROME)
+            wait_script(driver, 'return !!window.CyphraSettings&&!!document.getElementById("cyphra-settings-toolbar")&&!!window.CyphraPrivacy?.ready;')
+            driver.execute_script('''
+              window.CyphraPrivacy.setSiteMode(arguments[0],arguments[1],gBrowser.selectedBrowser.browsingContext.top.id);
+            ''', script_args=[url, 'off' if mode == 'work' else 'strict'])
+            appearance_protection[mode] = appearance_security(driver)
+            # These extra pins belong only to this disposable Windows profile.
+            # They never modify release defaults, source files or installer assets.
+            async_call(driver, '''
+              const {PlacesUtils}=ChromeUtils.importESModule('resource://gre/modules/PlacesUtils.sys.mjs');
+              for(let index=0;index<4;index++)await PlacesUtils.bookmarks.insert({parentGuid:PlacesUtils.bookmarks.toolbarGuid,
+                url:arguments[0]+'appearance-'+arguments[1]+'-'+index,title:'Disposable appearance fixture '+index});
+              return true;
+            ''', [url, mode])
+            requested = set_appearance_controls(driver, mode)
+            appearance_saved[mode] = appearance_state(driver)
+            chrome = driver.execute_script('''
+              const root=document.documentElement,gear=document.getElementById('cyphra-settings-toolbar'),tools=document.getElementById('cyphra-tools');
+              const visible=node=>{if(!node)return false;const box=node.getBoundingClientRect(),style=getComputedStyle(node);
+                return box.width>0&&box.height>0&&style.display!=='none'&&style.visibility==='visible';};
+              return {theme:root.getAttribute('cyphra-theme'),density:root.getAttribute('cyphra-density'),
+                railWidth:getComputedStyle(root).getPropertyValue('--cy-rail-width').trim(),railHidden:!visible(document.getElementById('cyphra-rail')),
+                settingsVisible:visible(gear),toolsVisible:visible(tools),navigationHeight:document.getElementById('nav-bar').getBoundingClientRect().height,
+                selectedTheme:document.querySelector('.cyphra-theme-choice[aria-pressed=true]')?.dataset.theme,
+                selectedAccent:document.querySelector('.cyphra-accent-choices [aria-pressed=true]')?.dataset.accent,
+                logo:document.querySelector('#cyphra-brand img')?.getAttribute('src')};
+            ''')
+            assert chrome['theme'] == requested['theme'] and chrome['density'] == str(requested['density'])
+            assert chrome['railWidth'] == str(requested['railWidth']) + 'px' and chrome['railHidden']
+            assert chrome['settingsVisible'] and chrome['toolsVisible'] and chrome['navigationHeight'] >= (54 if mode == 'work' else 47)
+            assert chrome['selectedTheme'] == requested['theme'] and chrome['selectedAccent'] == requested['accent']
+            assert chrome['logo'] == 'resource://cyphra/chrome/logo.svg'
+            assert appearance_security(driver) == appearance_protection[mode], 'Appearance controls changed native DNS/security.'
+            appearance[mode] = {'requested': requested, 'chrome': chrome, 'home': qualify_home_appearance(driver, requested),
+                'controlWiring': True, 'securityPreserved': True, 'securitySnapshot': appearance_protection[mode],
+                'presentationScope': 'native headless style/layout/control checks; GUI pixel presentation is not qualified'}
+            driver.set_context(driver.CONTEXT_CONTENT); driver.navigate(url + mode + '-appearance')
+            driver.set_context(driver.CONTEXT_CHROME)
+        for mode, driver in drivers.items():
+            assert appearance_state(driver) == appearance_saved[mode], 'Appearance leaked across Work/Personal processes.'
+            appearance[mode]['reset'] = qualify_appearance_reset(driver, appearance_saved[mode], appearance_protection[mode], bookmark_guids[mode])
+            foreign = 'personal' if mode == 'work' else 'work'
+            assert appearance_state(drivers[foreign]) == appearance_saved[foreign], 'Reset changed the other native profile.'
+        proof['checks'].append('headless-native-appearance-controls-live-home-palette-layout-isolation-and-security-preserving-reset')
+        print('PASS actual Windows appearance: installed control handlers, live Home palette/layout, original logo, rail-hidden access, isolated visual settings and reset preserving DNS/security/bookmarks.', flush=True)
         target = url + 'work-again'
         # Gecko 157.0.1 disables headless remote clients at nsAppRunner.cpp:5319-5323:
         # https://hg.mozilla.org/releases/mozilla-release/file/737ec77d798755890b062aab541a90d6c75afd19/toolkit/xre/nsAppRunner.cpp#l5319
@@ -550,6 +760,13 @@ def main():
             assert driver.execute_script("return Services.prefs.getIntPref('browser.uidensity');") == (2 if mode == 'work' else 0)
             bookmark = async_call(driver, "const {PlacesUtils}=ChromeUtils.importESModule('resource://gre/modules/PlacesUtils.sys.mjs');return await PlacesUtils.bookmarks.fetch(arguments[0]);", [bookmark_guids[mode]])
             assert bookmark and bookmark['title'] == 'Native ' + mode + ' fixture'
+            wait_script(driver, 'return !!window.CyphraSettings&&!!document.getElementById("cyphra-settings-toolbar");')
+            assert appearance_state(driver) == appearance_saved[mode], 'Reinstall/restart lost the native appearance choices.'
+            assert appearance_security(driver) == appearance_protection[mode], 'Reinstall/restart changed the retained DNS/security/site exception.'
+            appearance[mode]['reinstalledHome'] = qualify_home_appearance(driver, appearance[mode]['requested'])
+            appearance[mode]['reinstallPersistence'] = True
+            driver.set_context(driver.CONTEXT_CONTENT); driver.navigate(url + mode + '-reinstalled')
+            driver.set_context(driver.CONTEXT_CHROME)
         for driver in drivers.values():
             try: driver.execute_script('Services.startup.quit(Components.interfaces.nsIAppStartup.eForceQuit);')
             except Exception: pass
@@ -561,6 +778,7 @@ def main():
             time.sleep(.1)
         assert not launcher.exists() and profile_hashes(profiles) == preserved, 'Uninstall removed or modified profile data.'
         proof['checks'].append('real-silent-reinstall-settings-and-bookmarks-restored-uninstall-preserves-both-full-profiles')
+        proof['checks'].append('native-appearance-and-home-choices-restored-after-real-reinstall-with-dns-security-and-site-exceptions-retained')
         print('PASS actual Windows reinstall and uninstall: both full external profiles preserved byte-for-byte; settings and bookmarks restored on native restart.', flush=True)
         proof['passed'] = True
     finally:

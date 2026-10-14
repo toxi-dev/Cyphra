@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def validate_cyphra_layout(stage):
     private = stage / 'runtime' / 'cyphra' / 'browser'
-    required = ('modules/privacy.sys.mjs', 'modules/CosmeticsParent.sys.mjs',
+    required = ('modules/appearance.sys.mjs', 'modules/privacy.sys.mjs', 'modules/CosmeticsParent.sys.mjs',
                 'modules/CosmeticsChild.sys.mjs', 'chrome/cyphra-ui.js',
                 'chrome/cyphra.css', 'chrome/logo.svg', 'vendor/adblock.js',
                 'vendor/LICENSES.txt', 'vendor/adblock.js.LEGAL.txt',

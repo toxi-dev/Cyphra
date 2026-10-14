@@ -30,6 +30,7 @@ public final class ServicesSecurityTest extends Instrumentation {
         try {
             nativeCheck("mode-bound bookmarks, tabs and history", this::testModeBoundBookmarksTabsAndHistory, checks);
             nativeCheck("ordinary tab selection, native home and legacy session compatibility", this::testOrdinaryTabSelectionAndLegacySessionStorage, checks);
+            nativeCheck("appearance reset preserves protected profile data and other mode", this::testAppearanceResetKeepsProfileData, checks);
             nativeCheck("Android permission results stay bound to their original website request", this::testAndroidPermissionCallbacksStayBound, checks);
             nativeCheck("pinned P-256 manifest, tamper and cross-edition refusal", this::testPinnedSignedManifestAndCrossEditionRefusal, checks);
             nativeCheck("repository API and GitHub asset CDN allowlists", this::testOnlyRepositoryApiAndGitHubAssetCdnAllowed, checks);
@@ -172,6 +173,34 @@ public final class ServicesSecurityTest extends Instrumentation {
         store.saveTabs(new JSONArray(), 4); assertEquals(0, store.tabs().length()); assertEquals(0, store.selectedTab());
     }
 
+    public void testAppearanceResetKeepsProfileData() throws Exception {
+        BrowserStore work=new BrowserStore(target,"work",BuildConfig.EDITION);
+        BrowserStore personal=new BrowserStore(target,"personal",BuildConfig.EDITION);
+        work.addBookmark("Retained bookmark","https://example.org/retained");
+        work.saveTabs(new JSONArray().put("about:blank").put("https://example.org/retained"),1);
+        work.setStringPref("sync-config-encrypted-v2","opaque-profile-bound-fixture");
+        work.setBooleanPref("save-history",false);
+        updater("work").configureToken("github_pat_fixturefixturefixturefixturefixturefixturefixturefixture");
+        java.util.Map<String,?> before=new java.util.HashMap<>(target.getSharedPreferences("cyphra-data-work",Context.MODE_PRIVATE).getAll());
+        java.util.Map<String,?> engineBefore=new java.util.HashMap<>(target.getSharedPreferences("cyphra-engine-work",Context.MODE_PRIVATE).getAll());
+        personal.setStringPref(Appearance.PREFIX+"theme","light");
+        work.setStringPref(Appearance.PREFIX+"theme","black");
+        work.setStringPref(Appearance.PREFIX+"text-scale","125");
+        assertFalse(new Appearance(target,work).light);
+        assertTrue(new Appearance(target,personal).light);
+        Appearance.reset(work);
+        assertEquals(before,target.getSharedPreferences("cyphra-data-work",Context.MODE_PRIVATE).getAll());
+        assertEquals(engineBefore,target.getSharedPreferences("cyphra-engine-work",Context.MODE_PRIVATE).getAll());
+        assertEquals("light",new Appearance(target,personal).theme);
+        assertEquals("graphite",new Appearance(target,work).theme);
+        assertEquals("100",new Appearance(target,work).scaleChoice);
+        assertTrue(updater("work").hasToken());
+        work.setStringPref(Appearance.PREFIX+"theme","not-a-theme");
+        work.setStringPref(Appearance.PREFIX+"text-scale","1000000");
+        assertEquals("graphite",new Appearance(target,work).theme);
+        assertEquals("100",new Appearance(target,work).scaleChoice);
+    }
+
     public void testAndroidPermissionCallbacksStayBound() throws Exception {
         Throwable[] failure={null};
         runOnMainSync(()->{try{checkAndroidPermissionCallbacksStayBound();}catch(Throwable error){failure[0]=error;}});
@@ -184,7 +213,7 @@ public final class ServicesSecurityTest extends Instrumentation {
             android.Manifest.permission.ACCESS_FINE_LOCATION,android.Manifest.permission.ACCESS_COARSE_LOCATION})
             if(target.checkSelfPermission(permission)!=android.content.pm.PackageManager.PERMISSION_GRANTED){denied=permission;break;}
         if(denied==null)fail("Permission checks require one denied runtime permission in the disposable test profile.");
-        WebPrompts prompts=new WebPrompts(new PermissionTestActivity(target),session->"https://example.org/");
+        WebPrompts prompts=new WebPrompts(new PermissionTestActivity(target),new Appearance(target,new BrowserStore(target,"work",BuildConfig.EDITION)),session->"https://example.org/");
         PermissionDecision original=new PermissionDecision(),overlap=new PermissionDecision();
         seedPermissionRequest(prompts,original,denied);
         prompts.onAndroidPermissionsRequest(null,new String[]{denied},overlap);

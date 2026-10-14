@@ -6,6 +6,11 @@
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:windowBackground">#101113</item>
+        <item name="android:colorBackground">#101113</item>
+        <item name="android:textColorPrimary">#F1F2F4</item>
+        <item name="android:textColorSecondary">#A0A6B0</item>
+        <item name="android:textColorHint">#A0A6B0</item>
+        <item name="android:alertDialogTheme">@style/CyphraGraphiteDialog</item>
         <item name="android:colorAccent">#CAD2DF</item>
         <item name="android:navigationBarColor">#101113</item>
         <item name="android:statusBarColor">#101113</item>
@@ -15,4 +20,56 @@
     <style name="CyphraLaunchTheme" parent="CyphraTheme">
         <item name="android:windowDisablePreview">true</item>
     </style>
+    <style name="CyphraBlackTheme" parent="CyphraBaseTheme">
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:colorBackground">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:alertDialogTheme">@style/CyphraBlackDialog</item>
+    </style>
+    <style name="CyphraLightTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">#F6F7F9</item>
+        <item name="android:colorBackground">#F6F7F9</item>
+        <item name="android:textColorPrimary">#1D2026</item>
+        <item name="android:textColorSecondary">#59616E</item>
+        <item name="android:textColorHint">#59616E</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:navigationBarColor">#F6F7F9</item>
+        <item name="android:statusBarColor">#F6F7F9</item>
+        <item name="android:alertDialogTheme">@style/CyphraLightDialog</item>
+    </style>
+    <style name="CyphraGraphiteDialog" parent="android:style/Theme.Material.Dialog.Alert">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowBackground">@drawable/dialog_graphite</item>
+        <item name="android:colorBackground">#191B1F</item>
+        <item name="android:textColorPrimary">#F1F2F4</item>
+        <item name="android:textColorSecondary">#A0A6B0</item>
+        <item name="android:textColorHint">#A0A6B0</item>
+        <item name="android:colorAccent">#CAD2DF</item>
+    </style>
+    <style name="CyphraBlackDialog" parent="CyphraGraphiteDialog">
+        <item name="android:windowBackground">@drawable/dialog_black</item>
+        <item name="android:colorBackground">#111214</item>
+    </style>
+    <style name="CyphraLightDialog" parent="android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowBackground">@drawable/dialog_light</item>
+        <item name="android:colorBackground">#FFFFFF</item>
+        <item name="android:textColorPrimary">#1D2026</item>
+        <item name="android:textColorSecondary">#59616E</item>
+        <item name="android:textColorHint">#59616E</item>
+        <item name="android:colorAccent">#424B59</item>
+    </style>
+    <style name="CyphraNeutralDark"><item name="android:colorAccent">#CAD2DF</item><item name="android:colorControlActivated">#CAD2DF</item><item name="android:colorControlHighlight">#18CAD2DF</item></style>
+    <style name="CyphraNeutralLight"><item name="android:colorAccent">#424B59</item><item name="android:colorControlActivated">#424B59</item><item name="android:colorControlHighlight">#18424B59</item></style>
+    <style name="CyphraBlueDark"><item name="android:colorAccent">#9EBCE5</item><item name="android:colorControlActivated">#9EBCE5</item><item name="android:colorControlHighlight">#189EBCE5</item></style>
+    <style name="CyphraBlueLight"><item name="android:colorAccent">#345C93</item><item name="android:colorControlActivated">#345C93</item><item name="android:colorControlHighlight">#18345C93</item></style>
+    <style name="CyphraTealDark"><item name="android:colorAccent">#99C8BD</item><item name="android:colorControlActivated">#99C8BD</item><item name="android:colorControlHighlight">#1899C8BD</item></style>
+    <style name="CyphraTealLight"><item name="android:colorAccent">#226B62</item><item name="android:colorControlActivated">#226B62</item><item name="android:colorControlHighlight">#18226B62</item></style>
+    <style name="CyphraAmberDark"><item name="android:colorAccent">#D9BD83</item><item name="android:colorControlActivated">#D9BD83</item><item name="android:colorControlHighlight">#18D9BD83</item></style>
+    <style name="CyphraAmberLight"><item name="android:colorAccent">#865807</item><item name="android:colorControlActivated">#865807</item><item name="android:colorControlHighlight">#18865807</item></style>
 </resources>

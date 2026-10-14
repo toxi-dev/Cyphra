@@ -36,6 +36,7 @@ public final class BrowserStore {
     public String stringPref(String key, String fallback) { return preferences.getString(key, fallback); }
     public void setStringPref(String key, String value) { commit(preferences.edit().putString(key, value)); }
     public void removePref(String key) { commit(preferences.edit().remove(key)); }
+    public void removePrefs(String... keys) { SharedPreferences.Editor edit=preferences.edit();for(String key:keys)edit.remove(key);commit(edit); }
 
     public JSONArray bookmarks() { return read("bookmarks"); }
     public JSONArray history() { return read("history"); }

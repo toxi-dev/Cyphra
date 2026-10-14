@@ -55,6 +55,7 @@ var CyphraTools = (() => {
     const browserActions = el('div', '', { class: 'cyphra-browser-tools' });
     content.append(browserActions);
     button(browserActions, 'Search open tabs', () => { panel.hidePopup(); win.gTabsPanel.searchTabs(); });
+    button(browserActions, 'Appearance…', () => { panel.hidePopup(); win.CyphraSettings.open(anchor, 'appearance'); });
     const focus = button(browserActions, 'Focus view', () => {
       Services.prefs.setBoolPref('cyphra.ui.focus', !Services.prefs.getBoolPref('cyphra.ui.focus', false));
       updateFocus();

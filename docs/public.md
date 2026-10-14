@@ -6,8 +6,8 @@ An independent, open-source Gecko browser for Windows and Linux. Cyphra has no C
 
 Download a complete package from [Cyphra releases](https://github.com/toxi-dev/Cyphra/releases).
 
-- Windows x64: run `Cyphra-Public-0.7.1-win-x64.exe`, or extract the entire Windows ZIP and run `Cyphra.exe`.
-- Linux x64: extract `Cyphra-Public-0.7.1-linux-x64.tar.gz`, then run `./Cyphra/cyphra` as your desktop account. GTK/NSS desktop libraries, Python 3.9+ and util-linux `flock` are required.
+- Windows x64: run `Cyphra-Public-0.7.2-win-x64.exe`, or extract the entire Windows ZIP and run `Cyphra.exe`.
+- Linux x64: extract `Cyphra-Public-0.7.2-linux-x64.tar.gz`, then run `./Cyphra/cyphra` as your desktop account. GTK/NSS desktop libraries, Python 3.9+ and util-linux `flock` are required.
 
 The public edition installs separately from Cyphra Team and does not use its profiles, sync server, update credentials, or releases.
 
@@ -16,6 +16,10 @@ The public edition installs separately from Cyphra Team and does not use its pro
 Personal is the public edition's default. It uses balanced local filtering, native cookie partitioning and fingerprint protection, with WebGL available for compatibility. Work starts with Strict Shields, stronger fingerprint resistance and WebGL disabled. Neither mode disables certificate validation, the content sandbox or the telemetry deny rules.
 
 The profile control opens the other mode in its own browser process. Cookies, logins, bookmarks, history and settings stay separate. On Windows, profiles live under `%LOCALAPPDATA%\Cyphra\Profile` (Work) and `Profile-Personal`. On Linux, they live under `${XDG_CONFIG_HOME:-~/.config}/cyphra-public/profile` and `profile-personal`. Installers retain them across updates. A mode is a collection of defaults, not a promise of perfect security; explicit choices in that profile are retained.
+
+## Appearance
+
+Choose Graphite, Black, Light or System themes, restrained accents, toolbar density, rail/sidebar sizes and home layouts from Settings → Appearance. Changes apply immediately and are saved separately in each profile. Reset clears visual choices while keeping browsing data, DNS, privacy, sync and update credentials. See [all customization controls](docs/desktop-customization.md).
 
 ## Browsing
 
@@ -33,7 +37,7 @@ Public GitHub updates do not need a token. Automatic checks default off. A relea
 
 ## Android
 
-Cyphra Android **0.1.1** uses native Android controls and GeckoView, with separate Work/Personal profiles, local Shields, Brave Search, selectable DNS, manual encrypted bookmark sync and verified APK updates. Android 10 or later is required. See [Android installation, build and privacy details](android/README.md). Android releases use `android-v0.1.1` independently of desktop releases.
+Cyphra Android **0.1.2** uses native Android controls and GeckoView, with separate Work/Personal profiles, local Shields, Brave Search, selectable DNS, manual encrypted bookmark sync and verified APK updates. Android 10 or later is required. See [Android installation, build and privacy details](android/README.md). Android releases use `android-v0.1.2` independently of desktop releases.
 
 ## Build
 
@@ -51,7 +55,7 @@ python3 scripts/build-linux.py --edition public
 python3 scripts/build-source.py --edition public
 ```
 
-Output is in `dist/0.7.1/public/`. The release signer requires the separately held maintainer key; no private signing key is present here.
+Output is in `dist/0.7.2/public/`. The release signer requires the separately held maintainer key; no private signing key is present here.
 
 ## Privacy and licenses
 

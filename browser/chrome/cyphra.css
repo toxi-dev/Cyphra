@@ -1,24 +1,44 @@
 /* MPL-2.0. Applied as a user sheet to browser chrome and selected Cyphra-owned UI. */
 @-moz-document url("chrome://browser/content/browser.xhtml") {
   :root {
-    color-scheme: dark !important;
-    --lwt-accent-color: #0d0e11 !important;
-    --lwt-text-color: #d7d9de !important;
-    --lwt-toolbarbutton-hover-background: rgba(255,255,255,.055) !important;
-    --lwt-toolbarbutton-active-background: rgba(255,255,255,.085) !important;
-    --toolbar-bgcolor: #121318 !important;
-    --toolbar-color: #d7d9de !important;
-    --toolbar-field-background-color: #0f1014 !important;
-    --toolbar-field-color: #eceef2 !important;
-    --toolbar-field-border-color: #292c33 !important;
-    --toolbar-field-focus-border-color: #8294b7 !important;
-    --toolbar-field-focus-background-color: #14161b !important;
-    --toolbar-field-focus-color: #f3f4f6 !important;
-    --arrowpanel-background: #15171c !important;
-    --arrowpanel-color: #e6e8ec !important;
-    --arrowpanel-border-color: #2b2e35 !important;
-    --tab-selected-bgcolor: #1b1d22 !important;
-    --tab-selected-textcolor: #f1f2f4 !important;
+    /* Fallback palette before the local appearance controller runs. */
+    --cy-title: #0d0e11;
+    --cy-bg: #101115;
+    --cy-toolbar: #121318;
+    --cy-surface: #18191c;
+    --cy-inset: #111215;
+    --cy-raised: #26282d;
+    --cy-hover: #30333b;
+    --cy-text: #eff1f5;
+    --cy-subtle: #d1d5dd;
+    --cy-muted: #a0a6b1;
+    --cy-faint: #9299a5;
+    --cy-line: #303237;
+    --cy-strong: #454a55;
+    --cy-overlay: rgba(255,255,255,.055);
+    --cy-active: rgba(255,255,255,.09);
+    --cy-error: #e2b1b1;
+    --cy-accent: #a5b4cd;
+    --cy-accent-wash: #2a303b;
+    --cy-rail-width: 39px;
+    color-scheme: inherit !important;
+    --lwt-accent-color: var(--cy-title) !important;
+    --lwt-text-color: var(--cy-subtle) !important;
+    --lwt-toolbarbutton-hover-background: var(--cy-overlay) !important;
+    --lwt-toolbarbutton-active-background: var(--cy-active) !important;
+    --toolbar-bgcolor: var(--cy-toolbar) !important;
+    --toolbar-color: var(--cy-subtle) !important;
+    --toolbar-field-background-color: var(--cy-inset) !important;
+    --toolbar-field-color: var(--cy-text) !important;
+    --toolbar-field-border-color: var(--cy-line) !important;
+    --toolbar-field-focus-border-color: var(--cy-accent) !important;
+    --toolbar-field-focus-background-color: var(--cy-inset) !important;
+    --toolbar-field-focus-color: var(--cy-text) !important;
+    --arrowpanel-background: var(--cy-surface) !important;
+    --arrowpanel-color: var(--cy-text) !important;
+    --arrowpanel-border-color: var(--cy-line) !important;
+    --tab-selected-bgcolor: var(--cy-raised) !important;
+    --tab-selected-textcolor: var(--cy-text) !important;
     --tab-border-radius: 6px !important;
     --toolbarbutton-border-radius: 5px !important;
     --toolbarbutton-outer-padding: 2px !important;
@@ -26,48 +46,48 @@
   }
 
   #navigator-toolbox {
-    background: #0d0e11 !important;
-    border-bottom: 1px solid #25272d !important;
+    background: var(--cy-title) !important;
+    border-bottom: 1px solid var(--cy-line) !important;
     box-shadow: none !important;
   }
 
   #TabsToolbar {
     min-height: 39px !important;
     padding: 3px 5px 0 !important;
-    background: #0d0e11 !important;
-    color: #b7bac1 !important;
+    background: var(--cy-title) !important;
+    color: var(--cy-muted) !important;
   }
 
   .tabbrowser-tab { font-size: 11.5px !important; }
   .tab-background { margin-block: 2px 4px !important; border-radius: 6px !important; box-shadow: none !important; }
   .tabbrowser-tab:not([visuallyselected]) .tab-background { background: transparent !important; }
-  .tabbrowser-tab:not([visuallyselected]):hover .tab-background { background: #15161a !important; }
+  .tabbrowser-tab:not([visuallyselected]):hover .tab-background { background: var(--cy-surface) !important; }
   .tabbrowser-tab[visuallyselected] .tab-background,
-  .tab-background[selected] { background: #1b1d22 !important; border: 1px solid #2b2e35 !important; }
-  .tabbrowser-tab .tab-label { color: #aeb2ba !important; }
-  .tabbrowser-tab[visuallyselected] .tab-label { color: #f0f1f3 !important; }
+  .tab-background[selected] { background: var(--cy-raised) !important; border: 1px solid var(--cy-line) !important; }
+  .tabbrowser-tab .tab-label { color: var(--cy-muted) !important; }
+  .tabbrowser-tab[visuallyselected] .tab-label { color: var(--cy-text) !important; }
 
   #nav-bar {
     min-height: 43px !important;
     padding-block: 2px !important;
-    background: #121318 !important;
+    background: var(--cy-toolbar) !important;
     background-image: none !important;
     border-top: 0 !important;
     box-shadow: none !important;
   }
 
   #urlbar-background {
-    background: #0f1014 !important;
-    border: 1px solid #292c33 !important;
+    background: var(--cy-inset) !important;
+    border: 1px solid var(--cy-line) !important;
     border-radius: 7px !important;
     box-shadow: none !important;
   }
   #urlbar[focused] > #urlbar-background {
-    background: #14161b !important;
-    border-color: #8294b7 !important;
+    background: var(--cy-inset) !important;
+    border-color: var(--cy-accent) !important;
     box-shadow: 0 0 0 2px rgba(113,139,208,.09) !important;
   }
-  #urlbar-input { color: #eceef2 !important; caret-color: #eceef2 !important; }
+  #urlbar-input { color: var(--cy-text) !important; caret-color: var(--cy-text) !important; }
 
   /* Keep provider choice functional but make the chrome read like a browser,
      not an advertisement for the provider. */
@@ -81,14 +101,14 @@
     inset-block: 0 !important;
     display: flex !important;
     align-items: center !important;
-    color: #7c818b !important;
+    color: var(--cy-faint) !important;
     pointer-events: none !important;
   }
 
   #back-button, #forward-button, #reload-button, #stop-button,
   #downloads-button, #PanelUI-menu-button, #unified-extensions-button {
-    color: #bfc2c9 !important;
-    --toolbarbutton-icon-fill: #bfc2c9 !important;
+    color: var(--cy-subtle) !important;
+    --toolbarbutton-icon-fill: var(--cy-subtle) !important;
   }
 
   #cyphra-brand {
@@ -104,26 +124,47 @@
     border: 0 !important;
     border-radius: 7px !important;
     background: transparent !important;
-    color: #e5e7eb !important;
+    color: var(--cy-subtle) !important;
     font: 600 11.5px system-ui, "Segoe UI", sans-serif !important;
     -moz-window-dragging: no-drag !important;
   }
   #cyphra-brand img { width: 17px !important; height: 19px !important; }
-  #cyphra-brand:hover { background: rgba(255,255,255,.045) !important; }
+  #cyphra-brand:hover { background: var(--cy-overlay) !important; }
+  :root[cyphra-theme="light"] #cyphra-brand img,
+  :root[cyphra-theme="light"] .cyphra-shields-header > img,
+  :root[cyphra-theme="light"] #cyphra-shields .toolbarbutton-icon { filter: invert(1) !important; }
+  #cyphra-settings-toolbar > svg { width: 17px !important; height: 17px !important; fill: none !important; stroke: currentColor !important; stroke-width: 1.5 !important; stroke-linecap: round !important; stroke-linejoin: round !important; }
+  #cyphra-settings-toolbar { min-width: 32px !important; }
+  :root[cyphra-density="2"] #cyphra-settings-toolbar { min-width: 40px !important; }
+  #cyphra-settings-toolbar > .toolbarbutton-icon,
+  #cyphra-settings-toolbar > .toolbarbutton-text { display: none !important; }
+
+  /* Native density also controls Cyphra's chrome, rather than being masked by
+     a fixed toolbar height. Address and security controls remain reachable. */
+  :root[cyphra-density="1"] { --tab-min-height: 31px !important; }
+  :root[cyphra-density="1"] #TabsToolbar { min-height: 37px !important; }
+  :root[cyphra-density="1"] #nav-bar { min-height: 39px !important; }
+  :root[cyphra-density="0"] { --tab-min-height: 37px !important; }
+  :root[cyphra-density="0"] #TabsToolbar { min-height: 43px !important; }
+  :root[cyphra-density="0"] #nav-bar { min-height: 47px !important; }
+  :root[cyphra-density="2"] { --tab-min-height: 44px !important; }
+  :root[cyphra-density="2"] #TabsToolbar { min-height: 50px !important; }
+  :root[cyphra-density="2"] #nav-bar { min-height: 54px !important; }
+  :root[cyphra-density="2"] .cyphra-rail-button { height: 38px !important; }
 
   #cyphra-rail {
     box-sizing: border-box !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
-    width: 39px !important;
-    min-width: 39px !important;
-    max-width: 39px !important;
-    flex: 0 0 39px !important;
+    width: var(--cy-rail-width) !important;
+    min-width: var(--cy-rail-width) !important;
+    max-width: var(--cy-rail-width) !important;
+    flex: 0 0 var(--cy-rail-width) !important;
     padding: 7px 4px !important;
-    border-right: 1px solid #24262c !important;
-    background: #0f1014 !important;
-    color: #858b95 !important;
+    border-right: 1px solid var(--cy-line) !important;
+    background: var(--cy-inset) !important;
+    color: var(--cy-faint) !important;
   }
   #cyphra-rail[hidden] { display: none !important; }
   .cyphra-rail-button {
@@ -132,7 +173,7 @@
     align-items: center !important;
     justify-content: center !important;
     flex: none !important;
-    width: 30px !important;
+    width: min(36px, calc(var(--cy-rail-width) - 9px)) !important;
     height: 30px !important;
     padding: 0 !important;
     margin: 1px 0 !important;
@@ -142,27 +183,27 @@
     color: inherit !important;
   }
   .cyphra-rail-button svg { width: 15px !important; height: 15px !important; fill: none !important; stroke: currentColor !important; stroke-width: 1.6 !important; stroke-linecap: round !important; stroke-linejoin: round !important; }
-  .cyphra-rail-button:hover { color: #d9dce2 !important; background: rgba(255,255,255,.055) !important; }
-  .cyphra-rail-button[aria-pressed="true"] { color: #dfe5f3 !important; background: rgba(113,139,208,.14) !important; }
+  .cyphra-rail-button:hover { color: var(--cy-subtle) !important; background: var(--cy-overlay) !important; }
+  .cyphra-rail-button[aria-pressed="true"] { color: var(--cy-subtle) !important; background: var(--cy-accent-wash) !important; }
   .cyphra-rail-spacer { flex: 1 !important; }
-  .cyphra-rail-rule { width: 18px !important; height: 1px !important; margin: 5px 0 !important; background: #282a30 !important; }
+  .cyphra-rail-rule { width: 18px !important; height: 1px !important; margin: 5px 0 !important; background: var(--cy-line) !important; }
 
-  #sidebar-box { background: #111217 !important; border-color: #292b32 !important; }
-  #sidebar-header { background: #111217 !important; color: #d2d5da !important; border-bottom: 1px solid #292b32 !important; }
+  #sidebar-box { background: var(--cy-surface) !important; border-color: var(--cy-line) !important; }
+  #sidebar-header { background: var(--cy-surface) !important; color: var(--cy-subtle) !important; border-bottom: 1px solid var(--cy-line) !important; }
 
   #cyphra-shields {
     list-style-image: url("resource://cyphra/chrome/logo.svg") !important;
     --toolbarbutton-icon-size: 18px !important;
   }
   #cyphra-shields .toolbarbutton-icon { width: 18px !important; height: 18px !important; padding: 0 !important; }
-  #cyphra-shields[open] { background: rgba(113,139,208,.12) !important; border-radius: 7px !important; }
+  #cyphra-shields[open] { background: var(--cy-accent-wash) !important; border-radius: 7px !important; }
 
   #cyphra-shields-panel {
     --panel-padding: 0 !important;
-    --arrowpanel-background: #15171c !important;
-    --arrowpanel-color: #e8eaee !important;
-    --arrowpanel-border-color: #2e3138 !important;
-    color-scheme: dark !important;
+    --arrowpanel-background: var(--cy-surface) !important;
+    --arrowpanel-color: var(--cy-text) !important;
+    --arrowpanel-border-color: var(--cy-line) !important;
+    color-scheme: inherit !important;
   }
   #cyphra-shields-content {
     box-sizing: border-box !important;
@@ -170,72 +211,72 @@
     max-height: 80vh !important;
     overflow: auto !important;
     padding: 19px !important;
-    background: #15171c !important;
-    color: #e8eaee !important;
+    background: var(--cy-surface) !important;
+    color: var(--cy-text) !important;
     font: 12px system-ui, "Segoe UI", sans-serif !important;
   }
   .cyphra-shields-header { display: flex !important; align-items: center !important; gap: 10px !important; margin-bottom: 12px !important; }
   .cyphra-shields-header > img { width: 24px !important; height: 27px !important; flex: none !important; opacity: .95 !important; }
   .cyphra-shields-heading { min-width: 0 !important; }
-  .cyphra-shields-heading h2 { margin: 0 0 2px !important; color: #f1f2f4 !important; font-size: 14px !important; font-weight: 650 !important; letter-spacing: -.1px !important; }
-  .cyphra-shields-site { margin: 0 !important; color: #a2a9b5 !important; font-size: 11px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+  .cyphra-shields-heading h2 { margin: 0 0 2px !important; color: var(--cy-text) !important; font-size: 14px !important; font-weight: 650 !important; letter-spacing: -.1px !important; }
+  .cyphra-shields-site { margin: 0 !important; color: var(--cy-muted) !important; font-size: 11px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
 
-  .cyphra-shields-state { display: flex !important; align-items: center !important; gap: 7px !important; min-height: 31px !important; margin-bottom: 13px !important; padding: 0 10px !important; border: 1px solid #292c33 !important; border-radius: 8px !important; background: #101216 !important; color: #aeb4bd !important; font-size: 10.5px !important; }
+  .cyphra-shields-state { display: flex !important; align-items: center !important; gap: 7px !important; min-height: 31px !important; margin-bottom: 13px !important; padding: 0 10px !important; border: 1px solid var(--cy-line) !important; border-radius: 8px !important; background: var(--cy-inset) !important; color: var(--cy-muted) !important; font-size: 10.5px !important; }
   .cyphra-shields-state-dot { width: 6px !important; height: 6px !important; border-radius: 50% !important; background: #72ae8f !important; }
-  #cyphra-shields-content[data-mode="strict"] .cyphra-shields-state-dot { background: #7895d8 !important; }
+  #cyphra-shields-content[data-mode="strict"] .cyphra-shields-state-dot { background: var(--cy-accent) !important; }
   #cyphra-shields-content[data-mode="off"] .cyphra-shields-state-dot { background: #9b7a7d !important; }
 
   .cyphra-shields-protection { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important; }
-  .cyphra-shields-label { color: #a6aeba !important; font-size: 11px !important; }
-  .cyphra-shields-modes { display: inline-flex !important; align-items: center !important; gap: 2px !important; padding: 2px !important; border: 1px solid #292c33 !important; border-radius: 8px !important; background: #101216 !important; }
-  .cyphra-shields-modes button { appearance: none !important; padding: 6px 8px !important; border: 0 !important; border-radius: 5px !important; background: transparent !important; color: #a9b1be !important; font: 11px system-ui, "Segoe UI", sans-serif !important; }
-  .cyphra-shields-modes button:hover:enabled { color: #dce0e6 !important; background: rgba(255,255,255,.045) !important; }
-  .cyphra-shields-modes button[aria-pressed="true"] { color: #edf0f5 !important; background: #242831 !important; }
+  .cyphra-shields-label { color: var(--cy-muted) !important; font-size: 11px !important; }
+  .cyphra-shields-modes { display: inline-flex !important; align-items: center !important; gap: 2px !important; padding: 2px !important; border: 1px solid var(--cy-line) !important; border-radius: 8px !important; background: var(--cy-inset) !important; }
+  .cyphra-shields-modes button { appearance: none !important; padding: 6px 8px !important; border: 0 !important; border-radius: 5px !important; background: transparent !important; color: var(--cy-muted) !important; font: 11px system-ui, "Segoe UI", sans-serif !important; }
+  .cyphra-shields-modes button:hover:enabled { color: var(--cy-subtle) !important; background: var(--cy-overlay) !important; }
+  .cyphra-shields-modes button[aria-pressed="true"] { color: var(--cy-text) !important; background: var(--cy-raised) !important; }
   .cyphra-shields-modes button:disabled { opacity: .4 !important; }
-  .cyphra-shields-description { margin: 10px 0 16px !important; color: #a2a9b5 !important; font-size: 11px !important; line-height: 1.5 !important; }
+  .cyphra-shields-description { margin: 10px 0 16px !important; color: var(--cy-muted) !important; font-size: 11px !important; line-height: 1.5 !important; }
 
-  .cyphra-shields-stats { margin: 0 !important; padding: 0 !important; border-top: 1px solid #292c33 !important; border-bottom: 1px solid #292c33 !important; }
+  .cyphra-shields-stats { margin: 0 !important; padding: 0 !important; border-top: 1px solid var(--cy-line) !important; border-bottom: 1px solid var(--cy-line) !important; }
   .cyphra-shields-stat { display: flex !important; align-items: baseline !important; justify-content: space-between !important; gap: 20px !important; padding: 8px 0 !important; }
-  .cyphra-shields-stat + .cyphra-shields-stat { border-top: 1px solid rgba(255,255,255,.055) !important; }
+  .cyphra-shields-stat + .cyphra-shields-stat { border-top: 1px solid var(--cy-overlay) !important; }
   .cyphra-shields-stat dt, .cyphra-shields-stat dd { margin: 0 !important; }
-  .cyphra-shields-stat dt { color: #a2a9b5 !important; font-size: 11px !important; }
-  .cyphra-shields-stat dd { color: #dfe2e7 !important; font-size: 11px !important; font-weight: 600 !important; font-variant-numeric: tabular-nums !important; }
+  .cyphra-shields-stat dt { color: var(--cy-muted) !important; font-size: 11px !important; }
+  .cyphra-shields-stat dd { color: var(--cy-subtle) !important; font-size: 11px !important; font-weight: 600 !important; font-variant-numeric: tabular-nums !important; }
   .cyphra-shields-stat.primary { padding-block: 11px !important; }
-  .cyphra-shields-stat.primary dt { color: #c2c6cd !important; font-size: 11px !important; }
-  .cyphra-shields-stat.primary dd { color: #f4f5f7 !important; font-size: 24px !important; font-weight: 620 !important; letter-spacing: -.6px !important; }
+  .cyphra-shields-stat.primary dt { color: var(--cy-subtle) !important; font-size: 11px !important; }
+  .cyphra-shields-stat.primary dd { color: var(--cy-text) !important; font-size: 24px !important; font-weight: 620 !important; letter-spacing: -.6px !important; }
 
   .cyphra-shields-activity { margin-top: 14px !important; }
-  .cyphra-shields-activity h3 { margin: 0 0 7px !important; color: #b0b7c3 !important; font-size: 11px !important; font-weight: 600 !important; }
+  .cyphra-shields-activity h3 { margin: 0 0 7px !important; color: var(--cy-muted) !important; font-size: 11px !important; font-weight: 600 !important; }
   .cyphra-shields-recent { max-height: 112px !important; margin: 0 !important; padding: 0 !important; overflow: auto !important; list-style: none !important; }
-  .cyphra-shields-recent li { display: flex !important; justify-content: space-between !important; gap: 12px !important; padding: 6px 0 !important; color: #a2a9b5 !important; font-size: 10.5px !important; }
-  .cyphra-shields-recent li:not(.empty) + li { border-top: 1px solid rgba(255,255,255,.04) !important; }
+  .cyphra-shields-recent li { display: flex !important; justify-content: space-between !important; gap: 12px !important; padding: 6px 0 !important; color: var(--cy-muted) !important; font-size: 10.5px !important; }
+  .cyphra-shields-recent li:not(.empty) + li { border-top: 1px solid var(--cy-overlay) !important; }
   .cyphra-shields-recent li span:first-child { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
-  .cyphra-shields-recent li span:last-child { color: #9aa1ab !important; font-variant-numeric: tabular-nums !important; }
-  .cyphra-shields-note { margin: 15px 0 0 !important; color: #9da5b3 !important; font-size: 10px !important; line-height: 1.5 !important; }
-  .cyphra-shields-scope { margin: 8px 0 16px !important; color: #a2a9b5 !important; font-size: 10px !important; }
-  .cyphra-shields-details { border-top: 1px solid #292c33 !important; padding-top: 12px !important; }
-  .cyphra-shields-details > summary { color: #c4ccda !important; font-size: 11px !important; cursor: pointer !important; padding: 2px 0 !important; }
+  .cyphra-shields-recent li span:last-child { color: var(--cy-muted) !important; font-variant-numeric: tabular-nums !important; }
+  .cyphra-shields-note { margin: 15px 0 0 !important; color: var(--cy-muted) !important; font-size: 10px !important; line-height: 1.5 !important; }
+  .cyphra-shields-scope { margin: 8px 0 16px !important; color: var(--cy-muted) !important; font-size: 10px !important; }
+  .cyphra-shields-details { border-top: 1px solid var(--cy-line) !important; padding-top: 12px !important; }
+  .cyphra-shields-details > summary { color: var(--cy-subtle) !important; font-size: 11px !important; cursor: pointer !important; padding: 2px 0 !important; }
   .cyphra-shields-detail-stats { margin: 10px 0 0 !important; padding: 0 !important; }
-  .cyphra-shields-error { margin: 10px 0 0 !important; color: #e2b1b1 !important; font-size: 11px !important; line-height: 1.5 !important; }
+  .cyphra-shields-error { margin: 10px 0 0 !important; color: var(--cy-error) !important; font-size: 11px !important; line-height: 1.5 !important; }
   .cyphra-shields-error:empty { display: none !important; }
-  #cyphra-shields-content :focus-visible, #cyphra-mode-content :focus-visible, .cyphra-rail-button:focus-visible, #cyphra-brand:focus-visible { outline: 2px solid #8b9dc0 !important; outline-offset: 2px !important; }
+  #cyphra-shields-content :focus-visible, #cyphra-mode-content :focus-visible, .cyphra-rail-button:focus-visible, #cyphra-brand:focus-visible { outline: 2px solid var(--cy-accent) !important; outline-offset: 2px !important; }
 
   #cyphra-mode { margin-inline: 3px !important; padding-inline: 8px !important; }
   #cyphra-mode .toolbarbutton-text { display: block !important; font-size: 11px !important; }
   #cyphra-mode .toolbarbutton-icon { display: none !important; }
-  #cyphra-mode-panel { --panel-padding: 0 !important; --arrowpanel-background: #18191c !important; --arrowpanel-color: #e5e6e9 !important; color-scheme: dark !important; }
-  #cyphra-mode-content { box-sizing: border-box !important; width: 340px !important; padding: 20px !important; color: #e5e6e9 !important; background: #18191c !important; font: 12px system-ui,"Segoe UI",sans-serif !important; }
+  #cyphra-mode-panel { --panel-padding: 0 !important; --arrowpanel-background: var(--cy-surface) !important; --arrowpanel-color: var(--cy-text) !important; color-scheme: inherit !important; }
+  #cyphra-mode-content { box-sizing: border-box !important; width: 340px !important; padding: 20px !important; color: var(--cy-text) !important; background: var(--cy-surface) !important; font: 12px system-ui,"Segoe UI",sans-serif !important; }
   #cyphra-mode-content h2 { margin: 0 0 10px !important; font-size: 15px !important; font-weight: 600 !important; }
-  #cyphra-mode-content p { margin: 10px 0 15px !important; font-size: 11px !important; color: #a8afbd !important; line-height: 1.6 !important; }
-  #cyphra-mode-content .cyphra-profile-choice { display: grid !important; grid-template-columns: minmax(0,1fr) auto !important; gap: 7px !important; box-sizing: border-box !important; width: 100% !important; margin: 9px 0 !important; padding: 12px !important; text-align: left !important; border: 1px solid #363a44 !important; border-radius: 6px !important; background: #1d1f24 !important; color: #e4e8ef !important; font: inherit !important; }
-  #cyphra-mode-content .cyphra-profile-choice:hover:enabled { background: #262a32 !important; border-color: #515b6b !important; }
-  #cyphra-mode-content .cyphra-profile-choice[aria-current="true"] { border-color: #657895 !important; }
+  #cyphra-mode-content p { margin: 10px 0 15px !important; font-size: 11px !important; color: var(--cy-muted) !important; line-height: 1.6 !important; }
+  #cyphra-mode-content .cyphra-profile-choice { display: grid !important; grid-template-columns: minmax(0,1fr) auto !important; gap: 7px !important; box-sizing: border-box !important; width: 100% !important; margin: 9px 0 !important; padding: 12px !important; text-align: left !important; border: 1px solid var(--cy-strong) !important; border-radius: 6px !important; background: var(--cy-raised) !important; color: var(--cy-subtle) !important; font: inherit !important; }
+  #cyphra-mode-content .cyphra-profile-choice:hover:enabled { background: var(--cy-hover) !important; border-color: var(--cy-strong) !important; }
+  #cyphra-mode-content .cyphra-profile-choice[aria-current="true"] { border-color: var(--cy-accent) !important; }
   #cyphra-mode-content .cyphra-profile-choice strong { font-size: 12px !important; font-weight: 600 !important; }
-  #cyphra-mode-content .cyphra-profile-current { font-size: 10px !important; color: #aab8d0 !important; }
-  #cyphra-mode-content .cyphra-profile-description { grid-column: 1 / -1 !important; color: #a8afbd !important; font-size: 10.5px !important; line-height: 1.5 !important; }
+  #cyphra-mode-content .cyphra-profile-current { font-size: 10px !important; color: var(--cy-muted) !important; }
+  #cyphra-mode-content .cyphra-profile-description { grid-column: 1 / -1 !important; color: var(--cy-muted) !important; font-size: 10.5px !important; line-height: 1.5 !important; }
   #cyphra-mode-content .cyphra-profile-note { margin-bottom: 0 !important; font-size: 10px !important; }
   #cyphra-mode-content .cyphra-mode-status:empty { display: none !important; }
-  #cyphra-mode-content .cyphra-mode-status { color: #e2b1b1 !important; }
+  #cyphra-mode-content .cyphra-mode-status { color: var(--cy-error) !important; }
   #cyphra-mode-content button:disabled { opacity: .5 !important; }
 
   :root[cyphra-focus] #cyphra-rail, :root[cyphra-focus] #PersonalToolbar { display: none !important; }
@@ -246,7 +287,7 @@
   #unified-extensions-panel [data-l10n-id^="unified-extensions-empty-content-explain-extensions-onboarding"],
   #unified-extensions-panel [data-l10n-id="unified-extensions-discover-extensions"] { display: none !important; }
   #unified-extensions-panel #unified-extensions-empty-state { min-height: 72px !important; padding: 16px !important; }
-  #unified-extensions-panel #unified-extensions-empty-state::before { content: "No extensions installed" !important; display: block !important; color: #dfe2e7 !important; font: 600 11px system-ui, "Segoe UI", sans-serif !important; }
+  #unified-extensions-panel #unified-extensions-empty-state::before { content: "No extensions installed" !important; display: block !important; color: var(--cy-subtle) !important; font: 600 11px system-ui, "Segoe UI", sans-serif !important; }
 
   :root[inFullscreen] #cyphra-rail,
   :root[inDOMFullscreen] #cyphra-rail,
@@ -254,15 +295,6 @@
 }
 
 @-moz-document url-prefix("about:addons") {
-  :root {
-    color-scheme: dark !important;
-    --in-content-page-background: #101115 !important;
-    --in-content-page-color: #e7e9ed !important;
-    --in-content-box-background: #16181d !important;
-    --in-content-box-border-color: #2a2d34 !important;
-    --in-content-primary-button-background: #536faa !important;
-    --in-content-primary-button-background-hover: #6481bf !important;
-  }
   addon-page-header img, addon-page-header .header-icon { display: none !important; }
-  addon-page-header .header-name { color: #f0f1f3 !important; font-weight: 650 !important; letter-spacing: -.25px !important; }
+  addon-page-header .header-name { font-weight: 650 !important; letter-spacing: -.25px !important; }
 }

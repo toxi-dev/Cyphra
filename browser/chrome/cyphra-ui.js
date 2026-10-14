@@ -419,6 +419,23 @@ var CyphraUI = (() => {
     if (browser) browser.insertBefore(rail, browser.firstChild);
     installShields(win);
     installModes(win);
+    // Keep appearance and privacy controls reachable when the rail is hidden.
+    const settingsButton = doc.createXULElement('toolbarbutton');
+    settingsButton.id = 'cyphra-settings-toolbar';
+    settingsButton.classList.add('toolbarbutton-1');
+    settingsButton.setAttribute('label', 'Cyphra settings');
+    settingsButton.setAttribute('tooltiptext', 'Cyphra settings');
+    settingsButton.setAttribute('aria-label', 'Cyphra settings');
+    settingsButton.setAttribute('aria-haspopup', 'dialog');
+    settingsButton.setAttribute('aria-controls', 'cyphra-settings-panel');
+    settingsButton.setAttribute('aria-expanded', 'false');
+    settingsButton.append(svg(doc, 'settings'));
+    settingsButton.addEventListener('command', () => win.CyphraSettings.open(settingsButton));
+    doc.getElementById('nav-bar-customization-target')?.append(settingsButton);
+    const settingsPanel = doc.getElementById('cyphra-settings-panel');
+    settingsPanel?.addEventListener('popupshown', event => { if (event.target === settingsPanel) settingsButton.setAttribute('aria-expanded', 'true'); });
+    settingsPanel?.addEventListener('popuphidden', event => { if (event.target === settingsPanel) settingsButton.setAttribute('aria-expanded', 'false'); });
+    ChromeUtils.importESModule('resource://cyphra/modules/appearance.sys.mjs').Appearance.installWindow(win);
     win.gBrowser.tabContainer.addEventListener('TabClose', event => {
       const id = event.target.linkedBrowser?.browsingContext?.top?.id;
       if (id) win.CyphraPrivacy?.forgetContext(id);
