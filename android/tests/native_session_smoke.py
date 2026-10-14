@@ -47,9 +47,13 @@ def tab_count():
 def assert_displayed(url):
     for _ in range(15):
         tree=nodes()
-        displayed=next((n.get('text','') for n in tree if n.get('content-desc')=='Address and Brave Search'),None)
+        address=next((n for n in tree if n.get('content-desc')=='Address and Brave Search'),None)
+        displayed=address.get('text','') if address is not None else None
         if url=='about:blank':
-            if displayed=='' and any(n.get('text')=='Security reading' for n in tree):return
+            # Android's accessibility node exposes an empty EditText's hint as
+            # its text on some releases. The native Home content is also checked.
+            empty=displayed=='' or address is not None and displayed==address.get('hint')
+            if empty and any(n.get('text')=='Security reading' for n in tree):return
         elif displayed==url:return
         time.sleep(.4)
     raise AssertionError(f'Expected native address {url!r}, saw {displayed!r}.')
