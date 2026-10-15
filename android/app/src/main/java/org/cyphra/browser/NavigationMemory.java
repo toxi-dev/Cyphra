@@ -17,10 +17,17 @@ final class NavigationMemory {
         requestedUri=uri;prepared=false;
     }
     private void begin(){previousUrl=documentUrl;previousTitle=documentTitle;serial++;attachmentUri=null;}
+    boolean retainingDocument(){return attachmentSerial==serial;}
+    boolean acceptsPageStart(String uri){
+        // Gecko can deliver the attachment's progress start after its external
+        // response. That late callback must not clear the restored protection
+        // context/counters. A new request advances serial, including the same URI.
+        return !retainingDocument()||!sameResource(uri,attachmentUri);
+    }
     boolean location(String uri){
         // Some callback orders deliver the attachment location after the external
         // response. It must not become a restored tab or overwrite the old page.
-        if(attachmentSerial==serial&&sameResource(uri,attachmentUri))return false;
+        if(!acceptsPageStart(uri))return false;
         documentUrl=uri;return true;
     }
     void title(String title){documentTitle=title;}

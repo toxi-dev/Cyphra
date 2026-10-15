@@ -175,11 +175,13 @@ public abstract class MainActivity extends Activity {
         tab.session=engine.newSession(tab.privateTab,open);
         tab.session.setNavigationDelegate(new GeckoSession.NavigationDelegate(){
             @Override public void onLocationChange(GeckoSession s,String uri,List<GeckoSession.PermissionDelegate.ContentPermission> permissions,Boolean gesture){
+                if(!ownsSession(tab,s,"location-stale"))return;
                 if(uri!=null&&tab.navigation.location(uri)){tab.url=uri;if(tab==current){address.setText(uri.equals("about:blank")?"":uri);refreshButtons();}saveTabs();}
             }
-            @Override public void onCanGoBack(GeckoSession s,boolean value){tab.canBack=value;refreshButtons();}
-            @Override public void onCanGoForward(GeckoSession s,boolean value){tab.canForward=value;refreshButtons();}
+            @Override public void onCanGoBack(GeckoSession s,boolean value){if(ownsSession(tab,s,"back-state-stale")){tab.canBack=value;refreshButtons();}}
+            @Override public void onCanGoForward(GeckoSession s,boolean value){if(ownsSession(tab,s,"forward-state-stale")){tab.canForward=value;refreshButtons();}}
             @Override public GeckoResult<AllowOrDeny> onLoadRequest(GeckoSession s,LoadRequest request){
+                if(!ownsSession(tab,s,"load-request-stale"))return GeckoResult.fromValue(AllowOrDeny.DENY);
                 String uri=request.uri;
                 if(BrowserStore.isWebURL(uri)||"about:blank".equals(uri)||uri.startsWith("blob:")||uri.startsWith("view-source:http")){
                     if(request.target==TARGET_WINDOW_CURRENT){long previous=tab.navigation.serial;tab.navigation.request(uri,request.isRedirect);if(previous!=tab.navigation.serial)tab.previousSecurity=tab.security;}
@@ -194,37 +196,53 @@ public abstract class MainActivity extends Activity {
                 return GeckoResult.fromValue(AllowOrDeny.DENY);
             }
             @Override public GeckoResult<GeckoSession> onNewSession(GeckoSession s,String uri){
+                if(!ownsSession(tab,s,"new-session-stale"))return GeckoResult.fromValue(null);
                 if((!BrowserStore.isWebURL(uri)&&!"about:blank".equals(uri))||tabs.size()>=20)return GeckoResult.fromValue(null);
                 Tab child=new Tab(tab.privateTab);child.url=uri;tabs.add(child);prepare(child,false);
                 selectPopup(child);return GeckoResult.fromValue(child.session);
             }
             @Override public GeckoResult<String> onLoadError(GeckoSession s,String uri,WebRequestError error){
+                if(!ownsSession(tab,s,"load-error-stale"))return GeckoResult.fromValue(null);
                 if(tab==current){loading.setVisibility(View.GONE);showLoadError(uri,error);}
                 return GeckoResult.fromValue(null);
             }
         });
         tab.session.setProgressDelegate(new GeckoSession.ProgressDelegate(){
-            @Override public void onPageStart(GeckoSession s,String uri){prompts.dismissPending();engine.onPageStart(s,uri);if(tab==current){boolean errorView=lastLoadError!=null;lastLoadError=null;loadErrorUri=null;if(errorView)showGecko();loading.setVisibility(View.VISIBLE);}}
+            @Override public void onPageStart(GeckoSession s,String uri){
+                if(!ownsSession(tab,s,"page-start-stale"))return;
+                if(!tab.navigation.acceptsPageStart(uri)){traceNavigation("page-start-ignored",tab);return;}
+                traceNavigation("page-start-before",tab);prompts.dismissPending();engine.onPageStart(s,uri);traceNavigation("page-start-after",tab);
+                if(tab==current){boolean errorView=lastLoadError!=null;lastLoadError=null;loadErrorUri=null;if(errorView)showGecko();loading.setVisibility(View.VISIBLE);}
+            }
             @Override public void onPageStop(GeckoSession s,boolean success){
+                if(!ownsSession(tab,s,"page-stop-stale"))return;
+                traceNavigation("page-stop",tab);
                 if(tab==current)loading.setVisibility(View.GONE);
                 if(success&&!tab.privateTab)store.recordVisit(tab.title,tab.url);saveTabs();
             }
-            @Override public void onSecurityChange(GeckoSession s,SecurityInformation info){tab.security=info;}
+            @Override public void onSecurityChange(GeckoSession s,SecurityInformation info){if(ownsSession(tab,s,"security-change-stale"))tab.security=info;}
         });
         tab.session.setContentDelegate(new GeckoSession.ContentDelegate(){
-            @Override public void onTitleChange(GeckoSession s,String title){if(title!=null){tab.title=title;tab.navigation.title(title);}saveTabs();}
+            @Override public void onTitleChange(GeckoSession s,String title){if(!ownsSession(tab,s,"title-change-stale"))return;traceNavigation("title-change",tab);if(title!=null){tab.title=title;tab.navigation.title(title);}saveTabs();}
             @Override public void onFullScreen(GeckoSession s,boolean value){
-                if(tab!=current)return;fullScreen=value;top.setVisibility(value?View.GONE:View.VISIBLE);bottom.setVisibility(value?View.GONE:View.VISIBLE);
+                if(!ownsSession(tab,s,"full-screen-stale")||tab!=current)return;fullScreen=value;top.setVisibility(value?View.GONE:View.VISIBLE);bottom.setVisibility(value?View.GONE:View.VISIBLE);
             }
             @Override public void onContextMenu(GeckoSession s,int x,int y,ContextElement element){
+                if(!ownsSession(tab,s,"context-menu-stale"))return;
                 String url=element.linkUri;if(url==null||!BrowserStore.isWebURL(url))return;
                 dialogBuilder().setTitle(host(url)).setItems(new String[]{"Open in new tab","Copy link"},(d,w)->{
                     if(w==0)newTab(tab.privateTab,url);else copy(url);
                 }).show();
             }
             @Override public void onExternalResponse(GeckoSession s,WebResponse response){download(tab,s,response);}
-            @Override public void onCrash(GeckoSession s){tab.session=null;toast("This tab stopped. Reload to open it again.");}
-            @Override public void onKill(GeckoSession s){tab.session=null;}
+            @Override public void onCrash(GeckoSession s){
+                traceNavigation(tab.session==s?"session-crash-current":"session-crash-stale",tab);
+                if(tab.session!=s)return;tab.session=null;toast("This tab stopped. Reload to open it again.");
+            }
+            @Override public void onKill(GeckoSession s){
+                traceNavigation(tab.session==s?"session-kill-current":"session-kill-stale",tab);
+                if(tab.session!=s)return;tab.session=null;
+            }
         });
         tab.session.setPromptDelegate(prompts);
         tab.session.setPermissionDelegate(prompts);
@@ -457,9 +475,12 @@ public abstract class MainActivity extends Activity {
         if(isFinishing()||isDestroyed()||tab.session!=respondingSession||!respondingSession.isOpen()){if(response.body!=null)try{response.body.close();}catch(IOException ignored){}return;}
         // An attachment response is not a committed document. Keep the existing
         // page (or native Home) and never restore an attachment as a saved tab.
+        traceNavigation("external-response-before",tab);
         boolean restored=tab.navigation.external(response.uri);long navigation=tab.navigation.serial;
+        traceNavigation(restored?"external-response-restored":"external-response-stale",tab);
         if(restored){
             engine.restoreDocument(respondingSession,tab.navigation.documentUrl);
+            traceNavigation("external-context-restored",tab);
             tab.url=tab.navigation.documentUrl;tab.title=tab.navigation.documentTitle;tab.security=tab.previousSecurity;
             if(tab==current){lastLoadError=null;loadErrorUri=null;loading.setVisibility(View.GONE);address.setText("about:blank".equals(tab.url)?"":tab.url);if("about:blank".equals(tab.url)){respondingSession.setActive(false);showHomeView();}refreshButtons();}
         }
@@ -488,6 +509,19 @@ public abstract class MainActivity extends Activity {
         }).setNegativeButton("Cancel",null).create();
         confirmation.setOnDismissListener(d->{if(!accepted[0]){try{response.body.close();}catch(IOException ignored){}finish.run();}});
         confirmation.show();
+    }
+    private void traceNavigation(String event,Tab tab){
+        if(!BuildConfig.DEBUG)return;
+        Engine.Stats stats=tab.session==null?null:engine.snapshot(tab.session);
+        android.util.Log.d("CyphraNavigation","event="+event+" serial="+tab.navigation.serial
+            +" retained="+tab.navigation.retainingDocument()+" blocked="+(stats==null?0:stats.blocked)
+            +" nativeBlocked="+(stats==null?0:stats.nativeBlocked));
+    }
+    private boolean ownsSession(Tab tab,GeckoSession session,String staleEvent){
+        // A tab can retain its identity after Home retires its GeckoSession.
+        // Delayed callbacks from that old renderer do not own its replacement.
+        if(tab.session==session)return true;
+        traceNavigation(staleEvent,tab);return false;
     }
     private interface Task{Object run() throws Exception;}
     private void busy(String label,Task task,java.util.function.Consumer<Object> done){

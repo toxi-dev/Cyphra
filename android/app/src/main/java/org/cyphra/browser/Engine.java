@@ -214,6 +214,7 @@ public final class Engine {
     }
     /** An attachment leaves its initiating document, including its actual counters, alive. */
     public void restoreDocument(GeckoSession session,String uri){
+        traceDocument("restore-before",session,false);
         String pendingUri=pageUrls.get(session);pageUrls.put(session,uri);Stats previous=previousStatistics.remove(session);
         Stats pending=snapshot(session);
         if(previous==null){if(!uri.equals(pendingUri))statistics.put(session,empty());}
@@ -230,6 +231,7 @@ public final class Engine {
             JSONObject message=new JSONObject();try{message.put("type","restore-document");message.put("tabId",entry.getKey());message.put("url",uri);port.postMessage(message);}catch(JSONException error){fail("The document protection context could not be restored.");}break;
         }
         emitStats(session,snapshot(session));
+        traceDocument("restore-after",session,false);
     }
     public Stats snapshot(GeckoSession session){Stats found=statistics.get(session);return found==null?empty():found;}
     private Stats empty(){return new Stats(0,0,0,0,0,rules,isReady(),updatedAt,Collections.emptyList());}
@@ -318,10 +320,13 @@ public final class Engine {
                 // A progress stop and a same-URL bind can both finish an
                 // attachment. A new isolated content world proves a new document.
                 String documentId=message.optString("documentId");
-                if(documentId.matches("[a-f0-9]{32}")&&!documentId.equals(documentIds.get(sender.session))){
+                boolean generationChanged=documentId.matches("[a-f0-9]{32}")&&!documentId.equals(documentIds.get(sender.session));
+                traceDocument("content-bind-before",sender.session,generationChanged);
+                if(generationChanged){
                     documentIds.put(sender.session,documentId);previousStatistics.remove(sender.session);
                 }
                 receiveStats(sender.session,message.optJSONObject("snapshot"));
+                traceDocument("content-bind-after",sender.session,generationChanged);
             }
             return GeckoResult.fromValue(null);
         }
@@ -345,6 +350,13 @@ public final class Engine {
         Stats old=snapshot(session);hosts.addAll(old.hosts);
         Stats next=new Stats(blocked,filters,telemetry,strict,old.nativeBlocked,rules,isReady(),updatedAt,new ArrayList<>(hosts));
         statistics.put(session,next);emitStats(session,next);
+    }
+    private void traceDocument(String event,GeckoSession session,boolean generationChanged){
+        if(!BuildConfig.DEBUG)return;
+        Stats stats=snapshot(session);
+        // Local debug diagnostics contain no URL, hostname, document ID or data.
+        android.util.Log.d("CyphraDocument","event="+event+" generationChanged="+generationChanged
+            +" blocked="+stats.blocked+" nativeBlocked="+stats.nativeBlocked);
     }
     private int count(JSONObject value,String key){return Math.max(0,Math.min(1000000,value.optInt(key)));}
 
