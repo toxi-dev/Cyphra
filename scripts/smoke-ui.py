@@ -112,7 +112,9 @@ def settings_tab(title):
     button('#cyphra-settings-content [role="tab"]', title)
 
 def setting(label):
-    return script('return [...document.querySelectorAll("#cyphra-settings-content label")].find(node=>(node.firstChild?.nodeType===Node.TEXT_NODE?node.firstChild.textContent.trim():node.textContent.trim())===arguments[0])?.querySelector("input,select");', label)
+    node = script('return [...document.querySelectorAll("#cyphra-settings-content [role=tabpanel]:not([hidden]) label")].find(node=>(node.firstChild?.nodeType===Node.TEXT_NODE?node.firstChild.textContent.trim():node.textContent.trim())===arguments[0])?.querySelector("input,select");', label)
+    assert node, f'Missing control in the selected settings category: {label}'
+    return node
 
 def toolbox_state():
     return script('const {DevToolsShim}=ChromeUtils.importESModule("chrome://devtools-startup/content/DevToolsShim.sys.mjs"); const box=DevToolsShim.getToolboxForTab(gBrowser.selectedTab);return {ready:!!box?.isReady,tool:box?.currentToolId};')
@@ -134,6 +136,16 @@ def shutdown():
 
 try:
     scratch.chmod(0o755)
+    # The operator's cached tool may live below /root (0700). Execute an exact
+    # verified copy from this disposable directory without opening /root or
+    # changing permissions on any shared tool or application directory.
+    compositor_source = Path(COMPOSITOR).resolve(strict=True)
+    compositor_digest = hashlib.sha256(compositor_source.read_bytes()).hexdigest()
+    compositor = scratch / 'xcompmgr'
+    shutil.copyfile(compositor_source, compositor)
+    compositor.chmod(0o755)
+    assert hashlib.sha256(compositor.read_bytes()).hexdigest() == compositor_digest, 'The disposable compositor copy failed verification.'
+    print('Native compositor SHA-256:', compositor_digest, flush=True)
     app = scratch / 'Cyphra'
     shutil.copytree(STAGE, app, symlinks=True)
     runtime = app / 'runtime'
@@ -146,7 +158,7 @@ try:
     (profile / 'user.js').write_text(f'user_pref("marionette.port",{port});\nuser_pref("browser.sessionstore.resume_from_crash",false);\n')
     environment = dict(os.environ)
     environment['CYPHRA_MODE'] = MODE
-    environment['CYPHRA_TEST_COMPOSITOR'] = COMPOSITOR
+    environment['CYPHRA_TEST_COMPOSITOR'] = str(compositor)
     for key in list(environment):
         if key.startswith('MOZ_DISABLE_'): del environment[key]
     environment['MOZ_CRASHREPORTER_DISABLE'] = '1'
@@ -282,12 +294,13 @@ try:
         wait(lambda: script('const {ScreenshotsUtils}=ChromeUtils.importESModule("moz-src:///browser/components/screenshots/ScreenshotsUtils.sys.mjs");return ScreenshotsUtils.getUIPhase(gBrowser.selectedBrowser);') == 0, 'native screenshot overlay closes')
         print('PASS: Tools opens actual source text, native Page information and native screenshot selection UI.',flush=True)
     open_panel('cyphra-settings','cyphra-settings-panel')
-    assert script('return [...document.querySelectorAll(".cyphra-settings-tabs button")].map(n=>n.textContent);') == ['General','Home','Data','Privacy','DNS','Device sync','Updates']
+    assert script('return [...document.querySelectorAll(".cyphra-settings-tabs button")].map(n=>n.textContent);') == ['Appearance','General','Home','Data','Privacy','DNS','Device sync','Updates']
     settings_tab('General')
     tabs = script('return [...document.querySelectorAll(".cyphra-settings-tabs button")].map(n=>({selected:n.getAttribute("aria-selected"),tabIndex:n.tabIndex,panel:document.getElementById(n.getAttribute("aria-controls")).hidden}));')
-    assert tabs[0] == {'selected':'true','tabIndex':0,'panel':False} and all(row == {'selected':'false','tabIndex':-1,'panel':True} for row in tabs[1:])
+    assert tabs[1] == {'selected':'true','tabIndex':0,'panel':False} and all(row == {'selected':'false','tabIndex':-1,'panel':True} for index,row in enumerate(tabs) if index != 1)
     script('arguments[0].click();',setting('Ask where to save downloads'))
     assert script('return Services.prefs.getBoolPref("browser.download.useDownloadDir");') is True
+    settings_tab('Appearance')
     script('const node=arguments[0];node.value="0";node.dispatchEvent(new Event("change",{bubbles:true}));',setting('Toolbar density'))
     assert script('return Services.prefs.getIntPref("browser.uidensity");') == 0
     settings_tab('Privacy'); script('arguments[0].click();',setting('Keep browsing history'))
