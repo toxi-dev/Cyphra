@@ -306,6 +306,42 @@ def appearance_state(driver):
     ''')
 
 
+APPEARANCE_PREFS = (
+    'cyphra.ui.theme', 'cyphra.ui.accent', 'browser.uidensity', 'cyphra.ui.railWidth',
+    'cyphra.ui.sidebarWidth', 'cyphra.ui.toolRail', 'cyphra.ui.focus',
+    'browser.toolbars.bookmarks.visibility', 'cyphra.home.layout', 'cyphra.home.showSearch',
+    'cyphra.home.showPinned', 'cyphra.home.showBriefing', 'cyphra.home.showPublishers',
+    'cyphra.home.maxPins', 'cyphra.home.maxHeadlines', 'cyphra.home.openLinksInNewTabs',
+)
+
+
+def qualify_automation_preferences(driver):
+    driver.set_context(driver.CONTEXT_CHROME)
+    observed = driver.execute_script('''
+      const {RecommendedPreferences}=ChromeUtils.importESModule('chrome://remote/content/shared/RecommendedPreferences.sys.mjs');
+      return {recommended:Services.prefs.getBoolPref('remote.prefs.recommended',true),
+        applied:Services.prefs.getBoolPref('remote.prefs.recommended.applied',false),
+        initialized:RecommendedPreferences.isInitialized,altered:[...RecommendedPreferences.alteredPrefs],
+        trackingProtection:Services.prefs.getBoolPref('privacy.trackingprotection.enabled'),
+        privateTrackingProtection:Services.prefs.getBoolPref('privacy.trackingprotection.pbmode.enabled'),
+        savedPasswords:Services.prefs.getBoolPref('signon.rememberSignons')};
+    ''')
+    assert observed == {'recommended': False, 'applied': False, 'initialized': False, 'altered': [],
+                        'trackingProtection': True, 'privateTrackingProtection': True, 'savedPasswords': True}, \
+        'The automation driver changed the installed privacy or preference persistence behavior.'
+    return observed
+
+
+def disk_appearance(profile):
+    # Only these non-sensitive visual preferences may enter diagnostic output.
+    text = (profile / 'prefs.js').read_text(encoding='utf-8')
+    found = {}
+    for name in APPEARANCE_PREFS:
+        match = re.search(r'^user_pref\(' + re.escape(json.dumps(name)) + r', (.+)\);$', text, re.MULTILINE)
+        found[name] = json.loads(match.group(1)) if match else '<no-user-override>'
+    return found
+
+
 def set_appearance_controls(driver, mode):
     """Use installed chrome handlers; the headless runner does not prove pixels."""
     driver.set_context(driver.CONTEXT_CHROME)
@@ -491,7 +527,9 @@ def main():
     assert repository == os.environ['GITHUB_REPOSITORY'], 'Run the edition workflow in its own repository.'
     token = os.environ.get('GH_TOKEN', '')
     assert token or config['public'], 'The private release requires its ephemeral read-only workflow credential.'
-    proof = {'version': version, 'edition': edition, 'repository': repository, 'checks': []}
+    proof = {'version': version, 'edition': edition, 'repository': repository, 'checks': [],
+             'qualificationCommit': os.environ['GITHUB_SHA'], 'qualificationHarnessOnly': True,
+             'automationPreferences': {}}
     scratch = Path(tempfile.mkdtemp(prefix='cyphra-windows-native-', dir=os.environ['RUNNER_TEMP']))
     application, drivers = scratch / 'Installed Cyphra', {}
     engine = application / 'runtime/librewolf.exe'
@@ -526,7 +564,8 @@ def main():
         ports = {mode: free_port() for mode in profiles}
         for mode, profile in profiles.items():
             profile.mkdir(parents=True)
-            (profile / 'user.js').write_text(f'user_pref("marionette.port",{ports[mode]});\n')
+            (profile / 'user.js').write_text(f'user_pref("marionette.port",{ports[mode]});\n'
+                'user_pref("remote.prefs.recommended",false);\n')
         native_command([str(installer), '/S', '/D=' + str(application)], 240)
         assert (application / 'Cyphra.exe').is_file() and engine.is_file()
         installed = json.loads((application / 'cyphra.json').read_text())
@@ -538,6 +577,16 @@ def main():
         environment = dict(public_environment(), MOZ_HEADLESS='1', MOZ_MARIONETTE='1', MOZ_REMOTE_ALLOW_SYSTEM_ACCESS='1',
                            CYPHRA_MODE='spoofed', CYPHRA_EDITION='spoofed', MOZ_APP_REMOTINGNAME='spoofed')
         launcher = application / 'Cyphra.exe'
+        ref_data, _, _ = api_download(f'https://api.github.com/repos/{repository}/git/ref/tags/v{version}', token, MAX_METADATA)
+        release_ref = json.loads(ref_data)['object']
+        for _ in range(4):
+            if release_ref['type'] == 'commit':
+                break
+            assert release_ref['type'] == 'tag', 'The published release tag does not resolve to a commit.'
+            ref_data, _, _ = api_download(f'https://api.github.com/repos/{repository}/git/tags/{release_ref["sha"]}', token, MAX_METADATA)
+            release_ref = json.loads(ref_data)['object']
+        assert release_ref['type'] == 'commit' and re.fullmatch(r'[0-9a-f]{40}', release_ref['sha'])
+        proof['releaseSourceCommit'] = release_ref['sha']
         default = config['defaultMode']
         subprocess.run([str(launcher), url + 'default'], env=environment, timeout=20, check=True)
         drivers[default] = connect(ports[default])
@@ -590,6 +639,7 @@ def main():
             assert value['defaultShield'] == ('strict' if mode == 'work' else 'standard')
             assert value['rfp'] == (mode == 'work') and value['webglDisabled'] == (mode == 'work')
             assert value['telemetry'] is False and value['tls'] >= 3 and value['sandbox'] >= 4
+            proof['automationPreferences'][mode] = {'initial': qualify_automation_preferences(drivers[mode])}
             profile_lock(profiles[mode], True)
         proof['checks'].append('shipped-launcher-default-and-ui-mode-open-real-isolated-processes-and-protection-defaults')
 
@@ -752,6 +802,9 @@ def main():
         drivers.clear(); wait_closed(engine)
         for profile in profiles.values(): profile_lock(profile, False)
         preserved = profile_hashes(profiles)
+        proof['appearanceBeforeReinstall'] = {mode: {'saved': appearance_saved[mode], 'disk': disk_appearance(profile)}
+                                              for mode, profile in profiles.items()}
+        print('DIAGNOSTIC before reinstall: ' + json.dumps(proof['appearanceBeforeReinstall'], sort_keys=True), flush=True)
         native_command([str(installer), '/S', '/D=' + str(application)], 240)
         assert profile_hashes(profiles) == preserved, 'Reinstall modified the external profiles.'
         for mode in ['work', 'personal']:
@@ -761,7 +814,14 @@ def main():
             bookmark = async_call(driver, "const {PlacesUtils}=ChromeUtils.importESModule('resource://gre/modules/PlacesUtils.sys.mjs');return await PlacesUtils.bookmarks.fetch(arguments[0]);", [bookmark_guids[mode]])
             assert bookmark and bookmark['title'] == 'Native ' + mode + ' fixture'
             wait_script(driver, 'return !!window.CyphraSettings&&!!document.getElementById("cyphra-settings-toolbar");')
-            assert appearance_state(driver) == appearance_saved[mode], 'Reinstall/restart lost the native appearance choices.'
+            proof['automationPreferences'][mode]['restart'] = qualify_automation_preferences(driver)
+            restored = appearance_state(driver)
+            differences = {name: {'saved': value, 'restored': restored.get(name)} for name, value in appearance_saved[mode].items()
+                           if restored.get(name) != value}
+            appearance[mode]['reinstallDiagnostic'] = {'saved': appearance_saved[mode], 'restored': restored,
+                'differences': differences, 'diskAfterStartup': disk_appearance(profiles[mode])}
+            print('DIAGNOSTIC after reinstall ' + mode + ': ' + json.dumps(appearance[mode]['reinstallDiagnostic'], sort_keys=True), flush=True)
+            assert restored == appearance_saved[mode], 'Reinstall/restart lost the native appearance choices.'
             assert appearance_security(driver) == appearance_protection[mode], 'Reinstall/restart changed the retained DNS/security/site exception.'
             appearance[mode]['reinstalledHome'] = qualify_home_appearance(driver, appearance[mode]['requested'])
             appearance[mode]['reinstallPersistence'] = True
