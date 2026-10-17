@@ -120,7 +120,11 @@ public abstract class MainActivity extends Activity {
         loading.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(appearance.accentColor));loading.setVisibility(View.GONE);root.addView(loading,new LinearLayout.LayoutParams(-1,dp(2)));
         startup=text("Starting local protections…",13,MUTED);startup.setPadding(dp(20),dp(8),dp(20),dp(8));root.addView(startup);
         content=new FrameLayout(this);root.addView(content,new LinearLayout.LayoutParams(-1,0,1));
-        if(gecko==null)gecko=new GeckoView(this);gecko.setBackgroundColor(BG);
+        if(gecko==null)gecko=new GeckoView(this){
+            @Override public void onAttachedToWindow(){super.onAttachedToWindow();if(BuildConfig.DEBUG)android.util.Log.d("CyphraViewLifecycle","event=view-attached");}
+            @Override public void onDetachedFromWindow(){if(BuildConfig.DEBUG)android.util.Log.d("CyphraViewLifecycle","event=view-detaching");super.onDetachedFromWindow();}
+            @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(BuildConfig.DEBUG)android.util.Log.d("CyphraViewLifecycle",focused?"event=view-focused":"event=view-unfocused");}
+        };gecko.setBackgroundColor(BG);
         View divider=new View(this);divider.setBackgroundColor(LINE);root.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
         bottom=new LinearLayout(this);bottom.setGravity(Gravity.CENTER_VERTICAL);bottom.setPadding(dp(4),0,dp(4),0);
         back=iconButton("back","Back",this::backAction);forward=iconButton("forward","Forward",()->{if(current!=null&&current.session!=null)current.session.goForward();});
@@ -285,7 +289,15 @@ public abstract class MainActivity extends Activity {
         if(lastOrdinary==tab)lastOrdinary=null;
         if(current==tab)select(tabs.get(Math.max(0,tabs.size()-1)));tabCount.setText(Integer.toString(tabs.size()));saveTabs();
     }
-    private void showGecko(){content.removeAllViews();if(gecko.getParent()!=null)((android.view.ViewGroup)gecko.getParent()).removeView(gecko);content.addView(gecko,new FrameLayout.LayoutParams(-1,-1));}
+    private void showGecko(){
+        // Ordinary navigation keeps the same view/session. Detaching it destroys
+        // the display surface and deactivates Gecko before reattaching it.
+        if(gecko.getParent()==content&&content.getChildCount()==1&&content.getChildAt(0)==gecko){
+            if(current!=null)traceNavigation("view-host-retained",current);return;
+        }
+        if(current!=null)traceNavigation("view-host-attach",current);
+        content.removeAllViews();if(gecko.getParent()!=null)((android.view.ViewGroup)gecko.getParent()).removeView(gecko);content.addView(gecko,new FrameLayout.LayoutParams(-1,-1));
+    }
     private void showHome(){
         lastLoadError=null;loadErrorUri=null;
         if(current==null){showHomeView();return;}
@@ -544,8 +556,8 @@ public abstract class MainActivity extends Activity {
     private void toast(String message){Toast.makeText(this,message==null?"Could not complete the action.":message,Toast.LENGTH_SHORT).show();}
     private void copy(String value){((ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Cyphra",value));toast("Copied.");}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);String url=intent.getStringExtra("url");if(BrowserStore.isWebURL(url))navigate(url);}
-    @Override protected void onPause(){saveTabs();if(current!=null&&current.session!=null)current.session.setActive(false);super.onPause();}
-    @Override protected void onResume(){super.onResume();if(current!=null&&current.session!=null)current.session.setActive(true);}
+    @Override protected void onPause(){if(current!=null)traceNavigation("activity-pause",current);saveTabs();if(current!=null&&current.session!=null)current.session.setActive(false);super.onPause();}
+    @Override protected void onResume(){super.onResume();if(current!=null&&current.session!=null)current.session.setActive(true);if(current!=null)traceNavigation("activity-resume",current);}
     @Override public void onConfigurationChanged(android.content.res.Configuration configuration){super.onConfigurationChanged(configuration);if(appearance!=null&&"system".equals(appearance.theme))applyAppearance();}
     // API 33+ uses the native OnBackInvokedDispatcher registered above.
     // This override is the required fallback only on Android 10–12.
