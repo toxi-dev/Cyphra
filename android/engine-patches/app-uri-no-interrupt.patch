@@ -1,0 +1,28 @@
+--- a/modules/GeckoViewNavigation.sys.mjs
++++ b/modules/GeckoViewNavigation.sys.mjs
+@@ -278,0 +279,3 @@
++          // A response may be a download, leaving the current document alive.
++          // Do not abort its running callback before the response is known.
++          cyphraSkipNavigationJSInterrupt: true,
+--- a/moz-src/toolkit/components/remotebrowserutils/RemoteWebNavigation.sys.mjs
++++ b/moz-src/toolkit/components/remotebrowserutils/RemoteWebNavigation.sys.mjs
+@@ -140 +140,4 @@
+-  fixupAndLoadURIString(uriString, loadURIOptions) {
++  fixupAndLoadURIString(
++    uriString,
++    { cyphraSkipNavigationJSInterrupt = false, ...loadURIOptions }
++  ) {
+@@ -167,4 +170,9 @@
+-    let cancelContentJSEpoch = this.maybeCancelContentJSExecution(
+-      Ci.nsIRemoteTab.NAVIGATE_URL,
+-      { uri }
+-    );
++    // Consume this privileged, per-call option here. Keep advancing and
++    // forwarding the epoch so older navigation interrupts cannot affect a new
++    // load. Other callers retain the upstream interruption behavior.
++    let cancelContentJSEpoch =
++      cyphraSkipNavigationJSInterrupt === true
++        ? this._cancelContentJSEpoch++
++        : this.maybeCancelContentJSExecution(Ci.nsIRemoteTab.NAVIGATE_URL, {
++            uri,
++          });

@@ -8,6 +8,7 @@ from pathlib import Path
 import shutil
 import stat
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -37,6 +38,8 @@ def main():
                     f'-PcyphraVersionName={args.version}', f'-PcyphraVersionCode={args.version_code}',
                     f':app:assemble{args.edition.title()}Release'], env=env, check=True)
     apk = ROOT / f'android/app/build/outputs/apk/{args.edition}/release/app-{args.edition}-release.apk'
+    subprocess.run([sys.executable, str(ROOT / 'scripts/patch-android-engine.py'),
+                    'verify-apk', '--apk', str(apk)], check=True)
     sdk = Path(env.get('ANDROID_HOME', env.get('ANDROID_SDK_ROOT', '')))
     signer = sdk / 'build-tools/36.0.0/apksigner'
     subprocess.run([str(signer), 'verify', '--verbose', '--print-certs', str(apk)], check=True)

@@ -16,11 +16,19 @@ public final class WebPrompts implements GeckoSession.PromptDelegate,GeckoSessio
     private final java.util.function.Function<GeckoSession,String> sessionURL;
     private GeckoSession.PermissionDelegate.Callback permissionCallback;
     private boolean androidPermissionInFlight;
+    private boolean androidFileInFlight;
     private String[] requestedAndroidPermissions;
     private FilePrompt filePrompt;
     private GeckoResult<PromptResponse> fileResult;
     private final ArrayList<Dialog> dialogs=new ArrayList<>();
     WebPrompts(Activity activity,Appearance appearance,java.util.function.Function<GeckoSession,String> sessionURL){this.activity=activity;this.appearance=appearance;this.sessionURL=sessionURL;}
+    /** Occupancy survives recreation; website callbacks and Activity references do not. */
+    static final class PendingAndroidRequests {
+        final boolean permission,file;
+        PendingAndroidRequests(boolean permission,boolean file){this.permission=permission;this.file=file;}
+    }
+    PendingAndroidRequests pendingAndroidRequests(){return new PendingAndroidRequests(androidPermissionInFlight,androidFileInFlight);}
+    void inheritPendingAndroidRequests(PendingAndroidRequests pending){androidPermissionInFlight=pending.permission;androidFileInFlight=pending.file;}
     void setAppearance(Appearance appearance){this.appearance=appearance;}
     private AlertDialog.Builder builder(){return new NativeDialogs.Builder(activity,appearance);}
     private String origin(GeckoSession session){return origin(sessionURL.apply(session));}
@@ -63,12 +71,13 @@ public final class WebPrompts implements GeckoSession.PromptDelegate,GeckoSessio
         EditText value=new EditText(activity);value.setText(prompt.defaultValue);GeckoResult<PromptResponse> result=new GeckoResult<>();show(prompt,builder().setTitle("Date or time").setView(value).setPositiveButton("Choose",(d,w)->result.complete(prompt.confirm(value.getText().toString()))).setNegativeButton("Cancel",(d,w)->result.complete(prompt.dismiss())).setOnCancelListener(d->result.complete(prompt.dismiss())));return result;
     }
     @Override public GeckoResult<PromptResponse> onFilePrompt(GeckoSession s,FilePrompt prompt){
-        if(fileResult!=null){fileResult.complete(filePrompt.dismiss());fileResult=null;}
+        if(androidFileInFlight)return GeckoResult.fromValue(prompt.dismiss());
         filePrompt=prompt;fileResult=new GeckoResult<>();GeckoResult<PromptResponse> result=fileResult;
         prompt.setDelegate(new PromptInstanceDelegate(){@Override public void onPromptDismiss(BasePrompt obsolete){if(filePrompt==prompt){filePrompt=null;fileResult=null;}}});Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*");
         if(prompt.mimeTypes!=null&&prompt.mimeTypes.length>0)intent.putExtra(Intent.EXTRA_MIME_TYPES,prompt.mimeTypes);
         intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,prompt.type==FilePrompt.Type.MULTIPLE);
-        try{activity.startActivityForResult(intent,71);}catch(Exception e){fileResult=null;filePrompt=null;result.complete(prompt.dismiss());}return result;
+        androidFileInFlight=true;
+        try{activity.startActivityForResult(intent,71);}catch(Exception e){androidFileInFlight=false;fileResult=null;filePrompt=null;result.complete(prompt.dismiss());}return result;
     }
     @Override public GeckoResult<PromptResponse> onPopupPrompt(GeckoSession s,PopupPrompt prompt){
         GeckoResult<PromptResponse> result=new GeckoResult<>();show(prompt,builder().setTitle(origin(s)).setMessage("Allow this website to open another tab?")
@@ -101,7 +110,8 @@ public final class WebPrompts implements GeckoSession.PromptDelegate,GeckoSessio
         show(builder().setTitle(origin(uri)).setMessage("Allow this website to use "+(wantsVideo&&wantsAudio?"the camera and microphone":wantsVideo?"the camera":"the microphone")+"?").setPositiveButton("Allow",(d,w)->callback.grant(wantsVideo?video[0]:null,wantsAudio?audio[0]:null)).setNegativeButton("Block",(d,w)->callback.reject()).setOnCancelListener(d->callback.reject()));
     }
     void onActivityResult(int request,int result,Intent data){
-        if(request!=71||fileResult==null)return;GeckoResult<PromptResponse> pending=fileResult;FilePrompt prompt=filePrompt;fileResult=null;filePrompt=null;
+        if(request!=71||!androidFileInFlight)return;androidFileInFlight=false;
+        if(fileResult==null)return;GeckoResult<PromptResponse> pending=fileResult;FilePrompt prompt=filePrompt;fileResult=null;filePrompt=null;
         if(result!=Activity.RESULT_OK||data==null){pending.complete(prompt.dismiss());return;}ArrayList<Uri> uris=new ArrayList<>();if(data.getClipData()!=null)for(int i=0;i<data.getClipData().getItemCount();i++)uris.add(data.getClipData().getItemAt(i).getUri());else if(data.getData()!=null)uris.add(data.getData());
         try{pending.complete(uris.isEmpty()?prompt.dismiss():prompt.confirm(activity,uris.toArray(new Uri[0])));}catch(Exception e){pending.complete(prompt.dismiss());}
     }
@@ -118,6 +128,6 @@ public final class WebPrompts implements GeckoSession.PromptDelegate,GeckoSessio
         if(permissionCallback!=null){GeckoSession.PermissionDelegate.Callback pending=permissionCallback;permissionCallback=null;pending.reject();}
         // Keep the OS request occupied until its result arrives. Otherwise that
         // stale result could be mistaken for a new page's permission decision.
-        if(fileResult!=null){fileResult.complete(filePrompt.dismiss());fileResult=null;}for(Dialog d:new ArrayList<>(dialogs))d.cancel();dialogs.clear();
+        if(fileResult!=null){GeckoResult<PromptResponse> pending=fileResult;FilePrompt prompt=filePrompt;fileResult=null;filePrompt=null;pending.complete(prompt.dismiss());}for(Dialog d:new ArrayList<>(dialogs))d.cancel();dialogs.clear();
     }
 }

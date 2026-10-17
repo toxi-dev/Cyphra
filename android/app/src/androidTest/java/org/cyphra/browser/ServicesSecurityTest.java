@@ -243,6 +243,27 @@ public final class ServicesSecurityTest extends Instrumentation {
         seedPermissionRequest(prompts,emptyResult,denied);
         prompts.onRequestPermissionsResult(72,new int[0]);
         assertEquals(1,emptyResult.rejections);assertEquals(0,emptyResult.grants);
+
+        PermissionDecision beforeRecreation=new PermissionDecision();
+        seedPermissionRequest(prompts,beforeRecreation,denied);
+        WebPrompts.PendingAndroidRequests retained=prompts.pendingAndroidRequests();prompts.dismissPending();
+        WebPrompts replacement=new WebPrompts(new PermissionTestActivity(target),new Appearance(target,new BrowserStore(target,"work",BuildConfig.EDITION)),session->"https://next.example/");
+        replacement.inheritPendingAndroidRequests(retained);
+        PermissionDecision afterRecreation=new PermissionDecision();
+        replacement.onAndroidPermissionsRequest(null,new String[]{denied},afterRecreation);
+        assertEquals(1,beforeRecreation.rejections);assertEquals(1,afterRecreation.rejections);
+        assertEquals(null,permissionField(replacement,"permissionCallback"));
+        replacement.onRequestPermissionsResult(72,new int[]{android.content.pm.PackageManager.PERMISSION_GRANTED});
+        assertEquals(0,beforeRecreation.grants);assertEquals(0,afterRecreation.grants);
+        assertFalse((Boolean)permissionField(replacement,"androidPermissionInFlight"));
+
+        // A retained file picker result has no website callback to complete and
+        // releases only its own request code before another picker may start.
+        replacement.inheritPendingAndroidRequests(new WebPrompts.PendingAndroidRequests(false,true));
+        replacement.onActivityResult(72,Activity.RESULT_OK,null);
+        assertTrue(replacement.pendingAndroidRequests().file);
+        replacement.onActivityResult(71,Activity.RESULT_CANCELED,null);
+        assertFalse(replacement.pendingAndroidRequests().file);
     }
     private static final class PermissionTestActivity extends Activity {
         PermissionTestActivity(Context context){attachBaseContext(context);}

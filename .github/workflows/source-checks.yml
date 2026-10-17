@@ -39,6 +39,10 @@ jobs:
         run: npm test
       - name: Test Linux archive updates and rollback
         run: python3 -m unittest discover -s tests -p test_updates.py -v
+      - name: Test pinned Android engine overlay assembly and package guards
+        run: python3 -m unittest discover -s tests -p test_android_engine_patch.py -v
+      - name: Test native navigation safety supervisor without ADB or services
+        run: python3 -m unittest discover -s tests -p test_android_navigation_safety.py -v
       - name: Test local sync HTTP behavior and concurrent writes
         run: python3 tests/sync-server.test.py
       - name: Check Python source syntax

@@ -1,19 +1,98 @@
 {
-  "schema": 1,
-  "artifact": "org.mozilla.geckoview:geckoview:157.0.20261005135250",
-  "geckoVersion": "157.0.1",
-  "buildId": "20261005135250",
-  "sourceRevision": "737ec77d798755890b062aab541a90d6c75afd19",
+  "schema": 2,
+  "artifact": "org.mozilla.geckoview:geckoview:158.0.20261007201254",
+  "geckoVersion": "158.0",
+  "buildId": "20261007201254",
+  "sourceRevision": "eb9a6e3a736802c8e080a76c44dc81f409d99d54",
   "aar": {
-    "url": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/157.0.20261005135250/geckoview-157.0.20261005135250.aar",
-    "sha256": "15f1edf3c58abcdaf2783f299b8c19c3a36272d348969106a9009671fef8d268"
+    "url": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/158.0.20261007201254/geckoview-158.0.20261007201254.aar",
+    "sha256": "b33ab7d20c1361ff54ab793a9395aebc223a3fc2756b82a8c661d9739f566d05"
   },
-  "nativeSource": "https://hg.mozilla.org/releases/mozilla-release/rev/737ec77d798755890b062aab541a90d6c75afd19",
-  "javaSource": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/157.0.20261005135250/geckoview-157.0.20261005135250-sources.jar",
-  "abis": ["arm64-v8a", "armeabi-v7a", "x86_64"],
-  "excludedRuntimeGroups": ["com.google.android.gms"],
+  "nativeSource": "https://hg.mozilla.org/releases/mozilla-release/rev/eb9a6e3a736802c8e080a76c44dc81f409d99d54",
+  "javaSource": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/158.0.20261007201254/geckoview-158.0.20261007201254-sources.jar",
+  "abis": [
+    "arm64-v8a",
+    "armeabi-v7a",
+    "x86_64"
+  ],
+  "excludedRuntimeGroups": [
+    "com.google.android.gms"
+  ],
   "webAuthnEnabled": false,
   "upstreamReportingCodePresent": true,
   "reportingPolicy": "Runtime reporting preferences disabled and critical values read back before browsing; known telemetry requests denied; no crash-upload delegate. Reporting classes have not been compiled out.",
-  "nativePageAlignment": "arm64-v8a and x86_64 LOAD segments verified at 16384 bytes; armeabi-v7a at 4096 bytes. Physical devices remain unqualified."
+  "nativePageAlignment": "arm64-v8a and x86_64 LOAD segments verified at 16384 bytes; armeabi-v7a at 4096 bytes. Physical devices remain unqualified.",
+  "integration": {
+    "id": "cyphra-app-uri-no-interrupt-v1",
+    "kind": "generated-apk-asset-override",
+    "modifiedUpstreamEngine": true,
+    "patchFile": "android/engine-patches/app-uri-no-interrupt.patch",
+    "patchSha256": "fa1b46b86d9d31eb131d72d3f8df44a00b864c51f14a2164173b4f691d03ffc3",
+    "upstreamOmniSha256": "f57a01ec39057d63058018dc36ece9ffade201de99db464c3fe6ff7d536c89f9",
+    "patchedOmniSha256": "a70bc0ce798434038ba80dc159cdc9b11bc4f676d3adbb4d49a6f2ceb4bc8619",
+    "modules": [
+      {
+        "archivePath": "modules/GeckoViewNavigation.sys.mjs",
+        "upstreamSource": "android/engine-patches/upstream/GeckoViewNavigation.sys.mjs",
+        "upstreamSha256": "fb5926acbf81a405929309b39076f1ef86c4e407795f8903963d3f15158f208c",
+        "patchedSha256": "83a45bbe5337f47822b5e17eef16dbf075a9e9263149aec57c151cf8dc7ff9dd",
+        "sourcePath": "mobile/shared/modules/geckoview/GeckoViewNavigation.sys.mjs",
+        "sourceUrl": "https://hg.mozilla.org/releases/mozilla-release/raw-file/eb9a6e3a736802c8e080a76c44dc81f409d99d54/mobile/shared/modules/geckoview/GeckoViewNavigation.sys.mjs"
+      },
+      {
+        "archivePath": "moz-src/toolkit/components/remotebrowserutils/RemoteWebNavigation.sys.mjs",
+        "upstreamSource": "android/engine-patches/upstream/RemoteWebNavigation.sys.mjs",
+        "upstreamSha256": "2cce97678f39a0bb86bcc4a5270a396a6ccc81eddf37dbb286c7791dd54b20ca",
+        "patchedSha256": "69b8986d16a2480ba7caed6afd70b4726f8c4dffaa33085224dcf33e564fd67b",
+        "sourcePath": "toolkit/components/remotebrowserutils/RemoteWebNavigation.sys.mjs",
+        "sourceUrl": "https://hg.mozilla.org/releases/mozilla-release/raw-file/eb9a6e3a736802c8e080a76c44dc81f409d99d54/toolkit/components/remotebrowserutils/RemoteWebNavigation.sys.mjs"
+      }
+    ],
+    "startupCachePolicy": "Pass -purgecaches per profile until a protected startup records this overlay SHA-256 and installed APK update time; removes compiled startupCache and requests native soft invalidation of derived quota-cache metadata, without clearing site data or settings.",
+    "embeddedStartupBytecode": false,
+    "processHangMonitor": true
+  },
+  "nativeLibrariesSha256": {
+    "lib/arm64-v8a/libclearkey.so": "836d245bc1a2c31834cfeafbb3fd5732a69f2fd854c8d26c56b00642ebfedd31",
+    "lib/arm64-v8a/libcrashhelper.so": "d38e372bd1af446abfb3e9e0e3d3b4e58a2d75b3eb9ceaa6ecc45f9843072d08",
+    "lib/arm64-v8a/libcrashtools.so": "4de265f93a808f1d1bf4a4f78aec2ad48e771d80ec34993a9b3fe593e752fd9c",
+    "lib/arm64-v8a/libfreebl3.so": "208e640ef091aef6cdd119561a21a9524baeaf929ddd61ac9686c54d477b9767",
+    "lib/arm64-v8a/libgkcodecs.so": "1755700c080fdb6ba7b361752c952ac2725b534e8d7a305f38c9cb553b18b5e8",
+    "lib/arm64-v8a/liblgpllibs.so": "21d22924735dce30838e868b299c62e883714e82488133a097242a3ec6c9e3fa",
+    "lib/arm64-v8a/libmozavcodec.so": "f33994c18b6b8c89769944c10e9ece8b99ae9960e52dfbb5970bc0307602238a",
+    "lib/arm64-v8a/libmozavutil.so": "3585a17ab335b15b8ba0d74c0db7f37b2a99e66d347005d99358032f01c1fef7",
+    "lib/arm64-v8a/libmozglue.so": "f4dd6348e709d482786b2405278c59abf5cb70dc4803d6f5c0def0f94da8cd65",
+    "lib/arm64-v8a/libnss3.so": "3f3c2453865ed99197158cf74d6c55701dc245d7c10247ef5bddf3dd5b97b165",
+    "lib/arm64-v8a/libplugin-container.so": "946d1558ed7978051366ae83433a29d9b5a63b6d167e9b2e2a1509a48368c0f1",
+    "lib/arm64-v8a/libsoftokn3.so": "98b955d54934de84cc57c6d64dc983455f91fd5a413889daa128edde1cc26044",
+    "lib/arm64-v8a/libxul.so": "4201a0e63d3677f4c04cc986e6f107ff6ded1d053fa3a5b9445661c8ffbfb889",
+    "lib/armeabi-v7a/libclearkey.so": "e389dc60fdcc68a1b027f917a6ce18ba178fd678fd59a7b03f9c456f8f679928",
+    "lib/armeabi-v7a/libcrashhelper.so": "0509257ca37d6c64f1341e1602bade4921a087328cf40075448921c14f43f923",
+    "lib/armeabi-v7a/libcrashtools.so": "f9f5d9787e08690d2e79e72caf9bab2269901a5dcc65222dbaa1db8c41710a24",
+    "lib/armeabi-v7a/libfreebl3.so": "3a264ee99b227cef388e5609ce87e4b74419c11d27db400edaf8c03057b5bfd3",
+    "lib/armeabi-v7a/libgkcodecs.so": "bf47cbe952722d1d4b6ce14bbca9a50a7eca746d5ca16d8389b026944bd799f6",
+    "lib/armeabi-v7a/liblgpllibs.so": "93dacfcf3465ef8579daaefda6e6f0323583b2b2ec63caa3865d9d99a2776dc4",
+    "lib/armeabi-v7a/libmozavcodec.so": "f56ccaa1d73675e2bf392cd82e1756ba8a79c461675f2396b9dd8ba42a604ffc",
+    "lib/armeabi-v7a/libmozavutil.so": "5111eaaecf410903db1e540d040547231f5a5fc2c38f31e02353cde1a1acd6dd",
+    "lib/armeabi-v7a/libmozglue.so": "1c345f3911685fe76fbafad49dcf28518ad1d6c94726d77b0c5665f5960a328c",
+    "lib/armeabi-v7a/libnss3.so": "3aeac6b2607b0650ba403618e1a5901ccb6f0868fb0b812162970478e878bfe3",
+    "lib/armeabi-v7a/libplugin-container.so": "c7a23d7f88bafd1690caae749ecde832dc07b61b7e641f10dc83faa2905705be",
+    "lib/armeabi-v7a/libsoftokn3.so": "12c4bf4e99d27628711e6ffd80ff7f6b84df74fdd31431e00e28b7d9b553f21f",
+    "lib/armeabi-v7a/libxul.so": "86afc3c0961f3d88ccc5779bb41663e1aa4701b84a947e2d579fa7dfe64106df",
+    "lib/x86_64/libclearkey.so": "0e12a120041757259c2e52ffd38c890a2433e226311739a7ce2de85ab80b3480",
+    "lib/x86_64/libcrashhelper.so": "8445f6308310846ff0298c40ad93e7d26fa701f19904869e51f4372086c6a95d",
+    "lib/x86_64/libcrashtools.so": "a4d4e5900bc903e2b3953646cd8128e0521dd9c1cb79ec572122a8e74d16d7ed",
+    "lib/x86_64/libfreebl3.so": "5499cdfe4edce54e75b54f0032f53fab652c31ea9df1ed37927d2e6a593bd024",
+    "lib/x86_64/libgkcodecs.so": "3ce4bb1b691ca0ee1fc08232d4f05fb87040ca321e227a969d5f4ad91c6bde8b",
+    "lib/x86_64/liblgpllibs.so": "7c6f233cfdcc6bec688fa40ad9468a076e950bee84dda4d836e956fb348fd17a",
+    "lib/x86_64/libmozavcodec.so": "f12ed81905b1d04ebf6284a86a2a8fe236e18c1bbbfc9f8df579e9861b33b98e",
+    "lib/x86_64/libmozavutil.so": "34669b886dd586b770c386e51d7cb0f543aef90c7addbc298d2682fdd685b7ba",
+    "lib/x86_64/libmozglue.so": "74fb3d07185c1a5fa9c142af4860d09fa9f0f3a8c5d5d34e9418ff94a171d6d2",
+    "lib/x86_64/libnss3.so": "56cca185fe908d467da2a909e22843bad7bfa9ba9effddf806b7f260bde02b67",
+    "lib/x86_64/libplugin-container.so": "7a4b5ff6253cea0ec60cef9a6ea02996ed0f984cce54ee3f19994e624e969475",
+    "lib/x86_64/libsoftokn3.so": "8943c9198c3caec1e86c22825824b44223a17e5615015e31e482879e3715ebb1",
+    "lib/x86_64/libxul.so": "673a8f2d7fd9d98f5eba204c7363f0a88d4b4268d4e0410006887c4637080ae7"
+  },
+  "classesJarSha256": "f42db6ed0c09a2aa091d663ebae13df4ed3e0a1e8ad98555781754bb657ef049",
+  "javaSourceSha256": "bb855e43aa84c60193859022cb26fbcbfaece5df34015c8fb7e20f57d3846f2a"
 }

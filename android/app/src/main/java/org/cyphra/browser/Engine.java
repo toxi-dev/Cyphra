@@ -42,10 +42,13 @@ import org.mozilla.geckoview.WebExtension;
 public final class Engine {
     private static final String EXTENSION_ID="android-shields@cyphra.org";
     private static final String TOXITECH="https://dns.toxitechnetwork.org/dns-query";
+    private static final String STARTUP_CACHE_ENGINE_KEY="compiledStartupCacheEngineSHA256";
+    private static final String STARTUP_CACHE_APK_KEY="compiledStartupCacheApkUpdateTime";
     private static Engine instance;
     private final Handler ui=new Handler(Looper.getMainLooper());
     private final boolean work,team;
     private final SharedPreferences preferences;
+    private final long installedApkUpdateTime;
     private final File profile,config;
     private final WeakHashMap<GeckoSession,String> pageUrls=new WeakHashMap<>();
     private final WeakHashMap<GeckoSession,Stats> statistics=new WeakHashMap<>();
@@ -56,8 +59,8 @@ public final class Engine {
     private Listener listener;
     private WebExtension extension;
     private WebExtension.Port port;
-    private boolean ready,extensionReady,privateReady,preferencesVerified,failed,closing,runtimeExited;
-    private Runnable shutdownCallback;
+    private boolean ready,extensionReady,privateReady,preferencesVerified,failed,closing;
+    private final RuntimeShutdown shutdown;
     private int rules;
     private String updatedAt="",failure="";
     public final GeckoRuntime runtime;
@@ -96,6 +99,8 @@ public final class Engine {
         String mode=work?"work":"personal";
         if(!Application.getProcessName().endsWith(":"+mode))throw new IllegalStateException("Work and Personal require separate Android processes.");
         preferences=context.getSharedPreferences("cyphra-engine-"+mode,Context.MODE_PRIVATE);
+        try { installedApkUpdateTime=context.getPackageManager().getPackageInfo(context.getPackageName(),0).lastUpdateTime; }
+        catch(android.content.pm.PackageManager.NameNotFoundException e){throw new IllegalStateException("The installed browser package could not be identified.",e);}
         Set<String> saved=preferences.getStringSet("disabledHosts",Collections.emptySet());
         if(saved!=null)for(String host:saved)if(validHost(host))exceptions.add(host);
         File managed=new File(context.getFilesDir(),"gecko/"+mode);
@@ -118,7 +123,13 @@ public final class Engine {
             // Shields snapshot is distinct from a real-time malware reputation service.
             .safeBrowsing(0).build();
         GeckoRuntimeSettings settings=new GeckoRuntimeSettings.Builder()
-            .arguments(new String[]{"-profile",profile.getAbsolutePath()})
+            // Gecko's own build ID is unchanged by the source-module overlay.
+            // Invalidate compiled startup cache once per overlay and profile,
+            // before loading privileged modules from an existing installation.
+            // Native startup also soft-invalidates derived quota-cache metadata.
+            .arguments(startupCacheMatches()
+                ?new String[]{"-profile",profile.getAbsolutePath()}
+                :new String[]{"-profile",profile.getAbsolutePath(),"-purgecaches"})
             .configFilePath(config.getAbsolutePath())
             .contentBlocking(blocking)
             .globalPrivacyControlEnabled(true)
@@ -134,11 +145,16 @@ public final class Engine {
             .build();
         settings.setDohAutoselectEnabled(false);
         runtime=GeckoRuntime.create(context,settings);
+        shutdown=new RuntimeShutdown(runtime::shutdown,callback->ui.post(callback));
         runtime.setDelegate(()->{
-            runtimeExited=true;
-            if(shutdownCallback!=null){Runnable callback=shutdownCallback;shutdownCallback=null;ui.post(callback);}
-            else if(!closing)fail("The Gecko engine stopped. Restart Cyphra to continue browsing.");
+            shutdown.onExited();
+            if(!closing)fail("The Gecko engine stopped. Restart Cyphra to continue browsing.");
         });
+        // GeckoView 158's shutdown calls native forceQuit directly, even while
+        // GeckoRuntime.create is still loading JNI. This read-only query is
+        // queued until Gecko is RUNNING. Either Gecko reply proves native
+        // startup reached that state; only the delegate above proves exit.
+        runtime.getWebExtensionController().list().accept(value->shutdown.onReady(),error->shutdown.onReady());
         runtime.getWebExtensionController().ensureBuiltIn("resource://android/assets/shields/",EXTENSION_ID).accept(value->{
             extension=value;
             extension.setMessageDelegate(messages,"cyphra");
@@ -156,6 +172,7 @@ public final class Engine {
         listener=next;
         if(next!=null)ui.post(()->{if(listener!=next)return;if(failed)next.onFailure(failure);else if(ready)next.onReady();});
     }
+    public void clearListener(Listener previous){if(listener==previous)listener=null;}
     public boolean isReady(){return ready&&!failed;}
     public boolean workMode(){return work;}
     public File profileDirectory(){return profile;}
@@ -177,9 +194,8 @@ public final class Engine {
      */
     public void shutdownGracefully(Runnable exited){
         if(closing)return;closing=true;ready=false;
-        shutdownCallback=exited;
         for(GeckoSession session:new ArrayList<>(pageUrls.keySet()))try{session.stop();session.close();}catch(Exception ignored){}
-        if(runtimeExited){shutdownCallback=null;ui.post(exited);}else runtime.shutdown();
+        shutdown.request(exited);
     }
 
     public GeckoSession newSession(boolean privateTab){return newSession(privateTab,true);}
@@ -363,6 +379,7 @@ public final class Engine {
     private void verifyPreferences(){
         Map<String,Object> expected=new LinkedHashMap<>();
         expected.put("cyphra.android.policy",1);
+        expected.put("dom.ipc.processHangMonitor",true);
         expected.put("toolkit.telemetry.enabled",false);
         expected.put("toolkit.telemetry.unified",false);
         expected.put("toolkit.telemetry.server","data:,");
@@ -380,18 +397,34 @@ public final class Engine {
                 android.util.Log.e("CyphraEngine","Privacy policy verification failed for "+entry.getKey());
                 fail("Gecko did not apply its privacy policy.");return;
             }
+            // A boolean-only native policy trace provides positive readback
+            // evidence without recording URLs, script names or profile data.
+            android.util.Log.i("CyphraEngine","processHangMonitor=true verified before browsing");
             preferencesVerified=true;maybeReady();
         },e->fail("Gecko's privacy policy could not be verified."));
     }
     private void maybeReady(){
-        if(!failed&&!ready&&extensionReady&&privateReady&&preferencesVerified){ready=true;if(listener!=null)ui.post(()->{if(listener!=null&&isReady())listener.onReady();});}
+        if(!closing&&!failed&&!ready&&extensionReady&&privateReady&&preferencesVerified){
+            // A failed/interrupted startup retries the purge next time. This
+            // marker never changes browsing data or user settings.
+            if(!startupCacheMatches()
+                &&!preferences.edit().putString(STARTUP_CACHE_ENGINE_KEY,BuildConfig.GECKOVIEW_OMNI_SHA256)
+                    .putLong(STARTUP_CACHE_APK_KEY,installedApkUpdateTime).commit()){
+                fail("The engine startup cache version could not be saved.");return;
+            }
+            ready=true;if(listener!=null)ui.post(()->{if(listener!=null&&isReady())listener.onReady();});
+        }
+    }
+    private boolean startupCacheMatches(){
+        return BuildConfig.GECKOVIEW_OMNI_SHA256.equals(preferences.getString(STARTUP_CACHE_ENGINE_KEY,""))
+            &&installedApkUpdateTime==preferences.getLong(STARTUP_CACHE_APK_KEY,-1);
     }
     private void fail(String reason){
         if(failed||closing)return;failed=true;ready=false;failure=reason;
         // stop() alone leaves already loaded JavaScript alive. When the blocker
         // goes away, close every renderer and stop Gecko before further browsing.
         for(GeckoSession session:new ArrayList<>(pageUrls.keySet()))try{session.stop();session.close();}catch(Exception ignored){}
-        if(!runtimeExited)runtime.shutdown();
+        shutdown.request(null);
         if(listener!=null)listener.onFailure(reason);
     }
 
@@ -399,6 +432,7 @@ public final class Engine {
     private void writeConfiguration()throws IOException{
         Map<String,Object> prefs=new LinkedHashMap<>();
         prefs.put("cyphra.android.policy",1);
+        prefs.put("dom.ipc.processHangMonitor",true);
         for(String key:Arrays.asList("toolkit.telemetry.enabled","toolkit.telemetry.unified",
             "toolkit.telemetry.archive.enabled","toolkit.telemetry.newProfilePing.enabled",
             "toolkit.telemetry.firstShutdownPing.enabled","toolkit.telemetry.shutdownPingSender.enabled",

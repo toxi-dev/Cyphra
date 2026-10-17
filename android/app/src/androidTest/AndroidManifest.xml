@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Keep the normal runner first: AGP injects its generated attributes here. -->
+    <instrumentation android:name="org.cyphra.browser.ServicesSecurityTest" />
+    <instrumentation android:name="org.cyphra.browser.PersonalLifecycleTest"
+        android:targetPackage="${lifecycleTargetPackage}"
+        android:targetProcesses="${lifecycleTargetPackage}:personal" />
+    <instrumentation android:name="org.cyphra.browser.WorkLifecycleTest"
+        android:targetPackage="${lifecycleTargetPackage}"
+        android:targetProcesses="${lifecycleTargetPackage}:work" />
+</manifest>

@@ -2,6 +2,7 @@
 
 ## 0.1.2 — 17 October 2026
 
+- Update the pinned native engine to GeckoView 158 / Gecko 158.0, including Mozilla's 13 October security fixes.
 - Profile-local Graphite, Black, Light and System themes with restrained accent choices.
 - Live native appearance preview, compact/comfortable density, text scale and toolbar controls.
 - Home bookmark grid/list, limits and security-reading visibility.
@@ -10,6 +11,8 @@
 - Attachment downloads retain the existing document and avoid requesting the download again after restart.
 - Keep the active GeckoView attached during ordinary navigation, avoiding unnecessary display-surface teardown.
 - Cross-host attachments preserve the live document's site exceptions and measured Shields counts; late responses cannot replace a newer page's protection context.
+- A pinned, reproducible Gecko source-module overlay preserves running page timers when an app-initiated navigation becomes an attachment. General script hang protection remains enabled and verified.
+- Keep live ordinary and private sessions through Android Activity recreation; wait for native initialization before requesting runtime shutdown.
 
 ## 0.1.1 — 11 October 2026
 

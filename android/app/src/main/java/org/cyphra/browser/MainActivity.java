@@ -27,10 +27,13 @@ public abstract class MainActivity extends Activity {
     private int BG,PANEL,LINE,TEXT,MUTED;
     private final ExecutorService jobs=Executors.newSingleThreadExecutor();
     private final ArrayList<Tab> tabs=new ArrayList<>();
+    private final Set<Dialog> dialogs=Collections.newSetFromMap(new WeakHashMap<>());
     private BrowserStore store;
     private Appearance appearance;
     private AppearancePanel appearancePanel;
     private Engine engine;
+    private Engine.Listener engineListener;
+    private final Object sessionOwner=new Object();
     private UpdateClient updates;
     private SyncClient sync;
     private LinearLayout root, top, bottom;
@@ -48,18 +51,20 @@ public abstract class MainActivity extends Activity {
     private WebRequestError lastLoadError;
     private boolean ready, fullScreen;
     private boolean tabsRestored;
+    private boolean restoredLoading;
     private ShieldsPanel activeShield;
     private File pendingInstall;
     private UpdateClient.Offer pendingOffer;
-    private boolean shuttingDown;
+    private boolean shuttingDown,destroyed;
     private final BroadcastReceiver modeReceiver=new BroadcastReceiver(){
         @Override public void onReceive(Context context,Intent intent){if(mode().equals(intent.getStringExtra("mode")))shutdownProfile();}
     };
 
     protected abstract boolean workMode();
     public String mode(){return workMode()?"work":"personal";}
-    private class Tab {
+    private static final class Tab {
         GeckoSession session;
+        Object delegateOwner;
         String url="about:blank",title="New tab";
         final NavigationMemory navigation=new NavigationMemory();
         final boolean privateTab;
@@ -68,8 +73,33 @@ public abstract class MainActivity extends Activity {
         GeckoSession.ProgressDelegate.SecurityInformation previousSecurity;
         Tab(boolean privateTab){this.privateTab=privateTab;}
     }
+    /** Process-local handoff only: private tabs and live documents never enter saved state. */
+    private static final class RetainedTabs {
+        final ArrayList<Tab> tabs;
+        final Tab current,lastOrdinary;
+        final String pendingUrl,loadErrorUri;
+        final WebRequestError loadError;
+        final WebPrompts.PendingAndroidRequests androidRequests;
+        final File pendingInstall;
+        final UpdateClient.Offer pendingOffer;
+        final boolean restored,loading,fullScreen;
+        RetainedTabs(MainActivity activity){
+            tabs=new ArrayList<>(activity.tabs);current=activity.current;lastOrdinary=activity.lastOrdinary;
+            pendingUrl=activity.pendingUrl;loadErrorUri=activity.loadErrorUri;loadError=activity.lastLoadError;
+            androidRequests=activity.prompts.pendingAndroidRequests();
+            pendingInstall=activity.pendingInstall;pendingOffer=activity.pendingOffer;
+            restored=activity.tabsRestored;loading=activity.loading.getVisibility()==View.VISIBLE;fullScreen=activity.fullScreen;
+        }
+    }
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
+        RetainedTabs retained=(RetainedTabs)getLastNonConfigurationInstance();
+        if(retained!=null){
+            tabs.addAll(retained.tabs);current=retained.current;lastOrdinary=retained.lastOrdinary;
+            pendingUrl=retained.pendingUrl;loadErrorUri=retained.loadErrorUri;lastLoadError=retained.loadError;
+            pendingInstall=retained.pendingInstall;pendingOffer=retained.pendingOffer;
+            tabsRestored=retained.restored;restoredLoading=retained.loading;fullScreen=retained.fullScreen;
+        }else pendingUrl=getIntent().getStringExtra("url");
         store=new BrowserStore(this,mode(),BuildConfig.EDITION);
         loadAppearance();
         updates=new UpdateClient(this,store,new UpdateClient.Config(BuildConfig.EDITION,BuildConfig.REPOSITORY,
@@ -77,18 +107,21 @@ public abstract class MainActivity extends Activity {
             BuildConfig.VERSION_CODE,getPackageName()));
         sync=new SyncClient(this,store);
         prompts=new WebPrompts(this,appearance,s->{for(Tab t:tabs)if(t.session==s)return t.url;return "";});
-        pendingUrl=getIntent().getStringExtra("url");
+        if(retained!=null)prompts.inheritPendingAndroidRequests(retained.androidRequests);
         buildChrome();
-        engine=Engine.get(this,workMode(),BuildConfig.TEAM,new Engine.Listener(){
+        engineListener=new Engine.Listener(){
             @Override public void onReady(){runOnUiThread(()->engineReady());}
             @Override public void onStats(GeckoSession s,Engine.Stats stats){runOnUiThread(()->{
-                if(activeShield!=null && activeShield.isShowing() && current!=null && current.session==s) renderShields();
+                if(!destroyed && activeShield!=null && activeShield.isShowing() && current!=null && current.session==s) renderShields();
             });}
             @Override public void onFailure(String message){runOnUiThread(()->{
+                if(destroyed)return;
                 startup.setText("Protection could not start. "+message); startup.setVisibility(View.VISIBLE);
                 ready=false; address.setEnabled(false);
             });}
-        });
+        };
+        engine=Engine.get(this,workMode(),BuildConfig.TEAM,engineListener);
+        for(Tab tab:tabs)if(tab.session!=null)bindSession(tab);
         if(engine.isReady()) engineReady();
         IntentFilter closeFilter=new IntentFilter(getPackageName()+".CLOSE_MODE");
         if(Build.VERSION.SDK_INT>=33)registerReceiver(modeReceiver,closeFilter,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(modeReceiver,closeFilter,getPackageName()+".permission.INTERNAL",null);
@@ -156,7 +189,23 @@ public abstract class MainActivity extends Activity {
     private void showAppearance(){if(appearancePanel!=null&&appearancePanel.isShowing())return;appearancePanel=new AppearancePanel(this,store,this::applyAppearance,()->appearancePanel=null);appearancePanel.show();}
     private void reloadPage(){if(current!=null&&!"about:blank".equals(current.url)){if(current.session==null)navigate(current.url);else current.session.reload();}}
     private void engineReady(){
-        if(ready||isFinishing())return;ready=true;address.setEnabled(true);startup.setVisibility(View.GONE);
+        if(ready||shuttingDown||destroyed||isFinishing())return;ready=true;address.setEnabled(true);startup.setVisibility(View.GONE);
+        if(tabsRestored){
+            // Reattach the same document/session, including private tabs. Reusing
+            // the launch Intent or disk URLs here would create a second load.
+            if(current!=null){
+                address.setText("about:blank".equals(current.url)?"":current.url);
+                if(lastLoadError!=null)showLoadError(loadErrorUri,lastLoadError);
+                else if(!"about:blank".equals(current.url)){
+                    boolean fresh=current.session==null;prepare(current);showGecko();gecko.setSession(current.session);current.session.setActive(true);
+                    if(fresh)current.session.loadUri(current.url);
+                }
+            }
+            loading.setVisibility(restoredLoading?View.VISIBLE:View.GONE);
+            top.setVisibility(fullScreen?View.GONE:View.VISIBLE);bottom.setVisibility(fullScreen?View.GONE:View.VISIBLE);refreshButtons();
+            String destination=pendingUrl;pendingUrl=null;if(BrowserStore.isWebURL(destination))navigate(destination);
+            return;
+        }
         JSONArray stored=store.tabs();
         for(int i=0;i<stored.length()&&tabs.size()<20;i++){
             JSONObject entry=stored.optJSONObject(i);String url=entry==null?stored.optString(i):entry.optString("url");
@@ -177,6 +226,10 @@ public abstract class MainActivity extends Activity {
     private void prepare(Tab tab,boolean open){
         if(tab.session!=null)return;
         tab.session=engine.newSession(tab.privateTab,open);
+        bindSession(tab);
+    }
+    private void bindSession(Tab tab){
+        tab.delegateOwner=sessionOwner;
         tab.session.setNavigationDelegate(new GeckoSession.NavigationDelegate(){
             @Override public void onLocationChange(GeckoSession s,String uri,List<GeckoSession.PermissionDelegate.ContentPermission> permissions,Boolean gesture){
                 if(!ownsSession(tab,s,"location-stale"))return;
@@ -241,11 +294,11 @@ public abstract class MainActivity extends Activity {
             @Override public void onExternalResponse(GeckoSession s,WebResponse response){download(tab,s,response);}
             @Override public void onCrash(GeckoSession s){
                 traceNavigation(tab.session==s?"session-crash-current":"session-crash-stale",tab);
-                if(tab.session!=s)return;tab.session=null;toast("This tab stopped. Reload to open it again.");
+                if(!ownsSession(tab,s,"session-crash-stale"))return;tab.session=null;toast("This tab stopped. Reload to open it again.");
             }
             @Override public void onKill(GeckoSession s){
                 traceNavigation(tab.session==s?"session-kill-current":"session-kill-stale",tab);
-                if(tab.session!=s)return;tab.session=null;
+                if(!ownsSession(tab,s,"session-kill-stale"))return;tab.session=null;
             }
         });
         tab.session.setPromptDelegate(prompts);
@@ -253,6 +306,14 @@ public abstract class MainActivity extends Activity {
         BasicSelectionActionDelegate selections = new BasicSelectionActionDelegate(this);
         selections.enableExternalActions(false);
         tab.session.setSelectionActionDelegate(selections);
+    }
+    private void detachSessions(){
+        if(gecko!=null)gecko.releaseSession();
+        for(Tab tab:tabs)if(tab.session!=null&&tab.delegateOwner==sessionOwner){
+            tab.delegateOwner=null;
+            tab.session.setNavigationDelegate(null);tab.session.setProgressDelegate(null);tab.session.setContentDelegate(null);
+            tab.session.setPromptDelegate(null);tab.session.setPermissionDelegate(null);tab.session.setSelectionActionDelegate(null);
+        }
     }
     private void selectPopup(Tab tab){
         prompts.dismissPending();
@@ -484,7 +545,7 @@ public abstract class MainActivity extends Activity {
         }catch(Exception error){output.setText("Could not process this input: "+error.getMessage());}}));d.show();
     }
     private void download(Tab tab,GeckoSession respondingSession,WebResponse response){
-        if(isFinishing()||isDestroyed()||tab.session!=respondingSession||!respondingSession.isOpen()){if(response.body!=null)try{response.body.close();}catch(IOException ignored){}return;}
+        if(!ownsSession(tab,respondingSession,"external-response-stale")||!respondingSession.isOpen()){if(response.body!=null)try{response.body.close();}catch(IOException ignored){}return;}
         // An attachment response is not a committed document. Keep the existing
         // page (or native Home) and never restore an attachment as a saved tab.
         traceNavigation("external-response-before",tab);
@@ -499,7 +560,7 @@ public abstract class MainActivity extends Activity {
         saveTabs();
         Runnable finish=()->runOnUiThread(()->{
             if(restored&&tab.navigation.serial==navigation&&tab.session==respondingSession&&"about:blank".equals(tab.url)&&"about:blank".equals(tab.navigation.documentUrl)){
-                if(gecko.getSession()==respondingSession)gecko.releaseSession();if(respondingSession.isOpen())respondingSession.close();tab.session=null;tab.canBack=false;tab.canForward=false;tab.security=null;if(tab==current)refreshButtons();
+                if(gecko.getSession()==respondingSession)gecko.releaseSession();if(respondingSession.isOpen())respondingSession.close();tab.session=null;tab.canBack=false;tab.canForward=false;tab.security=null;if(!destroyed&&tab==current)refreshButtons();
             }
         });
         if(response.body==null){finish.run();return;}
@@ -532,16 +593,16 @@ public abstract class MainActivity extends Activity {
     private boolean ownsSession(Tab tab,GeckoSession session,String staleEvent){
         // A tab can retain its identity after Home retires its GeckoSession.
         // Delayed callbacks from that old renderer do not own its replacement.
-        if(tab.session==session)return true;
+        if(!isFinishing()&&!destroyed&&!shuttingDown&&tab.session==session&&tab.delegateOwner==sessionOwner)return true;
         traceNavigation(staleEvent,tab);return false;
     }
     private interface Task{Object run() throws Exception;}
     private void busy(String label,Task task,java.util.function.Consumer<Object> done){
-        ProgressDialog dialog=new ProgressDialog(appearance.dialogContext(this),appearance.dialogTheme());appearance.applyAccent(dialog.getContext());dialog.setMessage(label);dialog.setCancelable(false);dialog.show();appearance.decorateDialog(dialog,this);
-        jobs.submit(()->{try{Object value=task.run();runOnUiThread(()->{if(!isFinishing()){dialog.dismiss();done.accept(value);}});}catch(Exception e){runOnUiThread(()->{if(!isFinishing()){dialog.dismiss();dialogBuilder().setTitle("Could not complete this action").setMessage(e.getMessage()==null?"Please try again.":e.getMessage()).setPositiveButton("Done",null).show();}});}});
+        ProgressDialog dialog=new ProgressDialog(appearance.dialogContext(this),appearance.dialogTheme());dialogs.add(dialog);appearance.applyAccent(dialog.getContext());dialog.setMessage(label);dialog.setCancelable(false);dialog.show();appearance.decorateDialog(dialog,this);
+        jobs.submit(()->{try{Object value=task.run();runOnUiThread(()->{dialog.dismiss();if(!isFinishing()&&!destroyed)done.accept(value);});}catch(Exception e){runOnUiThread(()->{dialog.dismiss();if(!isFinishing()&&!destroyed)dialogBuilder().setTitle("Could not complete this action").setMessage(e.getMessage()==null?"Please try again.":e.getMessage()).setPositiveButton("Done",null).show();});}});
     }
     private AlertDialog dialog(String title,LinearLayout body){ScrollView scroll=new ScrollView(this);scroll.addView(body);AlertDialog d=dialogBuilder().setTitle(title).setView(scroll).setNegativeButton("Done",null).create();body.setTag(d);d.show();return d;}
-    private AlertDialog.Builder dialogBuilder(){return new NativeDialogs.Builder(this,appearance);}
+    private AlertDialog.Builder dialogBuilder(){return new NativeDialogs.Builder(this,appearance,dialogs::add);}
     private void dismissDialog(View body){Object tag=body.getTag();if(tag instanceof Dialog)((Dialog)tag).dismiss();}
     private LinearLayout column(){LinearLayout v=new LinearLayout(this);v.setOrientation(LinearLayout.VERTICAL);return v;}
     private TextView text(String value,float size,int color){TextView v=new TextView(this);v.setText(value);v.setTextSize(appearance.sp(size));v.setTextColor(color);appearance.markScaled(v);return v;}
@@ -567,7 +628,16 @@ public abstract class MainActivity extends Activity {
         if(shuttingDown||engine==null)return;shuttingDown=true;ready=false;saveTabs();prompts.dismissPending();
         engine.shutdownGracefully(()->{finishAndRemoveTask();android.os.Process.killProcess(android.os.Process.myPid());});
     }
-    @Override protected void onDestroy(){if(activeShield!=null)activeShield.dismiss();if(appearancePanel!=null)appearancePanel.dismiss();try{unregisterReceiver(modeReceiver);}catch(Exception ignored){}if(engine!=null){engine.setListener(null);if(!shuttingDown)shutdownProfile();}if(prompts!=null)prompts.dismissPending();jobs.shutdown();super.onDestroy();}
+    @Override public Object onRetainNonConfigurationInstance(){return shuttingDown?null:new RetainedTabs(this);}
+    @Override protected void onDestroy(){
+        destroyed=true;
+        if(activeShield!=null)activeShield.dismiss();if(appearancePanel!=null)appearancePanel.dismiss();
+        try{unregisterReceiver(modeReceiver);}catch(Exception ignored){}
+        if(engine!=null){engine.clearListener(engineListener);if(!isChangingConfigurations()&&!shuttingDown)shutdownProfile();}
+        if(prompts!=null)prompts.dismissPending();detachSessions();
+        for(Dialog dialog:new ArrayList<>(dialogs))dialog.dismiss();dialogs.clear();
+        jobs.shutdown();super.onDestroy();
+    }
     @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==52){if(getPackageManager().canRequestPackageInstalls())installUpdate();}else prompts.onActivityResult(request,result,data);}
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);prompts.onRequestPermissionsResult(request,results);}
 }

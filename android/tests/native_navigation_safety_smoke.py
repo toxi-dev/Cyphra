@@ -1,0 +1,420 @@
+#!/usr/bin/env python3
+"""Supervised native regression for the scoped GeckoView navigation patch (MPL-2.0).
+
+Run only on the disposable, root-enabled Android emulator after build approval.
+No APK installation, app-data clearing, profile edits or preference override is
+performed. Every ADB call and the whole worker have host deadlines. A failed or
+timed-out run force-stops only the named package and cannot report recovery.
+"""
+import argparse
+from datetime import datetime, timezone
+import importlib.util
+import json
+import os
+from pathlib import Path
+import re
+import shlex
+import signal
+import subprocess
+import sys
+import time
+import xml.etree.ElementTree as ET
+
+from native_navigation_safety_fixture import DOWNLOAD_BYTES, Fixture, TIMER_BUSY_MS, TIMER_INTERVAL_MS, TIMER_MAX_CALLBACKS
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def need(condition, message):
+    if not condition:
+        raise AssertionError(message)
+
+
+def atomic_json(path, value):
+    temporary = path.with_suffix(path.suffix + '.tmp')
+    temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + '\n')
+    temporary.replace(path)
+
+
+class NativeSafety:
+    def __init__(self, args):
+        self.args = args
+        self.prefix = [args.adb] + (['-s', args.serial] if args.serial else [])
+        self.fixture = Fixture(args.output / 'fixture-events.jsonl')
+        self.port = None
+        self.reverse_owned = False
+        self.report = {'passed': False, 'package': args.package, 'edition': args.package.rsplit('.', 1)[1],
+                       'started': datetime.now(timezone.utc).isoformat(),
+                       'timer': {'intervalMilliseconds': TIMER_INTERVAL_MS, 'busyMilliseconds': TIMER_BUSY_MS,
+                                 'maxCallbacks': TIMER_MAX_CALLBACKS},
+                       'timerTrials': [], 'nativeRecovery': [], 'forceStopCleanupUsed': False,
+                       'hostTimeoutSeconds': args.timeout, 'nativeRecoveryLimitSeconds': 20,
+                       'existingDownloadAndContextTestsChanged': False}
+        self.deadline = time.monotonic() + args.timeout - 30
+
+    def write(self):
+        atomic_json(self.args.output / 'report.json', self.report)
+
+    def command(self, *args, seconds=8):
+        remaining = self.deadline - time.monotonic()
+        need(remaining > 0, 'Native safety worker deadline expired.')
+        return subprocess.check_output([*self.prefix, *args], stderr=subprocess.STDOUT,
+                                       timeout=min(seconds, remaining)).decode().strip()
+
+    def shell(self, command, seconds=8):
+        return self.command('shell', command, seconds=seconds)
+
+    def wait(self, callback, label, seconds=10):
+        end = min(self.deadline, time.monotonic() + seconds)
+        while time.monotonic() < end:
+            result = callback()
+            if result:
+                return result
+            time.sleep(.05)
+        raise AssertionError(label)
+
+    def nodes(self):
+        # Never call this between loop-start and the direct native recovery tap.
+        text = self.command('exec-out', 'uiautomator', 'dump', '/dev/tty', seconds=6)
+        start = text.find('<?xml')
+        need(start >= 0 and '</hierarchy>' in text, 'No complete accessibility hierarchy.')
+        xml = text[start:text.index('</hierarchy>') + len('</hierarchy>')]
+        return list(ET.fromstring(xml).iter('node'))
+
+    @staticmethod
+    def bound(tree, label):
+        matches = [node for node in tree if node.get('content-desc') == label or node.get('text') == label]
+        need(len(matches) == 1, 'Expected exactly one visible native/content control: ' + label)
+        coordinates = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', matches[0].get('bounds', ''))
+        need(coordinates is not None, 'Missing bounds: ' + label)
+        x1, y1, x2, y2 = map(int, coordinates.groups())
+        need(x2 > x1 and y2 > y1, 'Empty bounds: ' + label)
+        return [(x1 + x2) // 2, (y1 + y2) // 2]
+
+    def tap(self, point):
+        self.shell('input tap ' + ' '.join(map(str, point)), seconds=4)
+
+    def click(self, label):
+        self.tap(self.bound(self.nodes(), label))
+
+    def ready(self):
+        def check():
+            tree = self.nodes()
+            need(not any('Protection could not start' in node.get('text', '') for node in tree), 'Engine startup protections failed.')
+            return tree if any(node.get('content-desc') == 'Address and Brave Search' and node.get('enabled') == 'true' for node in tree) else None
+        return self.wait(check, 'Protected engine did not become ready.', seconds=35)
+
+    def open(self, uri=None):
+        command = 'am start -n ' + self.args.package + '/org.cyphra.browser.LauncherActivity --es mode personal'
+        if uri:
+            command += ' -d ' + shlex.quote(uri)
+        # No am-start wait while deliberately overlapping a timer callback.
+        self.shell(command, seconds=8)
+
+    def url(self, path, run):
+        return 'http://localhost:' + str(self.port) + '/' + path + '?run=' + run
+
+    def events(self, run, kind=None):
+        records = self.fixture.snapshot(run)
+        return [event for event in records if event.get('body', {}).get('kind') == kind] if kind else records
+
+    def event(self, run, kind, after=0, seconds=8):
+        return self.wait(lambda: next((row for row in reversed(self.events(run, kind))
+                                      if row['monotonicNs'] > after), None),
+                         'Missing browser event: ' + kind + ' in ' + run, seconds=seconds)
+
+    def same_process(self, previous):
+        actual = self.shell('pidof ' + self.args.package + ':personal')
+        need(actual == previous and re.fullmatch(r'\d+', actual), 'Recovery restarted or lost the original Personal process.')
+
+    def home(self, point):
+        self.tap(point)
+        def check():
+            tree = self.nodes()
+            addresses = [node for node in tree if node.get('content-desc') == 'Address and Brave Search']
+            # Empty Android EditText may expose its hint as text.
+            empty = len(addresses) == 1 and addresses[0].get('text') in ('', addresses[0].get('hint'))
+            return tree if empty and any(node.get('text') == 'Personal profile' for node in tree) else None
+        return self.wait(check, 'Direct native Home did not replace the looping document.', seconds=12)
+
+    def policy(self):
+        base = '/data/user/0/' + self.args.package + '/files/gecko/personal/'
+        key = shlex.quote('"dom.ipc.processHangMonitor"')
+        policy = self.shell('grep -F ' + key + ' ' + shlex.quote(base + 'policy.yaml'))
+        need(re.fullmatch(r'"dom\.ipc\.processHangMonitor":\s*true', policy), 'Startup hang-monitor policy is not explicitly true.')
+        overrides = {}
+        for name in ('prefs.js', 'user.js'):
+            value = self.shell('if test -f ' + shlex.quote(base + 'profile/' + name) + '; then grep -F '
+                               + key + ' ' + shlex.quote(base + 'profile/' + name) + ' || true; fi')
+            need(not re.search(r'processHangMonitor"\s*,\s*false', value), 'A persisted profile override disables the hang monitor.')
+            overrides[name] = value or 'No override; pinned true default'
+        process = self.shell('pidof ' + self.args.package + ':personal')
+        self.report['lastLoopProcess'] = process
+        need(re.fullmatch(r'\d+', process), 'Missing Personal process for policy readback evidence.')
+        log = self.command('logcat', '-d', '--pid=' + process, '-v', 'brief', '-s', 'CyphraEngine:I')
+        readback = [line for line in log.splitlines() if 'processHangMonitor=true verified before browsing' in line]
+        need(readback, 'No positive live processHangMonitor=true readback for the current Personal process.')
+        return {'startupPolicyTrue': True, 'engineReadyAfterMandatoryLivePreferenceReadback': True,
+                'currentProcess': process, 'positiveReadback': readback[-1], 'persistedOverrides': overrides}
+
+    def setup(self):
+        spec = importlib.util.spec_from_file_location('engine_patch', ROOT / 'scripts/patch-android-engine.py')
+        patcher = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(patcher)
+        self.report['packagedEngine'] = patcher.verify_apk(self.args.apk, patcher.load_lock())
+        self.report['overlaySHA256'] = self.report['packagedEngine']['overlaySHA256']
+        expected = self.report['packagedEngine']['apkSHA256']
+        installed = self.shell('pm path ' + self.args.package).splitlines()
+        need(len(installed) == 1 and installed[0].startswith('package:/data/app/') and installed[0].endswith('/base.apk'), 'Expected one installed universal base APK.')
+        apk_path = installed[0][len('package:'):]
+        actual = self.shell('sha256sum ' + shlex.quote(apk_path)).split()[0]
+        need(actual == expected, 'Installed APK differs from the supplied sealed patched APK.')
+        self.report['installedAPK'] = {'sha256': actual, 'exactSuppliedAPK': True}
+        need(self.shell('getprop ro.kernel.qemu') == '1' and self.shell('id -u') == '0', 'Use the disposable root-enabled Android emulator.')
+        self.port = self.fixture.start()
+        existing = self.command('reverse', '--list')
+        need(not any('tcp:' + str(self.port) in line.split()[1:2] for line in existing.splitlines()), 'Chosen device reverse port is already owned.')
+        self.command('reverse', 'tcp:' + str(self.port), 'tcp:' + str(self.port))
+        self.reverse_owned = True
+        self.report['ownedReversePort'] = self.port
+        self.write()
+        self.open()
+        tree = self.ready()
+        self.toolbar = {name: self.bound(tree, name) for name in ('Home', 'Back')}
+        self.home(self.toolbar['Home'])
+        self.report['hangMonitorEvidence'] = {'before': self.policy()}
+        self.report['processHangMonitor'] = True
+        self.write()
+
+    def timer_trial(self, trial):
+        run = 'navtimer-' + str(time.time_ns()) + '-' + str(trial)
+        document = self.url('timer', run)
+        self.open(document)
+        initial = self.event(run, 'tick-complete')
+        identity = {key: initial['body'][key] for key in ('token', 'url', 'title')}
+        need(identity['url'] == document, 'Wrong initial timer document.')
+        row = {'run': run, 'identity': identity, 'actions': []}
+        self.report['timerTrials'].append(row)
+        self.write()
+        for action in ('cancel', 'save'):
+            previous = self.events(run, 'tick-start')[-1]
+            overlap = self.event(run, 'tick-start', after=previous['monotonicNs'], seconds=3)
+            attachment_run = run + '-' + action
+            self.open(self.url('attachment', attachment_run))
+            def dialog():
+                tree = self.nodes()
+                return tree if any(node.get('text') == 'Save download?' for node in tree) else None
+            tree = self.wait(dialog, 'Attachment did not show native confirmation.', seconds=12)
+            filename = 'cyphra-safety-' + attachment_run + '.txt'
+            need(any(filename in node.get('text', '') for node in tree), 'Attachment filename differs.')
+            self.tap(self.bound(tree, 'Cancel' if action == 'cancel' else 'Save'))
+            after_dialog = time.monotonic_ns()
+            first = self.event(run, 'tick-complete', after=after_dialog, seconds=6)
+            second = self.event(run, 'tick-complete', after=first['monotonicNs'], seconds=4)
+            for event in (first, second):
+                need(all(event['body'].get(key) == value for key, value in identity.items()), 'Attachment changed timer document identity/URL/title.')
+            requests = [event for event in self.events(attachment_run) if event['method'] == 'GET' and event['path'] == '/attachment']
+            need(len(requests) == 1, 'Attachment was fetched more or less than once.')
+            request = requests[0]
+            starts = [event for event in self.events(run, 'tick-start') if event['monotonicNs'] <= request['monotonicNs']]
+            need(starts, 'No timer callback preceded the attachment request.')
+            actual_start = starts[-1]
+            completes = [event for event in self.events(run, 'tick-complete') if event['body']['ticks'] == actual_start['body']['ticks']]
+            need(completes and request['monotonicNs'] < completes[0]['monotonicNs'], 'The actual attachment request did not overlap the bounded busy callback.')
+            need(len([event for event in self.events(run) if event['method'] == 'GET' and event['path'] == '/timer']) == 1, 'Timer document was refetched.')
+            path = '/sdcard/Download/Cyphra/' + filename
+            if action == 'cancel':
+                self.shell('test ! -e ' + shlex.quote(path))
+            else:
+                self.wait(lambda: self.shell('if test -f ' + shlex.quote(path) + '; then echo saved; fi') == 'saved', 'Saved attachment file missing.', seconds=8)
+                content = subprocess.check_output([*self.prefix, 'shell', 'cat ' + shlex.quote(path)], timeout=5)
+                need(content == DOWNLOAD_BYTES, 'Saved attachment bytes differ.')
+            address = [node for node in self.nodes() if node.get('content-desc') == 'Address and Brave Search']
+            need(len(address) == 1 and address[0].get('text') == document, 'Native address no longer identifies the retained timer document.')
+            row['actions'].append({'action': action, 'scheduledOverlap': overlap, 'actualOverlap': actual_start,
+                                   'actualOverlapComplete': completes[0],
+                                   'attachment': request, 'firstContinued': first, 'secondContinued': second,
+                                   'attachmentFetches': 1, 'documentFetches': 1, 'exactSavedBytes': action == 'save'})
+            self.write()
+        self.home(self.toolbar['Home'])
+
+    def recovery(self, control):
+        run = 'navloop-' + str(time.time_ns()) + '-' + control.lower()
+        sentinel_run = run + '-sentinel'
+        self.open(self.url('sentinel', sentinel_run))
+        sentinel = self.event(sentinel_run, 'sentinel-ready')
+        self.ready()
+        sentinel_bounds = self.bound(self.nodes(), 'Inspect recovered document')
+        self.open(self.url('loop', run))
+        self.event(run, 'loop-ready')
+        # Capture native controls while Gecko is still healthy. There are no
+        # accessibility queries after arming until the direct recovery tap.
+        tree = self.nodes()
+        points = {label: self.bound(tree, label) for label in ('Home', 'Back', 'Address and Brave Search', 'Start supervised loop')}
+        need(control != 'Back' or any(node.get('content-desc') == 'Back' and node.get('enabled') == 'true' for node in tree), 'Back has no healthy history target.')
+        process = self.shell('pidof ' + self.args.package + ':personal')
+        row = {'control': control, 'run': run, 'capturedHealthyBounds': points, 'processBefore': process,
+               'recovered': False, 'forceStopUsedForRecovery': False}
+        self.report['nativeRecovery'].append(row)
+        self.write()
+        self.tap(points['Start supervised loop'])
+        row['loopStarted'] = self.event(run, 'loop-start', seconds=4)
+        time.sleep(.4)
+        start = time.monotonic()
+        self.tap(points['Address and Brave Search' if control == 'Address' else control])
+        row['nativeInputTapSeconds'] = round(time.monotonic() - start, 3)
+        need(row['nativeInputTapSeconds'] < 4, 'Native control input exceeded its declared deadline.')
+        if control == 'Back':
+            # A direct tap into the previous page proves fresh JS execution,
+            # independently of any stale address/title accessibility nodes.
+            self.wait(lambda: any(node.get('text') == 'Inspect recovered document' for node in self.nodes()), 'Native Back did not expose its prior document.', seconds=12)
+            self.tap(sentinel_bounds)
+            inspected = self.event(sentinel_run, 'sentinel-inspect', after=row['loopStarted']['monotonicNs'], seconds=5)
+            need(inspected['body']['url'] == sentinel['body']['url'], 'Back recovered an unexpected document.')
+            row['freshJavaScriptAfterBack'] = inspected
+        elif control == 'Home':
+            # Home was already tapped using captured bounds; query only now.
+            def is_home():
+                tree = self.nodes()
+                addresses = [node for node in tree if node.get('content-desc') == 'Address and Brave Search']
+                empty = len(addresses) == 1 and addresses[0].get('text') in ('', addresses[0].get('hint'))
+                return empty and any(node.get('text') == 'Personal profile' for node in tree)
+            self.wait(is_home, 'Native Home did not recover from the infinite script.', seconds=12)
+        else:
+            destination_run = run + '-new-uri'
+            destination = self.url('sentinel', destination_run)
+            # The existing address control selects all on focus. Explicit
+            # Ctrl+A additionally avoids relying on a stale selection.
+            self.shell('input keycombination KEYCODE_CTRL_LEFT KEYCODE_A', seconds=4)
+            self.shell('input text ' + shlex.quote(destination), seconds=4)
+            self.shell('input keyevent KEYCODE_ENTER', seconds=4)
+            reached = self.event(destination_run, 'sentinel-ready', seconds=12)
+            need(reached['body']['url'] == destination, 'Address navigation did not reach the requested new URI.')
+            row['newURIDocument'] = reached
+            log = self.command('logcat', '-d', '--pid=' + process, '-v', 'threadtime', seconds=6)
+            (self.args.output / (run + '-hang.logcat.txt')).write_text(log + '\n')
+            row['hangReportLines'] = [line for line in log.splitlines() if any(word in line for word in ('GeckoView:HangReport', 'HangReport', 'ProcessHang'))]
+            row['hangReportObserved'] = bool(row['hangReportLines'])
+        self.same_process(process)
+        row.update(recovered=True, recoverySeconds=round(time.monotonic() - start, 3), processAfter=process)
+        need(row['recoverySeconds'] < 20, 'Native recovery exceeded its declared deadline.')
+        self.write()
+        if control != 'Home':
+            self.home(points['Home'])
+
+    def run(self):
+        try:
+            self.setup()
+            for trial in range(1, self.args.trials + 1):
+                self.timer_trial(trial)
+            for control in ('Back', 'Home', 'Address'):
+                self.recovery(control)
+            self.report['hangMonitorEvidence']['after'] = self.policy()
+            self.report['busyTimerAttachment'] = {'passed': True, 'trialCount': self.args.trials, 'trials': self.report['timerTrials']}
+            for control in ('Back', 'Home', 'Address'):
+                self.report['hung' + control] = next(row for row in self.report['nativeRecovery'] if row['control'] == control)
+            self.report.update(passed=True, checks=[
+                'Installed exact patched APK and all official native libraries verified',
+                'Explicit true startup hang-monitor policy and mandatory app live-preference readback gate',
+                'Bounded busy intervals survive overlapping attachment Cancel/Save with same token/URL/title and no refetch',
+                'Each attachment fetched once; Cancel leaves no file and Save retains exact bytes',
+                'Native Back recovers fresh prior-document JS from an intentional infinite loop',
+                'Native Home recovers from an intentional infinite loop in the same Android process',
+                'Native address entry reaches a new URI from an intentional infinite loop with hang monitor enabled',
+                'Direct native taps use bounds captured before hanging; force-stop is failure cleanup only',
+            ])
+        except BaseException as error:
+            self.report['error'] = type(error).__name__ + ': ' + str(error)
+            raise
+        finally:
+            self.report['finished'] = datetime.now(timezone.utc).isoformat()
+            self.write()
+            if self.reverse_owned:
+                try:
+                    self.command('reverse', '--remove', 'tcp:' + str(self.port), seconds=4)
+                except BaseException as error:
+                    self.report['reverseCleanupError'] = str(error)
+                    self.report['passed'] = False
+            self.fixture.close()
+            self.write()
+
+
+def supervised(args):
+    command = [sys.executable, str(Path(__file__).resolve()), *sys.argv[1:], '--worker']
+    deadline = time.monotonic() + args.timeout
+    with (args.output / 'native-safety.log').open('wb') as log:
+        child = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        timed_out = False
+        try:
+            code = child.wait(timeout=args.timeout - 25)
+        except BaseException as error:
+            timed_out = isinstance(error, subprocess.TimeoutExpired)
+            for sig in (signal.SIGTERM, signal.SIGKILL):
+                try:
+                    os.killpg(child.pid, sig)
+                except ProcessLookupError:
+                    pass
+                try:
+                    child.wait(timeout=2)
+                    break
+                except subprocess.TimeoutExpired:
+                    continue
+            code = 1
+    path = args.output / 'report.json'
+    report = json.loads(path.read_text()) if path.exists() else {'passed': False, 'package': args.package}
+    prefix = [args.adb] + (['-s', args.serial] if args.serial else [])
+    if code or timed_out or report.get('passed') is not True:
+        report.update(passed=False, hostTimedOut=timed_out, forceStopCleanupUsed=True, nativeRecoveryClaimed=False)
+        process = report.get('lastLoopProcess', '')
+        if re.fullmatch(r'\d+', process):
+            try:
+                log = subprocess.run([*prefix, 'logcat', '-d', '--pid=' + process, '-v', 'threadtime'],
+                                     capture_output=True, timeout=min(4, max(.1, deadline - time.monotonic())))
+                (args.output / 'failure-hang.logcat.txt').write_bytes(log.stdout)
+                report['failureHangReportLines'] = [line for line in log.stdout.decode(errors='replace').splitlines()
+                                                     if any(word in line for word in ('GeckoView:HangReport', 'HangReport', 'ProcessHang'))]
+            except BaseException as error:
+                report['failureLogcatError'] = str(error)
+        for label, command in [('forceStop', ['shell', 'am force-stop ' + args.package]),
+                               ('ownedReverseRemoval', ['reverse', '--remove', 'tcp:' + str(report['ownedReversePort'])] if report.get('ownedReversePort') else None)]:
+            if command:
+                try:
+                    remaining = deadline - time.monotonic()
+                    need(remaining > 0, 'No remaining host cleanup deadline.')
+                    result = subprocess.run([*prefix, *command], capture_output=True, timeout=min(8, remaining))
+                    report[label + 'Cleanup'] = {'exitCode': result.returncode, 'output': result.stdout.decode(errors='replace').strip()}
+                except BaseException as error:
+                    report[label + 'CleanupError'] = str(error)
+        atomic_json(args.output / 'proof.json', report)
+        print(json.dumps({'passed': False, 'package': args.package, 'hostTimedOut': timed_out,
+                          'forceStopCleanupUsed': True, 'proof': str(args.output / 'proof.json')}))
+        return 1
+    atomic_json(args.output / 'proof.json', report)
+    print(json.dumps(report, sort_keys=True))
+    return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--package', required=True, choices=('org.cyphra.browser.team', 'org.cyphra.browser.public'))
+    parser.add_argument('--apk', type=Path, required=True, help='The exact new sealed APK already installed; this test never installs it.')
+    parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--adb', default='adb')
+    parser.add_argument('--serial', default=os.environ.get('ANDROID_SERIAL'))
+    parser.add_argument('--trials', type=int, default=3, choices=(1, 2, 3))
+    parser.add_argument('--timeout', type=int, default=300, help='Hard total host deadline, including failure cleanup reserve (120–600 seconds).')
+    parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
+    args = parser.parse_args()
+    need(120 <= args.timeout <= 600, 'Use a bounded host timeout of 120–600 seconds.')
+    args.apk = args.apk.resolve()
+    args.output = args.output.resolve()
+    args.output.mkdir(parents=True, exist_ok=True)
+    need(not (args.output / 'proof.json').exists(), 'Use a new output directory for each native safety run.')
+    if args.worker:
+        NativeSafety(args).run()
+        return 0
+    return supervised(args)
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

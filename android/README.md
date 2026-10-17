@@ -1,6 +1,8 @@
 # Cyphra for Android
 
-The Android application uses native Java chrome and pinned Mozilla GeckoView **157.0.20261005135250** (Gecko 157.0.1). It contains no Chromium, Electron or Android WebView runtime. Android version **0.1.2** is independent of the desktop version.
+The Android application uses native Java chrome and pinned Mozilla GeckoView **158.0.20261007201254** (Gecko 158.0), with a Cyphra source-module overlay for app URI navigation. The native libraries and Java bridge remain unchanged. See [engine-patches/README.md](engine-patches/README.md) for exact source edits, hashes, compiled-cache upgrade handling and required release checks. It contains no Chromium, Electron or Android WebView runtime. Android version **0.1.2** is independent of the desktop version.
+
+This engine includes Mozilla's [Firefox 158 security fixes announced 13 October 2026](https://www.mozilla.org/en-US/security/advisories/mfsa2026-106/). The original attachment-failure comparisons used Gecko 157.0.1; those diagnostic results do not qualify the new engine. Release validation must use the exact new APKs and include upgrades from the earlier Gecko 157 profiles.
 
 The public APK installs independently of the desktop browser:
 
@@ -12,7 +14,7 @@ Android 10/API 29 or later is required. The universal APK contains arm64-v8a, ar
 
 ## Profiles and browsing
 
-Work and Personal have separate app-private Gecko profiles, cookies, local storage, bookmarks, ordinary tabs and settings. Android runs **one profile at a time**: switching closes the current Gecko runtime, waits for its exit and restores the other profile. This avoids conflicts in GeckoView's package-wide helper services. The last selected ordinary tab and native Home tabs are restored after restart; browsing sessions saved by 0.1.0 remain compatible. Private tabs are never saved to history or restored; Android screenshots are blocked while a private tab is selected. Work disables Android Recents screenshots and starts with history recording off.
+Work and Personal have separate app-private Gecko profiles, cookies, local storage, bookmarks, ordinary tabs and settings. Android runs **one profile at a time**: switching closes the current Gecko runtime, waits for its exit and restores the other profile. This avoids conflicts in GeckoView's package-wide helper services. The last selected ordinary tab and native Home tabs are restored after restart; browsing sessions saved by 0.1.0 remain compatible. Activity recreation keeps live ordinary and private tabs in memory, including their current documents and selection. Private tabs are never saved to disk or history and are not restored after the process ends; Android screenshots are blocked while a private tab is selected. Work disables Android Recents screenshots and starts with history recording off.
 
 Work uses stricter request filtering, HTTPS-only mode, fingerprint resistance and disabled WebGL. Personal uses balanced filtering, cookie partitioning and WebGL compatibility. Core TLS validation and telemetry policy remain enforced. Work may need per-site Shields exceptions for sites that depend on third-party scripts.
 
@@ -42,7 +44,7 @@ Settings → Updates checks stable `android-v<version>` GitHub releases only, in
 
 ## Build
 
-Use JDK 21, Android SDK platform **37.1**, Build Tools **36.0.0**, Android Gradle Plugin **9.4.1** and Gradle **9.8.1**. `targetSdk` is 36; `minSdk` is 29. The higher compile SDK is required by pinned GeckoView/AndroidX. Dependency and Gradle checksums accompany source. No signing key or credential belongs in this repository.
+Use JDK 21, Python **3.11+**, Android SDK platform **37.2**, Build Tools **36.0.0**, Android Gradle Plugin **9.4.1** and Gradle **9.8.1**. `targetSdk` is 36; `minSdk` is 29. The higher compile SDK is required by pinned GeckoView/AndroidX. Dependency and Gradle checksums accompany source. The build generates a hash-guarded modified `omni.ja` from the official read-only AAR; the release helper verifies the packaged overlay and unchanged native libraries. No signing key or credential belongs in this repository.
 
 ```sh
 ./android/gradlew -p android :app:assemblePublicDebug :app:testPublicDebugUnitTest
@@ -57,4 +59,4 @@ Cyphra initializes no analytics, account or crash-upload SDK. Gecko reporting pr
 
 This mobile release does not port the desktop offline OneCRL maintenance system or desktop developer inspector. Passkeys/WebAuthn are disabled so the APK can exclude GeckoView’s proprietary Google Play FIDO SDK dependency. It disables remote Safe Browsing lookups and DRM component downloads; it does not claim a phishing/malware reputation feed or protected-video compatibility. Endpoint blocking cannot stop every tracking technique. See the release validation report for actual emulator checks and their physical-device limits.
 
-Cyphra source and Gecko retain MPL-2.0; bundled filters retain their notices and CC-BY-SA-3.0 attribution. Native engine source revision is `737ec77d798755890b062aab541a90d6c75afd19`: [Mozilla source](https://hg.mozilla.org/releases/mozilla-release/rev/737ec77d798755890b062aab541a90d6c75afd19). GeckoView Java source is available beside the pinned artifact at [Mozilla Maven](https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/157.0.20261005135250/). AndroidX components use Apache-2.0. Matching source, notices and checksums must accompany distributed APKs.
+Cyphra source and Gecko retain MPL-2.0; bundled filters retain their notices and CC-BY-SA-3.0 attribution. Native engine source revision is `eb9a6e3a736802c8e080a76c44dc81f409d99d54`: [Mozilla source](https://hg.mozilla.org/releases/mozilla-release/rev/eb9a6e3a736802c8e080a76c44dc81f409d99d54). GeckoView Java source is available beside the pinned artifact at [Mozilla Maven](https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/158.0.20261007201254/). AndroidX components use Apache-2.0. Matching source, notices and checksums must accompany distributed APKs.
