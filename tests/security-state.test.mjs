@@ -24,7 +24,7 @@ test('the real Mozilla snapshot authenticates with the qualified pinned P-384 si
   assert.equal(await verifySnapshotSignature(snapshot, metadata, chainURL, canonical, webcrypto.subtle), true);
   const chain = new X509Certificate(await readFile(new URL('onecrl-chain.pem', security)));
   assert.equal(chain.publicKey.export({ type: 'spki', format: 'der' }).toString('base64'), ONECRL_PUBLIC_KEY_SPKI);
-  assert.equal(validateSnapshot(snapshot).data.length, 1895);
+  assert.equal(validateSnapshot(snapshot).data.length, 1901);
 });
 
 test('changing a valid revocation identity or detached signature is rejected', async () => {
@@ -50,7 +50,7 @@ test('snapshot validation rejects duplicate IDs, ambiguous identities and malfor
 
 test('revocation mapping enforces active entries and clears disabled issuer and key entries', () => {
   const entries = revocationEntries(snapshot);
-  assert.equal(entries.filter(entry => entry.enforce).length, 1250);
+  assert.equal(entries.filter(entry => entry.enforce).length, 1256);
   assert.equal(entries.filter(entry => !entry.enforce).length, 645);
   assert.ok(entries.some(entry => entry.kind === 'subject' && typeof entry.pubKey === 'string'));
   assert.ok(entries.some(entry => entry.kind === 'issuer' && !entry.enforce && typeof entry.serial === 'string'));

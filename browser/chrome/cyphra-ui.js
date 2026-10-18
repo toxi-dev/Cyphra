@@ -63,6 +63,7 @@ var CyphraUI = (() => {
   function installShields(win) {
     const doc = win.document;
     const privacy = () => win.CyphraPrivacy;
+    const everyday = win.CyphraEdition?.id === 'home';
     const target = doc.getElementById('nav-bar-customization-target');
     const popupSet = doc.getElementById('mainPopupSet');
     if (!target || !popupSet) return;
@@ -94,28 +95,28 @@ var CyphraUI = (() => {
     const mark = html(doc, 'img', { src: BASE + 'logo.svg', alt: '' });
     const heading = html(doc, 'div', { class: 'cyphra-shields-heading' });
     const title = html(doc, 'h2');
-    title.textContent = 'Shields';
+    title.textContent = 'Cyphra Shields';
     const site = html(doc, 'p', { class: 'cyphra-shields-site' });
     heading.append(title, site);
     header.append(mark, heading);
     content.appendChild(header);
 
-    const state = html(doc, 'div', { class: 'cyphra-shields-state' });
+    const state = html(doc, 'div', { class: 'cyphra-shields-state', role: 'status' });
     const stateDot = html(doc, 'span', { class: 'cyphra-shields-state-dot', 'aria-hidden': 'true' });
     const stateText = html(doc, 'span');
     state.append(stateDot, stateText);
-    content.appendChild(state);
+    header.appendChild(state);
 
     const protectionRow = html(doc, 'div', { class: 'cyphra-shields-protection' });
     const protectionLabel = html(doc, 'span', { class: 'cyphra-shields-label' });
-    protectionLabel.textContent = 'Protection';
+    protectionLabel.textContent = everyday ? 'Block ads and trackers' : 'Site protection';
     const modeGroup = html(doc, 'div', {
       class: 'cyphra-shields-modes', role: 'group', 'aria-label': 'Site protection level',
     });
     const modeButtons = {};
     for (const mode of ['standard', 'strict', 'off']) {
       const item = html(doc, 'button', { type: 'button', 'data-mode': mode });
-      item.textContent = mode[0].toUpperCase() + mode.slice(1);
+      item.textContent = everyday && mode === 'standard' ? 'On' : mode[0].toUpperCase() + mode.slice(1);
       item.addEventListener('click', () => {
         const browser = win.gBrowser.selectedBrowser;
         const id = browser.browsingContext.top.id;
@@ -127,7 +128,7 @@ var CyphraUI = (() => {
         } catch (error) { failure.textContent = error.message || String(error); }
       });
       modeButtons[mode] = item;
-      modeGroup.appendChild(item);
+      if (!everyday || mode !== 'strict') modeGroup.appendChild(item);
     }
     protectionRow.append(protectionLabel, modeGroup);
     content.appendChild(protectionRow);
@@ -139,11 +140,19 @@ var CyphraUI = (() => {
     const counters = {};
     const details = html(doc, 'details', { class: 'cyphra-shields-details', id: 'cyphra-shields-details' });
     const summary = html(doc, 'summary');
-    summary.textContent = 'View blocking details';
+    summary.textContent = everyday ? 'Activity and advanced options' : 'View blocking details';
     details.append(summary);
+    if (everyday) {
+      const strictRow = html(doc, 'div', { class: 'cyphra-home-advanced-mode' });
+      const strictCopy = html(doc, 'p');
+      strictCopy.textContent = 'Strict filtering can affect how some sites work.';
+      modeButtons.strict.textContent = 'Use strict filtering';
+      strictRow.append(strictCopy, modeButtons.strict);
+      details.append(strictRow);
+    }
     const detailStats = html(doc, 'dl', { class: 'cyphra-shields-detail-stats' });
     for (const [key, label] of [
-      ['blocked', 'Blocked'],
+      ['blocked', 'Requests blocked'],
       ['telemetry', 'Telemetry'],
       ['strict', 'Strict rules'],
     ]) {
@@ -154,7 +163,7 @@ var CyphraUI = (() => {
       value.textContent = '—';
       counters[key] = value;
       row.append(term, value);
-      (key === 'blocked' ? stats : detailStats).appendChild(row);
+      if (key === 'blocked' || !everyday) (key === 'blocked' ? stats : detailStats).appendChild(row);
     }
     const scope = html(doc, 'p', { class: 'cyphra-shields-scope' });
     scope.textContent = 'Requests blocked since this tab opened';
@@ -170,7 +179,7 @@ var CyphraUI = (() => {
     content.appendChild(details);
 
     const note = html(doc, 'p', { class: 'cyphra-shields-note' });
-    note.textContent = 'Telemetry deny rules remain active in every mode.';
+    note.textContent = win.CyphraEdition?.id === 'home' ? 'Changes apply to this website. You can change them at any time.' : 'Telemetry deny rules remain active in every mode.';
     content.appendChild(note);
     const failure = html(doc, 'p', { class: 'cyphra-shields-error', role: 'status' });
     content.append(failure);
@@ -196,6 +205,7 @@ var CyphraUI = (() => {
       const tabStats = api && id !== undefined ? api.stats(id) : null;
       content.setAttribute('data-mode', mode);
       const startupError = Services.prefs.getStringPref('cyphra.startupError', '');
+      content.setAttribute('data-state', !api?.ready ? startupError ? 'error' : 'pending' : !web ? 'no-site' : mode === 'off' ? 'off' : 'on');
       stateText.textContent = !api?.ready ? startupError ? 'Filtering could not start' : 'Filtering is initializing' : !web ? 'No website in this tab' : mode === 'off' ? 'Site filtering paused' : mode === 'strict' ? 'Strict filtering on' : 'Standard filtering on';
       const blocks = api?.recentBlocks(id) || [];
       destinations.replaceChildren();
@@ -248,6 +258,7 @@ var CyphraUI = (() => {
   }
 
   function installModes(win) {
+    if (win.CyphraEdition?.id === 'home') return;
     const doc = win.document;
     const anchor = doc.createXULElement('toolbarbutton');
     anchor.id = 'cyphra-mode';
@@ -362,6 +373,7 @@ var CyphraUI = (() => {
         doc.getElementById('cyphra-rail')) return;
 
     const services = win.Services || Services;
+    const everyday = win.CyphraEdition?.id === 'home';
 
     const brand = html(doc, 'button', {
       id: 'cyphra-brand', type: 'button', title: 'Cyphra · New tab',
@@ -369,14 +381,14 @@ var CyphraUI = (() => {
     });
     const logo = html(doc, 'img', { src: BASE + 'logo.svg', alt: '' });
     const name = html(doc, 'span');
-    name.textContent = 'Cyphra';
+    name.textContent = everyday ? 'Cyphra Home' : 'Cyphra';
     brand.append(logo, name);
     brand.addEventListener('click', () => nativeCommand(win, 'cmd_newNavigatorTab'));
     const tabsToolbar = doc.getElementById('TabsToolbar');
     if (tabsToolbar) tabsToolbar.insertBefore(brand, tabsToolbar.firstChild);
 
     const rail = html(doc, 'nav', {
-      id: 'cyphra-rail', 'aria-label': 'Cyphra browser tools',
+      id: 'cyphra-rail', 'aria-label': everyday ? 'Browser shortcuts' : 'Cyphra browser tools',
     });
     const controls = {};
     function add(id, label, name, callback) {
@@ -407,12 +419,15 @@ var CyphraUI = (() => {
       win.SidebarController.toggle('viewHistorySidebar', button));
     add('downloads', 'Downloads · Ctrl+J', 'download', () =>
       nativeCommand(win, 'Tools:Downloads'));
-    add('page-info', 'Page information · Ctrl+I', 'info', () =>
-      nativeCommand(win, 'View:PageInfo'));
-    add('developer-tools', 'Developer tools · F12', 'tools', () => developerTools(win));
+    if (!everyday) {
+      add('page-info', 'Page information · Ctrl+I', 'info', () => nativeCommand(win, 'View:PageInfo'));
+      add('developer-tools', 'Developer tools · F12', 'tools', () => developerTools(win));
+    }
     rail.appendChild(html(doc, 'span', { class: 'cyphra-rail-spacer', 'aria-hidden': 'true' }));
-    const containerButton = add('containers', 'Containers and private windows', 'containers', () => {});
-    containerMenu(win, containerButton);
+    if (!everyday) {
+      const containerButton = add('containers', 'Containers and private windows', 'containers', () => {});
+      containerMenu(win, containerButton);
+    }
     add('settings', 'Cyphra settings', 'settings', button => win.CyphraSettings.open(button));
 
     const browser = doc.getElementById('browser');
@@ -474,7 +489,7 @@ var CyphraUI = (() => {
       menuitem = doc.createXULElement('menuitem');
       menuitem.id = 'cyphra-toggle-rail';
       menuitem.setAttribute('type', 'checkbox');
-      menuitem.setAttribute('label', 'Show Cyphra tool rail');
+      menuitem.setAttribute('label', everyday ? 'Show browser shortcuts' : 'Show Cyphra tool rail');
       menuitem.addEventListener('command', () => {
         services.prefs.setBoolPref(RAIL_PREF, rail.hidden);
       });

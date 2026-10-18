@@ -18,7 +18,12 @@
 #endif
 
 #define COMMAND_LIMIT 32767
-#ifdef CYPHRA_PUBLIC_EDITION
+#ifdef CYPHRA_HOME_EDITION
+#define PROFILE_ROOT L"\\CyphraHome\\Profile"
+#define UPDATE_MUTEX L"Local\\CyphraHomeInstallationUpdate"
+#define EDITION L"home"
+#define REMOTING_ROOT L"cyphra-home-"
+#elif defined(CYPHRA_PUBLIC_EDITION)
 #define PROFILE_ROOT L"\\Cyphra\\Profile"
 #define UPDATE_MUTEX L"Local\\CyphraPublicInstallationUpdate"
 #define EDITION L"public"
@@ -85,13 +90,19 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command, int s
     wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (!argv) return fail(L"Cyphra could not read its launch arguments.");
     int private_window = 0;
-#ifdef CYPHRA_PUBLIC_EDITION
+#if defined(CYPHRA_PUBLIC_EDITION) || defined(CYPHRA_HOME_EDITION)
     int personal_mode = 1;
 #else
     int personal_mode = 0;
 #endif
     for (int i = 1; i < argc; i++) {
-        if (!wcscmp(argv[i], L"--work") || !wcscmp(argv[i], L"-work")) { personal_mode = 0; continue; }
+        if (!wcscmp(argv[i], L"--work") || !wcscmp(argv[i], L"-work")) {
+#ifdef CYPHRA_HOME_EDITION
+            LocalFree(argv); return fail(L"Cyphra Home has one everyday browsing profile.");
+#else
+            personal_mode = 0; continue;
+#endif
+        }
         if (!wcscmp(argv[i], L"--personal") || !wcscmp(argv[i], L"-personal")) { personal_mode = 1; continue; }
         if (wcscmp(argv[i], L"--private-window") == 0) { private_window = 1; continue; }
         if (!allowed_url(argv[i])) {

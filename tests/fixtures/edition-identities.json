@@ -1,0 +1,23 @@
+[
+  {
+    "id": "team",
+    "repository": "toxi-dev/Cyphra-Browser",
+    "assetPrefix": "Cyphra",
+    "keyId": "cyphra-release-2026-01",
+    "updateKeySPKI": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEMkWnWz3OgYq4Cj9hXGPiGz+h+Ig6j2XVEyDkGIxaom1jBenWtc5UI/nBBRr5kMltXxLmGTjmXtpeQOWkUlIZHQ=="
+  },
+  {
+    "id": "public",
+    "repository": "toxi-dev/Cyphra",
+    "assetPrefix": "Cyphra-Public",
+    "keyId": "cyphra-public-release-2026-01",
+    "updateKeySPKI": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE3vDDnNPl2fNrTboTKQ5pANzu6vVe7+vXa19+FZO99arkBpZeb80VuL59U3mSGdAJ3DrVjEeFN7YslweH/fD6Jw=="
+  },
+  {
+    "id": "home",
+    "repository": "toxi-dev/Cyphra-Home",
+    "assetPrefix": "Cyphra-Home",
+    "keyId": "cyphra-home-release-2026-01",
+    "updateKeySPKI": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExUAU/CnYxSROwVVOHYaH/sI49xWxIAjJClutLif6QuPURibalRr1ddGOY1xD7df2kPGtZ3+6B/2dECupt3+u/A=="
+  }
+]

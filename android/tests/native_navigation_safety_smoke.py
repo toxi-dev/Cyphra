@@ -21,6 +21,7 @@ import time
 import xml.etree.ElementTree as ET
 
 from native_navigation_safety_fixture import DOWNLOAD_BYTES, Fixture, TIMER_BUSY_MS, TIMER_INTERVAL_MS, TIMER_MAX_CALLBACKS
+from native_navigation_clock import MODEL as CLOCK_MODEL, validate_overlap
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -34,6 +35,26 @@ def atomic_json(path, value):
     temporary = path.with_suffix(path.suffix + '.tmp')
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + '\n')
     temporary.replace(path)
+
+
+def native_home_observation(tree, package):
+    """Recognize the actual native new tab, never a stale page label/address."""
+    contexts = {'org.cyphra.browser.team': 'Byte Team · Personal',
+                'org.cyphra.browser.public': 'Personal profile',
+                'org.cyphra.browser.home': 'Everyday browsing'}
+    need(package in contexts, 'Unsupported native Home package.')
+    def native(node, widget):
+        return node.get('package') == package and node.get('class') == 'android.widget.'+widget
+    addresses = [node for node in tree if node.get('content-desc') == 'Address and Brave Search'
+                 and native(node, 'EditText') and node.get('enabled') == 'true']
+    markers = [node for node in tree if node.get('content-desc') == 'Cyphra new tab' and native(node, 'ImageView')]
+    context = [node for node in tree if node.get('text') == contexts[package] and native(node, 'TextView')]
+    empty = len(addresses) == 1 and isinstance(addresses[0].get('text'), str) \
+        and addresses[0]['text'] in ('', addresses[0].get('hint'))
+    if empty and len(markers) == len(context) == 1:
+        return {'package': package, 'mode': 'personal', 'blankAddress': True,
+                'marker': 'Cyphra new tab', 'context': contexts[package]}
+    return None
 
 
 def capture_failure_ui(prefix, output, seconds=3):
@@ -69,7 +90,7 @@ class NativeSafety:
         self.fixture = Fixture(args.output / 'fixture-events.jsonl')
         self.port = None
         self.reverse_owned = False
-        self.report = {'passed': False, 'package': args.package, 'edition': args.package.rsplit('.', 1)[1],
+        self.report = {'passed': False, 'package': args.package, 'edition': args.package.rsplit('.', 1)[1], 'mode': 'personal',
                        'started': datetime.now(timezone.utc).isoformat(),
                        'timer': {'intervalMilliseconds': TIMER_INTERVAL_MS, 'busyMilliseconds': TIMER_BUSY_MS,
                                  'maxCallbacks': TIMER_MAX_CALLBACKS},
@@ -130,7 +151,18 @@ class NativeSafety:
 
     def ready(self):
         def check():
-            tree = self.nodes()
+            try:
+                tree = self.nodes()
+            except AssertionError as error:
+                # Android can expose no accessibility root during cold Activity
+                # attachment. Readiness still requires a complete native tree.
+                if str(error) == 'No complete accessibility hierarchy.':
+                    self.report['startupHierarchyPending'] = True
+                    return None
+                raise
+            except subprocess.TimeoutExpired:
+                self.report['startupHierarchyPending'] = True
+                return None
             need(not any('Protection could not start' in node.get('text', '') for node in tree), 'Engine startup protections failed.')
             return tree if any(node.get('content-desc') == 'Address and Brave Search' and node.get('enabled') == 'true' for node in tree) else None
         return self.wait(check, 'Protected engine did not become ready.', seconds=35)
@@ -160,13 +192,8 @@ class NativeSafety:
 
     def home(self, point):
         self.tap(point)
-        def check():
-            tree = self.nodes()
-            addresses = [node for node in tree if node.get('content-desc') == 'Address and Brave Search']
-            # Empty Android EditText may expose its hint as text.
-            empty = len(addresses) == 1 and addresses[0].get('text') in ('', addresses[0].get('hint'))
-            return tree if empty and any(node.get('text') == 'Personal profile' for node in tree) else None
-        return self.wait(check, 'Direct native Home did not replace the looping document.', seconds=12)
+        return self.wait(lambda: native_home_observation(self.nodes(), self.args.package),
+                         'Direct native Home did not replace the looping document.', seconds=12)
 
     def policy(self):
         base = '/data/user/0/' + self.args.package + '/files/gecko/personal/'
@@ -211,8 +238,8 @@ class NativeSafety:
         self.write()
         self.open()
         tree = self.ready()
-        self.toolbar = {name: self.bound(tree, name) for name in ('Home', 'Back')}
-        self.home(self.toolbar['Home'])
+        self.toolbar = {'Home': self.bound(tree, 'Home')}  # Back is captured fresh only after healthy history exists.
+        self.report['initialNativeHome'] = self.home(self.toolbar['Home'])
         self.report['hangMonitorEvidence'] = {'before': self.policy()}
         self.report['processHangMonitor'] = True
         self.write()
@@ -222,6 +249,9 @@ class NativeSafety:
         document = self.url('timer', run)
         self.open(document)
         initial = self.event(run, 'tick-complete')
+        need(not initial['body'].get('clockErrors') and initial['body'].get('clockWarmup', {}).get('acknowledged') is True
+             and len(initial['body'].get('clockSamples', [])) == 3,
+             'The timer did not begin with three acknowledged bounded clock echoes.')
         identity = {key: initial['body'][key] for key in ('token', 'url', 'title')}
         need(identity['url'] == document, 'Wrong initial timer document.')
         row = {'run': run, 'identity': identity, 'actions': []}
@@ -250,8 +280,35 @@ class NativeSafety:
             starts = [event for event in self.events(run, 'tick-start') if event['monotonicNs'] <= request['monotonicNs']]
             need(starts, 'No timer callback preceded the attachment request.')
             actual_start = starts[-1]
-            completes = [event for event in self.events(run, 'tick-complete') if event['body']['ticks'] == actual_start['body']['ticks']]
-            need(completes and request['monotonicNs'] < completes[0]['monotonicNs'], 'The actual attachment request did not overlap the bounded busy callback.')
+            # Inspect the retained immutable ledger after fresh later pulses.
+            # A navigation can cancel a completion report without canceling
+            # its callback. Do not invent a host completion time or use the
+            # delayed arrival of another POST as an actual callback boundary.
+            inspection_started = time.monotonic_ns()
+            self.click('Inspect timer identity')
+            carrier = self.event(run, 'inspect', after=inspection_started, seconds=8)
+            carrier_body = carrier['body']
+            ack = {'seq': carrier_body.get('eventSeq'), 'nonce': carrier_body.get('reportNonce')}
+            witness = self.wait(lambda: next((event for event in reversed(self.events(run))
+                if event.get('method') == 'POST' and event.get('path') == '/event'
+                and event['monotonicNs'] > carrier['monotonicNs']
+                and ack in event.get('body', {}).get('reportAcknowledgements', [])), None),
+                'No later report acknowledged receipt of the durable ledger.', seconds=5)
+            before = [sample for sample in carrier_body.get('clockSamples', []) if sample.get('phase') == 'before']
+            after = [sample for sample in carrier_body.get('clockSamples', [])
+                     if sample.get('phase') == carrier_body.get('inspectionPhase')]
+            nonces = {sample.get('nonce') for sample in before+after}
+            overlap_evidence = {'clockModel': dict(CLOCK_MODEL), 'ledgerCarrier': carrier,
+                'startReport': actual_start,
+                'acknowledgementWitness': witness, 'clockBefore': before, 'clockAfter': after,
+                'warmupServerEvents': [event for event in self.events(run) if event.get('path') == '/clock'
+                                       and event.get('body', {}).get('kind') == 'clock-warmup'],
+                'clockServerEvents': [event for event in self.events(run) if event.get('path') == '/clock'
+                                     and event.get('body', {}).get('nonce') in nonces]}
+            tick = actual_start['body']['ticks']
+            overlap_evidence['strictHostInterval'] = validate_overlap(overlap_evidence, identity, run, tick, request)
+            need(first['body']['ticks'] > tick and second['body']['ticks'] > first['body']['ticks'],
+                 'The two continued pulses are not later independent callback completions.')
             need(len([event for event in self.events(run) if event['method'] == 'GET' and event['path'] == '/timer']) == 1, 'Timer document was refetched.')
             path = '/sdcard/Download/Cyphra/' + filename
             if action == 'cancel':
@@ -263,7 +320,7 @@ class NativeSafety:
             address = [node for node in self.nodes() if node.get('content-desc') == 'Address and Brave Search']
             need(len(address) == 1 and address[0].get('text') == document, 'Native address no longer identifies the retained timer document.')
             row['actions'].append({'action': action, 'scheduledOverlap': overlap, 'actualOverlap': actual_start,
-                                   'actualOverlapComplete': completes[0],
+                                   'overlapEvidence': overlap_evidence,
                                    'attachment': request, 'firstContinued': first, 'secondContinued': second,
                                    'attachmentFetches': 1, 'documentFetches': 1, 'exactSavedBytes': action == 'save'})
             self.write()
@@ -305,12 +362,8 @@ class NativeSafety:
             row['freshJavaScriptAfterBack'] = inspected
         elif control == 'Home':
             # Home was already tapped using captured bounds; query only now.
-            def is_home():
-                tree = self.nodes()
-                addresses = [node for node in tree if node.get('content-desc') == 'Address and Brave Search']
-                empty = len(addresses) == 1 and addresses[0].get('text') in ('', addresses[0].get('hint'))
-                return empty and any(node.get('text') == 'Personal profile' for node in tree)
-            self.wait(is_home, 'Native Home did not recover from the infinite script.', seconds=12)
+            row['nativeHome'] = self.wait(lambda: native_home_observation(self.nodes(), self.args.package),
+                'Native Home did not recover from the infinite script.', seconds=12)
         else:
             destination_run = run + '-new-uri'
             destination = self.url('sentinel', destination_run)
@@ -433,7 +486,7 @@ def supervised(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--package', required=True, choices=('org.cyphra.browser.team', 'org.cyphra.browser.public'))
+    parser.add_argument('--package', required=True, choices=('org.cyphra.browser.team', 'org.cyphra.browser.public', 'org.cyphra.browser.home'))
     parser.add_argument('--apk', type=Path, required=True, help='The exact new sealed APK already installed; this test never installs it.')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--adb', default='adb')

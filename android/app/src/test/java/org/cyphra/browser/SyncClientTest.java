@@ -53,6 +53,18 @@ public final class SyncClientTest {
         assertEquals("https://example.org", SyncClient.parsePairingCode(code).getString("endpoint"));
         rejects(() -> SyncClient.parsePairingCode(code.replace("cyphra-sync-v2", "cyphra-sync-v1")));
     }
+    @Test public void homePairingAndEncryptedPayloadsStayPersonalAndSeparate() throws Exception {
+        JSONObject payload=new JSONObject(fixture().getJSONObject("payload").toString());
+        JSONObject home=new JSONObject().put("edition","home").put("mode","personal");payload.put("scope",home);
+        String code="cyphra-sync-v2.aHR0cHM6Ly9leGFtcGxlLm9yZw.11111111111111111111111111111111.BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc.home.personal";
+        assertEquals("home",SyncClient.parsePairingCode(code).getJSONObject("scope").getString("edition"));
+        rejects(()->SyncClient.parsePairingCode(code.replace("home.personal","home.work")));
+        rejects(()->SyncClient.validateScope(new JSONObject().put("edition","home").put("mode","work")));
+        JSONObject f=fixture();JSONObject encrypted=SyncClient.encryptPayload(payload,f.getString("secret"),f.getString("vault"));
+        JSONObject decoded=SyncClient.decryptPayload(encrypted,f.getString("secret"),f.getString("vault"));SyncClient.assertPayloadScope(decoded,home);
+        for(String edition:new String[]{"team","public"})rejects(()->SyncClient.assertPayloadScope(decoded,new JSONObject().put("edition",edition).put("mode","personal")));
+        rejects(()->SyncClient.mergePayloads(payload,fixture().getJSONObject("payload")));
+    }
     @Test public void onlySafeBookmarksAndSelectedPreferencesAreAccepted() throws Exception {
         JSONObject payload = fixture().getJSONObject("payload");
         JSONObject unsafe = new JSONObject(payload.toString());

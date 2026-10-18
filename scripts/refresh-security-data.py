@@ -57,6 +57,17 @@ def encoded(value):
     return (json.dumps(value, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
 
 
+def collection_metadata(value):
+    # Kinto may include an empty, unsigned permissions envelope around the
+    # signed collection data. Accept only these two exact response shapes;
+    # permissions never contribute to snapshot or signer authentication.
+    if (not isinstance(value, dict) or set(value) not in ({'data'}, {'data', 'permissions'})
+            or not isinstance(value.get('data'), dict)
+            or ('permissions' in value and (not isinstance(value['permissions'], dict) or value['permissions']))):
+        raise ValueError('Mozilla did not return OneCRL collection metadata.')
+    return value['data']
+
+
 # Import the browser's verifier itself. Its qualified public key, record schema
 # and detached-signature policy must agree with the candidate. No Gecko process
 # or network-capable browser service runs in this maintainer helper.
@@ -140,10 +151,7 @@ def prepare(output):
     records = json.loads(fetch(SOURCE + '/records'))
     if set(records) != {'data'} or not isinstance(records['data'], list) or not records['data']:
         raise ValueError('Mozilla did not return a complete OneCRL collection.')
-    metadata = json.loads(fetch(SOURCE))
-    if set(metadata) != {'data'}:
-        raise ValueError('Mozilla did not return OneCRL collection metadata.')
-    metadata = metadata['data']
+    metadata = collection_metadata(json.loads(fetch(SOURCE)))
     chain_url = metadata.get('signature', {}).get('x5u', '')
     if not CHAIN.fullmatch(chain_url):
         raise ValueError('Mozilla signature chain URL is not an approved endpoint.')

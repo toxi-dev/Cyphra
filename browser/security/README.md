@@ -1,13 +1,13 @@
 # Bundled certificate revocation data
 
 This directory contains Mozilla's OneCRL snapshot fetched from the official
-Remote Settings service on 10 October 2026. The complete signed records, metadata
+Remote Settings service on 18 October 2026. The complete signed records, metadata
 and certificate chain are retained; `manifest.json` records provenance, dates,
-byte lengths and SHA-256 hashes. The snapshot has 1,895 entries, 1,250 enabled.
+byte lengths and SHA-256 hashes. The snapshot has 1,901 entries, 1,256 enabled.
 It is security data from Mozilla, not browser activity collected by Cyphra.
 
-Gecko's Mozilla production-root verifier authenticated the P-384 content
-signature and signing chain in an isolated native Linux profile. The exact
+Gecko 158's Mozilla production-root verifier authenticated the P-384 content
+signature and signing chain in an isolated native Linux profile. Timestamp and record tampering were rejected, and native certificate-storage installation returned success in a fresh, network-isolated profile. The exact
 public signing key is pinned in `security-state.sys.mjs`. At startup Cyphra
 validates local integrity and verifies that detached signature before applying
 the enabled/disabled entries through native `nsICertStorage`. These operations

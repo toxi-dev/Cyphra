@@ -1,8 +1,8 @@
 # Desktop appearance and new tabs
 
-Open the Settings gear beside the profile selector, or choose **Tools → Appearance**. The Settings gear stays in the navigation bar when the tool rail is hidden or focus view is enabled. On a new tab, **Customize** opens the Home category.
+Open the Settings gear in the navigation bar. Public and Team also offer **Tools → Appearance**. The Settings gear stays in the navigation bar when the tool rail is hidden or focus view is enabled. On a new tab, **Customize** opens the Home category.
 
-The Public and Byte Team editions have the same appearance controls. Each existing Work or Personal profile saves its own choices. Appearance changes apply immediately to open browser windows and new tabs in that profile.
+All three editions offer themes, accents, density, rail/sidebar sizes and bookmark controls. Home uses a shortcut rail and one Personal profile; its new tab has search, pinned favorites and native library shortcuts, with no security briefing or publisher controls. It starts with System theme and up to eight pinned sites. Public and Byte Team keep their security workspace and appearance controls. Each existing Work or Personal profile saves its own choices. Appearance changes apply immediately to open browser windows and new tabs in that profile.
 
 | Control | Choices |
 | --- | --- |
@@ -29,6 +29,6 @@ The new tab still uses Brave Search. Pins use local toolbar bookmarks without fe
 
 `node --test tests/appearance.test.mjs` verifies invalid-value refusal, profile separation, reset boundaries, contrast, live window binding and observer cleanup. Palette text has at least 4.5:1 contrast against its ordinary backgrounds; accent focus indicators have at least 3:1 contrast.
 
-`python tests/appearance-native.py` uses a disposable ordinary-user Gecko profile, checks real chrome and new-tab behavior, restarts to verify saved settings, and confirms that the original edition’s DNS, telemetry, fingerprinting, history, Shields and sandbox settings survive customization and reset. It checks native back/forward navigation, the original logo and actual zero counters on a local new tab. Fixture bookmarks are created only inside the disposable test profile.
+`python tests/appearance-native.py` exercises the existing Public and Team workspace using a disposable ordinary-user Gecko profile, checks real chrome and new-tab behavior, restarts to verify saved settings, and confirms that the original edition’s DNS, telemetry, fingerprinting, history, Shields and sandbox settings survive customization and reset. It checks native back/forward navigation, the original logo and actual zero counters on a local new tab. Fixture bookmarks are created only inside the disposable test profile.
 
 For transparent GTK popup screenshots on a private Xvfb desktop, provide a normal desktop window manager and `xcompmgr` via `--compositor` or `CYPHRA_TEST_COMPOSITOR`. This test-only desktop composition does not change shipped graphics preferences. The optional `--overlay-source` copies only changed UI sources into the disposable application copy; shared build stages stay untouched. Native Windows presentation still needs release qualification.

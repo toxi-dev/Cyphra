@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--edition', choices=('team', 'public'), required=True)
+    parser.add_argument('--edition', choices=('team', 'public', 'home'), required=True)
     parser.add_argument('--signing-config', type=Path, required=True)
     parser.add_argument('--version', default='0.1.2')
     parser.add_argument('--version-code', type=int, default=4)
@@ -43,7 +43,8 @@ def main():
     sdk = Path(env.get('ANDROID_HOME', env.get('ANDROID_SDK_ROOT', '')))
     signer = sdk / 'build-tools/36.0.0/apksigner'
     subprocess.run([str(signer), 'verify', '--verbose', '--print-certs', str(apk)], check=True)
-    prefix = 'Cyphra' if args.edition == 'team' else 'Cyphra-Public'
+    from edition_metadata import edition_config
+    prefix = edition_config(args.edition)['assetPrefix']
     output = args.dist or ROOT / 'dist/android' / args.version / args.edition
     output.mkdir(parents=True, exist_ok=True)
     target = output / f'{prefix}-{args.version}-android-universal.apk'

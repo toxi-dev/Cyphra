@@ -30,7 +30,7 @@ public final class ServicesSecurityTest extends Instrumentation {
         try {
             nativeCheck("mode-bound bookmarks, tabs and history", this::testModeBoundBookmarksTabsAndHistory, checks);
             nativeCheck("ordinary tab selection, native home and legacy session compatibility", this::testOrdinaryTabSelectionAndLegacySessionStorage, checks);
-            nativeCheck("appearance reset preserves protected profile data and other mode", this::testAppearanceResetKeepsProfileData, checks);
+            nativeCheck(BuildConfig.HOME?"Home appearance reset preserves protected everyday profile data":"appearance reset preserves protected profile data and other mode", this::testAppearanceResetKeepsProfileData, checks);
             nativeCheck("Android permission results stay bound to their original website request", this::testAndroidPermissionCallbacksStayBound, checks);
             nativeCheck("pinned P-256 manifest, tamper and cross-edition refusal", this::testPinnedSignedManifestAndCrossEditionRefusal, checks);
             nativeCheck("repository API and GitHub asset CDN allowlists", this::testOnlyRepositoryApiAndGitHubAssetCdnAllowed, checks);
@@ -40,6 +40,9 @@ public final class ServicesSecurityTest extends Instrumentation {
             proof.put("passed", true); proof.put("edition", BuildConfig.EDITION);
             proof.put("packageName", getTargetContext().getPackageName()); proof.put("checks", checks);
             proof.put("sync", SyncNativeChecks.run(target));
+            if ("true".equals(arguments.getString("publishedCurrentHome", "false"))) {
+                proof.put("githubCurrentHome", testRealPublishedCurrentHome());
+            }
             if ("true".equals(arguments.getString("updaterNetwork", "false"))) {
                 proof.put("githubUpdate", testRealPublishedGitHubUpdate());
             }
@@ -77,7 +80,7 @@ public final class ServicesSecurityTest extends Instrumentation {
     }
     private void clearFiles() {
         if (target == null) return;
-        for (String mode : new String[]{"work", "personal"}) {
+        for (String mode : BuildConfig.HOME?new String[]{"personal"}:new String[]{"work", "personal"}) {
             BrowserStore store = new BrowserStore(target, mode, BuildConfig.EDITION);
             try { new UpdateClient(target, store, config()).forgetToken(); } catch (Exception ignored) {}
             target.getSharedPreferences("cyphra-data-" + mode, Context.MODE_PRIVATE).edit().clear().commit();
@@ -90,6 +93,7 @@ public final class ServicesSecurityTest extends Instrumentation {
                 BuildConfig.UPDATE_KEY_SPKI, BuildConfig.ASSET_PREFIX, installed.versionName, installed.getLongVersionCode(), target.getPackageName());
         } catch(android.content.pm.PackageManager.NameNotFoundException error) {throw new IllegalStateException(error);}
     }
+    private String primaryMode(){return BuildConfig.HOME?"personal":"work";}
     private UpdateClient updater(String mode) { return new UpdateClient(target, new BrowserStore(target, mode, BuildConfig.EDITION), config()); }
     private String fixture(String edition) throws Exception {
         return fixtureFile("updater-valid-" + edition + ".json");
@@ -126,6 +130,17 @@ public final class ServicesSecurityTest extends Instrumentation {
     }
 
     public void testModeBoundBookmarksTabsAndHistory() throws Exception {
+        if(BuildConfig.HOME){
+            BrowserStore personal=new BrowserStore(target,"personal",BuildConfig.EDITION);
+            personal.addBookmark("Everyday","https://example.org/home");personal.recordVisit("Everyday","https://example.org/home");
+            personal.saveTabs(new JSONArray().put("https://example.org/home").put("javascript:alert(1)"));
+            assertEquals(1,personal.bookmarks().length());assertEquals(1,personal.history().length());assertEquals(1,personal.tabs().length());
+            rejects(()->new BrowserStore(target,"work",BuildConfig.EDITION));
+            assertEquals("personal",EditionPolicy.launchMode("home","work","work","work"));
+            try{target.getPackageManager().getActivityInfo(new android.content.ComponentName(target.getPackageName(),WorkActivity.class.getName()),0);fail("Home exposes a Work activity.");}
+            catch(android.content.pm.PackageManager.NameNotFoundException expected){}
+            rejects(()->personal.addBookmark("Script","javascript:alert(1)"));return;
+        }
         BrowserStore work = new BrowserStore(target, "work", BuildConfig.EDITION);
         BrowserStore personal = new BrowserStore(target, "personal", BuildConfig.EDITION);
         work.addBookmark("Internal", "https://example.org/work");
@@ -146,10 +161,10 @@ public final class ServicesSecurityTest extends Instrumentation {
     }
 
     public void testOrdinaryTabSelectionAndLegacySessionStorage() throws Exception {
-        BrowserStore store = new BrowserStore(target, "work", BuildConfig.EDITION);
+        BrowserStore store = new BrowserStore(target, primaryMode(), BuildConfig.EDITION);
         // Existing releases stored either URL strings or title/URL objects,
         // without a selected-tab preference. They still open the first tab.
-        target.getSharedPreferences("cyphra-data-work", Context.MODE_PRIVATE).edit()
+        target.getSharedPreferences("cyphra-data-"+primaryMode(), Context.MODE_PRIVATE).edit()
             .putString("tabs", new JSONArray().put("https://example.org/legacy")
                 .put(new JSONObject().put("url", "about:blank").put("title", "New tab")).toString())
             .remove("tabs-selected").commit();
@@ -162,11 +177,11 @@ public final class ServicesSecurityTest extends Instrumentation {
             .put(new JSONObject().put("url", "about:blank").put("title", "New tab"))
             .put("https://example.org/last");
         store.saveTabs(input, 3);
-        BrowserStore reopened = new BrowserStore(target, "work", BuildConfig.EDITION);
+        BrowserStore reopened = new BrowserStore(target, primaryMode(), BuildConfig.EDITION);
         assertEquals(3, reopened.tabs().length()); assertEquals(1, reopened.selectedTab());
         assertEquals("about:blank", reopened.tabs().getJSONObject(reopened.selectedTab()).getString("url"));
         assertFalse(reopened.tabs().toString().contains("example.org/private"));
-        assertEquals(0, new BrowserStore(target, "personal", BuildConfig.EDITION).tabs().length());
+        if(!BuildConfig.HOME)assertEquals(0, new BrowserStore(target, "personal", BuildConfig.EDITION).tabs().length());
 
         store.saveTabs(input, 999); assertEquals(2, store.selectedTab());
         store.saveTabs(input, -1); assertEquals(0, store.selectedTab());
@@ -174,6 +189,17 @@ public final class ServicesSecurityTest extends Instrumentation {
     }
 
     public void testAppearanceResetKeepsProfileData() throws Exception {
+        if(BuildConfig.HOME){
+            BrowserStore store=new BrowserStore(target,"personal",BuildConfig.EDITION);
+            store.addBookmark("Keep me","https://example.org/retained");store.setBooleanPref("save-history",false);
+            java.util.Map<String,?> before=new java.util.HashMap<>(target.getSharedPreferences("cyphra-data-personal",Context.MODE_PRIVATE).getAll());
+            java.util.Map<String,?> engineBefore=new java.util.HashMap<>(target.getSharedPreferences("cyphra-engine-personal",Context.MODE_PRIVATE).getAll());
+            store.setStringPref(Appearance.PREFIX+"theme","black");store.setStringPref(Appearance.PREFIX+"home-alignment","center");store.setBooleanPref(Appearance.PREFIX+"home-reading",true);
+            assertFalse(new Appearance(target,store).reading);Appearance.reset(store);
+            assertEquals(before,target.getSharedPreferences("cyphra-data-personal",Context.MODE_PRIVATE).getAll());
+            assertEquals(engineBefore,target.getSharedPreferences("cyphra-engine-personal",Context.MODE_PRIVATE).getAll());
+            Appearance defaults=new Appearance(target,store);assertEquals("system",defaults.theme);assertEquals("grid",defaults.homeLayout);assertEquals("100",defaults.scaleChoice);assertFalse(defaults.reading);return;
+        }
         BrowserStore work=new BrowserStore(target,"work",BuildConfig.EDITION);
         BrowserStore personal=new BrowserStore(target,"personal",BuildConfig.EDITION);
         work.addBookmark("Retained bookmark","https://example.org/retained");
@@ -213,7 +239,7 @@ public final class ServicesSecurityTest extends Instrumentation {
             android.Manifest.permission.ACCESS_FINE_LOCATION,android.Manifest.permission.ACCESS_COARSE_LOCATION})
             if(target.checkSelfPermission(permission)!=android.content.pm.PackageManager.PERMISSION_GRANTED){denied=permission;break;}
         if(denied==null)fail("Permission checks require one denied runtime permission in the disposable test profile.");
-        WebPrompts prompts=new WebPrompts(new PermissionTestActivity(target),new Appearance(target,new BrowserStore(target,"work",BuildConfig.EDITION)),session->"https://example.org/");
+        WebPrompts prompts=new WebPrompts(new PermissionTestActivity(target),new Appearance(target,new BrowserStore(target,primaryMode(),BuildConfig.EDITION)),session->"https://example.org/");
         PermissionDecision original=new PermissionDecision(),overlap=new PermissionDecision();
         seedPermissionRequest(prompts,original,denied);
         prompts.onAndroidPermissionsRequest(null,new String[]{denied},overlap);
@@ -247,7 +273,7 @@ public final class ServicesSecurityTest extends Instrumentation {
         PermissionDecision beforeRecreation=new PermissionDecision();
         seedPermissionRequest(prompts,beforeRecreation,denied);
         WebPrompts.PendingAndroidRequests retained=prompts.pendingAndroidRequests();prompts.dismissPending();
-        WebPrompts replacement=new WebPrompts(new PermissionTestActivity(target),new Appearance(target,new BrowserStore(target,"work",BuildConfig.EDITION)),session->"https://next.example/");
+        WebPrompts replacement=new WebPrompts(new PermissionTestActivity(target),new Appearance(target,new BrowserStore(target,primaryMode(),BuildConfig.EDITION)),session->"https://next.example/");
         replacement.inheritPendingAndroidRequests(retained);
         PermissionDecision afterRecreation=new PermissionDecision();
         replacement.onAndroidPermissionsRequest(null,new String[]{denied},afterRecreation);
@@ -284,13 +310,17 @@ public final class ServicesSecurityTest extends Instrumentation {
     }
 
     public void testPinnedSignedManifestAndCrossEditionRefusal() throws Exception {
-        UpdateClient client = updater("work");
+        UpdateClient client = updater(primaryMode());
         JSONObject valid = (JSONObject) invoke(client, "verifyManifest", new Class<?>[]{String.class}, fixture(BuildConfig.EDITION));
         assertEquals(BuildConfig.EDITION, valid.getString("edition"));
         assertEquals("org.cyphra.browser." + BuildConfig.EDITION, valid.getString("packageName"));
         assertEquals("android-v0.1.0", valid.getString("tag"));
-        String otherEdition = "team".equals(BuildConfig.EDITION) ? "public" : "team";
-        rejects(() -> invoke(client, "verifyManifest", new Class<?>[]{String.class}, fixture(otherEdition)));
+        for(String otherEdition:new String[]{"team","public","home"})if(!BuildConfig.EDITION.equals(otherEdition))
+            rejects(() -> invoke(client, "verifyManifest", new Class<?>[]{String.class}, fixture(otherEdition)));
+        rejects(()->new UpdateClient.Config(BuildConfig.EDITION,BuildConfig.REPOSITORY,BuildConfig.UPDATE_KEY_ID,BuildConfig.UPDATE_KEY_SPKI,
+            "Another-Edition",BuildConfig.VERSION_NAME,BuildConfig.VERSION_CODE,target.getPackageName()));
+        rejects(()->new UpdateClient.Config(BuildConfig.EDITION,BuildConfig.REPOSITORY,"another-release-key",BuildConfig.UPDATE_KEY_SPKI,
+            BuildConfig.ASSET_PREFIX,BuildConfig.VERSION_NAME,BuildConfig.VERSION_CODE,target.getPackageName()));
         JSONObject envelope = new JSONObject(fixture(BuildConfig.EDITION));
         String signature = envelope.getString("signature");
         envelope.put("signature", (signature.charAt(0) == 'A' ? "B" : "A") + signature.substring(1));
@@ -320,6 +350,15 @@ public final class ServicesSecurityTest extends Instrumentation {
     }
 
     public void testCredentialsAreEncryptedAndBoundToMode() throws Exception {
+        if(BuildConfig.HOME){
+            UpdateClient client=updater("personal");String fake="github_pat_fixturefixturefixturefixturefixturefixturefixturefixture";
+            rejects(()->client.configureToken("ghp_classic_token_is_not_a_fine_grained_read_token"));client.configureToken(fake);
+            String encrypted=new BrowserStore(target,"personal",BuildConfig.EDITION).stringPref("github-token-encrypted","");
+            assertTrue(client.hasToken());assertFalse(encrypted.contains(fake));assertEquals(fake,invoke(client,"credential",new Class<?>[]{}));
+            rejects(()->updater("work"));
+            rejects(()->new UpdateClient(target,new BrowserStore(target,"personal","public"),config()));
+            client.forgetToken();assertFalse(client.hasToken());return;
+        }
         UpdateClient work = updater("work"), personal = updater("personal");
         String fake = "github_pat_fixturefixturefixturefixturefixturefixturefixturefixture";
         rejects(() -> work.configureToken("ghp_classic_token_is_not_a_fine_grained_read_token"));
@@ -340,15 +379,15 @@ public final class ServicesSecurityTest extends Instrumentation {
         // verifyPackage still reads the real installed package and certificate.
         UpdateClient.Config baseline=new UpdateClient.Config(BuildConfig.EDITION,BuildConfig.REPOSITORY,BuildConfig.UPDATE_KEY_ID,
             BuildConfig.UPDATE_KEY_SPKI,BuildConfig.ASSET_PREFIX,"0.0.0",1,target.getPackageName());
-        UpdateClient client = new UpdateClient(target,new BrowserStore(target,"work",BuildConfig.EDITION),baseline);
-        UpdateClient personal = new UpdateClient(target,new BrowserStore(target,"personal",BuildConfig.EDITION),baseline);
+        UpdateClient client = new UpdateClient(target,new BrowserStore(target,primaryMode(),BuildConfig.EDITION),baseline);
+        UpdateClient personal = BuildConfig.HOME?null:new UpdateClient(target,new BrowserStore(target,"personal",BuildConfig.EDITION),baseline);
         String envelope = fixtureFile("updater-invalid-apk-" + BuildConfig.EDITION + ".json");
         JSONObject manifest = (JSONObject) invoke(client, "verifyManifest", new Class<?>[]{String.class}, envelope);
         Constructor<UpdateClient.Offer> constructor = UpdateClient.Offer.class.getDeclaredConstructor(JSONObject.class, String.class, String.class, boolean.class);
         constructor.setAccessible(true);
         UpdateClient.Offer offer = constructor.newInstance(manifest, envelope,
             "https://api.github.com/repos/" + BuildConfig.REPOSITORY + "/releases/assets/123", true);
-        File folder = new File(target.getCacheDir(), "updates-work");
+        File folder = new File(target.getCacheDir(), "updates-"+primaryMode());
         if (!folder.isDirectory() && !folder.mkdirs()) throw new IllegalStateException("Test cache could not be created.");
         File file = new File(folder, offer.name);
         File other = new File(target.getCacheDir(), "outside-" + offer.name);
@@ -367,7 +406,11 @@ public final class ServicesSecurityTest extends Instrumentation {
             try (FileOutputStream output = new FileOutputStream(file)) { output.write('x'); }
             try (FileOutputStream output = new FileOutputStream(other)) { output.write('x'); }
             rejectsWithMessage(changed,() -> client.verifyForInstall(other, offer));
-            rejectsWithMessage(changed,() -> personal.verifyForInstall(file, offer));
+            if(personal!=null)rejectsWithMessage(changed,() -> personal.verifyForInstall(file, offer));
+            else {
+                File removedMode=new File(target.getCacheDir(),"updates-work");if(!removedMode.isDirectory()&&!removedMode.mkdirs())throw new IllegalStateException("Could not create removed-profile fixture.");
+                File wrongProfile=new File(removedMode,offer.name);try{try(FileOutputStream output=new FileOutputStream(wrongProfile)){output.write('x');}rejectsWithMessage(changed,()->client.verifyForInstall(wrongProfile,offer));}finally{wrongProfile.delete();removedMode.delete();}
+            }
         } finally { file.delete(); other.delete(); }
     }
 
@@ -383,6 +426,37 @@ public final class ServicesSecurityTest extends Instrumentation {
                     || suite.startsWith("TLS_ECDHE_") || suite.startsWith("TLS_DHE_"));
             }
         }
+    }
+
+    /** First Home release: inspect its actual published current offer anonymously.
+     * This deliberately does not claim an older Home upgrade or download/install.
+     */
+    private JSONObject testRealPublishedCurrentHome() throws Exception {
+        if(!BuildConfig.HOME||!"home".equals(BuildConfig.EDITION))throw new IllegalStateException("The current Home publication check requires the Home edition.");
+        String started=java.time.Instant.now().toString();
+        UpdateClient client=updater("personal");
+        assertFalse(client.requiresToken());assertFalse(client.hasToken());
+        UpdateClient.Offer offer=client.check();
+        android.content.pm.PackageInfo installed=target.getPackageManager().getPackageInfo(target.getPackageName(),0);
+        assertFalse(offer.newer);assertEquals(installed.versionName,offer.version);assertEquals(installed.getLongVersionCode(),offer.versionCode);
+        assertEquals(target.getPackageName(),offer.packageName);assertEquals(BuildConfig.REPOSITORY,client.repository());
+        assertEquals(BuildConfig.ASSET_PREFIX+"-"+offer.version+"-android-universal.apk",offer.name);
+        // check() authenticates the envelope and exact release tag before it
+        // constructs an Offer. Also bind that signed asset to the installed APK.
+        File apk=new File(target.getApplicationInfo().sourceDir);
+        assertEquals(offer.size,apk.length());
+        java.security.MessageDigest digest=java.security.MessageDigest.getInstance("SHA-256");
+        try(java.io.FileInputStream input=new java.io.FileInputStream(apk)){
+            byte[] buffer=new byte[65536];int count;while((count=input.read(buffer))!=-1)digest.update(buffer,0,count);
+        }
+        StringBuilder hex=new StringBuilder();for(byte value:digest.digest())hex.append(String.format(java.util.Locale.ROOT,"%02x",value&255));
+        assertEquals(offer.sha256,hex.toString());
+        return new JSONObject().put("passed",true).put("scope","home-current-published-check").put("edition",BuildConfig.EDITION)
+            .put("repository",client.repository()).put("packageName",offer.packageName).put("currentVersion",installed.versionName).put("offerVersion",offer.version)
+            .put("versionCode",offer.versionCode).put("asset",offer.name).put("sha256",offer.sha256).put("size",offer.size).put("newer",offer.newer)
+            .put("anonymous",true).put("manifestSignatureVerified",true).put("installedAPKMatchesSignedManifest",true)
+            .put("fullDownload",false).put("installerInvoked",false).put("oldHomeReleaseUsed",false)
+            .put("startedAt",started).put("finishedAt",java.time.Instant.now().toString());
     }
 
     /** Optional full release download from an older signed disposable install. */

@@ -61,11 +61,11 @@ public final class UpdateClient {
         public final long versionCode;
         public Config(String edition, String repository, String keyId, String keySPKI,
                       String assetPrefix, String currentVersion, long versionCode, String packageName) {
-            if (!"team".equals(edition) && !"public".equals(edition)) throw new IllegalArgumentException("Invalid edition.");
-            String expectedRepository = "team".equals(edition) ? "toxi-dev/Cyphra-Browser" : "toxi-dev/Cyphra";
+            String expectedRepository = EditionPolicy.repository(edition);
             String expectedPackage = "org.cyphra.browser." + edition;
             boolean allowedDebugPackage = BuildConfig.DEBUG && (expectedPackage + ".debug").equals(packageName);
-            if (!expectedRepository.equals(repository) || !(expectedPackage.equals(packageName) || allowedDebugPackage)
+            if (!expectedRepository.equals(repository) || !EditionPolicy.assetPrefix(edition).equals(assetPrefix)
+                || !EditionPolicy.keyId(edition).equals(keyId) || !(expectedPackage.equals(packageName) || allowedDebugPackage)
                 || !VERSION.matcher(currentVersion).matches() || versionCode < 1)
                 throw new IllegalArgumentException("Invalid Android update configuration.");
             this.edition = edition; this.repository = repository; this.keyId = keyId;

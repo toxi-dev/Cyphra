@@ -259,3 +259,18 @@ test('disconnect can recover damaged binding without reading or applying vault d
     assert.equal(Sync.info().configured, false); assert.equal(f.requests.length, 0);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+
+test('Home vaults accept only home.personal and cannot merge with either security edition', async () => {
+  const home = { edition: 'home', mode: 'personal' };
+  const homePayload = { ...payload({ 'b:bookmark0001': record(bookmark) }), scope: home };
+  assert.deepEqual(validateScope(home), home);
+  assert.deepEqual(parsePairingCode(code(home)).scope, home);
+  assert.throws(() => validateScope({ edition: 'home', mode: 'work' }), /binding/);
+  assert.throws(() => parsePairingCode(code({ edition: 'home', mode: 'work' })), /binding/);
+  assert.deepEqual((await decryptPayload(await encryptPayload(homePayload, secret, vault), secret, vault)).scope, home);
+  for (const other of [work, personal, publicPersonal, { edition: 'public', mode: 'work' }]) {
+    assert.throws(() => assertPayloadScope(homePayload, other), /different Cyphra edition or mode/);
+    assert.throws(() => mergePayloads(homePayload, { ...payload({}), scope: other }), /cannot be merged/);
+  }
+});

@@ -218,11 +218,11 @@ def install_update(archive_path, installation, *, wait_for_close=False):
     current_version = read_metadata(installation)
     check_edition(installation)
     previous = read_manifest(installation, required=False)
-    root = 'cyphra-public' if CYPHRA_EDITION == 'public' else 'cyphra'
+    root = 'cyphra' if CYPHRA_EDITION == 'team' else 'cyphra-' + CYPHRA_EDITION
     profile_root = Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config'))) / root
     with ExitStack() as stack:
         locks = []
-        for name in ('profile', 'profile-personal'):
+        for name in (('profile-personal',) if CYPHRA_EDITION == 'home' else ('profile', 'profile-personal')):
             profile = profile_root / name
             profile.mkdir(parents=True, mode=0o700, exist_ok=True)
             descriptor = os.open(profile / '.cyphra-update.lock', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)

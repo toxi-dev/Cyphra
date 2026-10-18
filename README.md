@@ -1,13 +1,15 @@
 # Cyphra
 
-An independent, open-source Gecko browser for Windows and Linux. Cyphra has no Chromium runtime, browser telemetry, advertisements on its home page, or required team account.
+An independent, open-source Gecko browser for Windows and Linux. Version **0.7.3** uses verified LibreWolf 158.0-1 / Gecko 158.0 engine inputs. Cyphra has no Chromium runtime, browser telemetry, advertisements on its home page, or required team account.
+
+For everyday browsing without the security workspace, [Cyphra Home](https://github.com/toxi-dev/Cyphra-Home) is a separate edition with one Personal profile, a simpler new tab and the same core ad blocking and update checks. This Cyphra edition keeps its Work mode and tools.
 
 ## Install
 
-Download a complete package from [Cyphra releases](https://github.com/toxi-dev/Cyphra/releases).
+Download a complete package from [Cyphra 0.7.3 releases](https://github.com/toxi-dev/Cyphra/releases/tag/v0.7.3).
 
-- Windows x64: run `Cyphra-Public-0.7.2-win-x64.exe`, or extract the entire Windows ZIP and run `Cyphra.exe`.
-- Linux x64: extract `Cyphra-Public-0.7.2-linux-x64.tar.gz`, then run `./Cyphra/cyphra` as your desktop account. GTK/NSS desktop libraries, Python 3.9+ and util-linux `flock` are required.
+- Windows x64: run [Cyphra-Public-0.7.3-win-x64.exe](https://github.com/toxi-dev/Cyphra/releases/download/v0.7.3/Cyphra-Public-0.7.3-win-x64.exe), or extract the entire [Windows ZIP](https://github.com/toxi-dev/Cyphra/releases/download/v0.7.3/Cyphra-Public-0.7.3-win-x64.zip) and run `Cyphra.exe`.
+- Linux x64: extract [Cyphra-Public-0.7.3-linux-x64.tar.gz](https://github.com/toxi-dev/Cyphra/releases/download/v0.7.3/Cyphra-Public-0.7.3-linux-x64.tar.gz), then run `./Cyphra/cyphra` as your desktop account. GTK/NSS desktop libraries, Python 3.9+ and util-linux `flock` are required.
 
 The public edition installs separately from Cyphra Team and does not use its profiles, sync server, update credentials, or releases.
 
@@ -55,7 +57,7 @@ python3 scripts/build-linux.py --edition public
 python3 scripts/build-source.py --edition public
 ```
 
-Output is in `dist/0.7.2/public/`. The release signer requires the separately held maintainer key; no private signing key is present here.
+Output is in `dist/0.7.3/public/`. The release signer requires the separately held maintainer key; no private signing key is present here.
 
 ## Privacy and licenses
 
@@ -63,4 +65,4 @@ Browser telemetry, upstream data reporting, studies and upstream update services
 
 Original Cyphra code uses MPL-2.0. Gecko, local matcher dependencies and filters retain their licenses and source attribution in `THIRD_PARTY_NOTICES.md`, `engine-lock.json` and `package-lock.json`. Give binary recipients matching Cyphra source and the exact upstream engine source listed there.
 
-Native Linux tests and supplementary Wine checks are documented separately. Native Windows installation, runtime and uninstall still need qualification on a physical Windows system. Automated testing is not an independent security audit.
+Check the release’s qualification records for completed native Windows and Linux tests and any pending checks. Supplementary Wine checks do not establish native Windows compatibility. Compatibility on individual PCs and independent security auditing are outside those checks.

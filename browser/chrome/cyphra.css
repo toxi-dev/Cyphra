@@ -207,24 +207,26 @@
   }
   #cyphra-shields-content {
     box-sizing: border-box !important;
-    width: 342px !important;
+    width: 354px !important;
+    max-width: calc(100vw - 24px) !important;
     max-height: 80vh !important;
     overflow: auto !important;
-    padding: 19px !important;
+    padding: 22px !important;
     background: var(--cy-surface) !important;
     color: var(--cy-text) !important;
     font: 12px system-ui, "Segoe UI", sans-serif !important;
   }
-  .cyphra-shields-header { display: flex !important; align-items: center !important; gap: 10px !important; margin-bottom: 12px !important; }
+  .cyphra-shields-header { display: grid !important; grid-template-columns: 28px minmax(0,1fr) !important; align-items: center !important; column-gap: 11px !important; row-gap: 13px !important; margin-bottom: 19px !important; }
   .cyphra-shields-header > img { width: 24px !important; height: 27px !important; flex: none !important; opacity: .95 !important; }
   .cyphra-shields-heading { min-width: 0 !important; }
-  .cyphra-shields-heading h2 { margin: 0 0 2px !important; color: var(--cy-text) !important; font-size: 14px !important; font-weight: 650 !important; letter-spacing: -.1px !important; }
-  .cyphra-shields-site { margin: 0 !important; color: var(--cy-muted) !important; font-size: 11px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+  .cyphra-shields-heading h2 { margin: 0 0 4px !important; color: var(--cy-muted) !important; font-size: 11px !important; font-weight: 650 !important; letter-spacing: -.1px !important; }
+  .cyphra-shields-site { margin: 0 !important; color: var(--cy-text) !important; font-size: 15px !important; font-weight: 600 !important; letter-spacing: -.2px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
 
-  .cyphra-shields-state { display: flex !important; align-items: center !important; gap: 7px !important; min-height: 31px !important; margin-bottom: 13px !important; padding: 0 10px !important; border: 1px solid var(--cy-line) !important; border-radius: 8px !important; background: var(--cy-inset) !important; color: var(--cy-muted) !important; font-size: 10.5px !important; }
-  .cyphra-shields-state-dot { width: 6px !important; height: 6px !important; border-radius: 50% !important; background: #72ae8f !important; }
-  #cyphra-shields-content[data-mode="strict"] .cyphra-shields-state-dot { background: var(--cy-accent) !important; }
-  #cyphra-shields-content[data-mode="off"] .cyphra-shields-state-dot { background: #9b7a7d !important; }
+  .cyphra-shields-state { grid-column: 1 / -1 !important; display: flex !important; align-items: center !important; gap: 7px !important; min-height: 18px !important; margin: 0 !important; color: var(--cy-muted) !important; font-size: 11px !important; }
+  .cyphra-shields-state-dot { width: 6px !important; height: 6px !important; border-radius: 50% !important; background: var(--cy-faint) !important; flex: none !important; }
+  #cyphra-shields-content[data-state="on"] .cyphra-shields-state-dot { background: #72ae8f !important; }
+  #cyphra-shields-content[data-state="on"][data-mode="strict"] .cyphra-shields-state-dot { background: var(--cy-accent) !important; }
+  #cyphra-shields-content[data-state="off"] .cyphra-shields-state-dot, #cyphra-shields-content[data-state="error"] .cyphra-shields-state-dot { background: #9b7a7d !important; }
 
   .cyphra-shields-protection { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important; }
   .cyphra-shields-label { color: var(--cy-muted) !important; font-size: 11px !important; }
@@ -241,9 +243,9 @@
   .cyphra-shields-stat dt, .cyphra-shields-stat dd { margin: 0 !important; }
   .cyphra-shields-stat dt { color: var(--cy-muted) !important; font-size: 11px !important; }
   .cyphra-shields-stat dd { color: var(--cy-subtle) !important; font-size: 11px !important; font-weight: 600 !important; font-variant-numeric: tabular-nums !important; }
-  .cyphra-shields-stat.primary { padding-block: 11px !important; }
+  .cyphra-shields-stat.primary { padding-block: 17px !important; }
   .cyphra-shields-stat.primary dt { color: var(--cy-subtle) !important; font-size: 11px !important; }
-  .cyphra-shields-stat.primary dd { color: var(--cy-text) !important; font-size: 24px !important; font-weight: 620 !important; letter-spacing: -.6px !important; }
+  .cyphra-shields-stat.primary dd { color: var(--cy-text) !important; font-size: 30px !important; font-weight: 620 !important; letter-spacing: -.6px !important; }
 
   .cyphra-shields-activity { margin-top: 14px !important; }
   .cyphra-shields-activity h3 { margin: 0 0 7px !important; color: var(--cy-muted) !important; font-size: 11px !important; font-weight: 600 !important; }
@@ -260,6 +262,12 @@
   .cyphra-shields-error { margin: 10px 0 0 !important; color: var(--cy-error) !important; font-size: 11px !important; line-height: 1.5 !important; }
   .cyphra-shields-error:empty { display: none !important; }
   #cyphra-shields-content :focus-visible, #cyphra-mode-content :focus-visible, .cyphra-rail-button:focus-visible, #cyphra-brand:focus-visible { outline: 2px solid var(--cy-accent) !important; outline-offset: 2px !important; }
+
+  .cyphra-home-advanced-mode { margin: 12px 0 16px !important; }
+  .cyphra-home-advanced-mode p { color: var(--cy-muted) !important; font-size: 11px !important; line-height: 1.5 !important; }
+  .cyphra-home-advanced-mode button { appearance: none !important; color: var(--cy-subtle) !important; background: var(--cy-inset) !important; border: 1px solid var(--cy-strong) !important; border-radius: 6px !important; padding: 7px 10px !important; font: 11px system-ui,sans-serif !important; }
+  .cyphra-home-advanced-mode button[aria-pressed="true"] { border-color: var(--cy-accent) !important; }
+  :root[cyphra-edition="home"] #cyphra-brand { min-width: 112px !important; }
 
   #cyphra-mode { margin-inline: 3px !important; padding-inline: 8px !important; }
   #cyphra-mode .toolbarbutton-text { display: block !important; font-size: 11px !important; }
@@ -281,6 +289,9 @@
 
   :root[cyphra-focus] #cyphra-rail, :root[cyphra-focus] #PersonalToolbar { display: none !important; }
 
+  @media (prefers-reduced-motion: no-preference) {
+    .cyphra-rail-button, #cyphra-brand, .cyphra-shields-modes button { transition: background-color 110ms ease, color 110ms ease !important; }
+  }
   /* Remove Mozilla's promotional empty-state from the Extensions popup. */
   #unified-extensions-panel #unified-extensions-empty-state > img,
   #unified-extensions-panel [data-l10n-id^="unified-extensions-empty-reason-zero-extensions"],

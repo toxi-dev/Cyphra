@@ -5,6 +5,7 @@ var CyphraSettings = (() => {
   function install(win) {
     const doc = win.document;
     const edition = win.CyphraEdition || {};
+    const everyday = edition.id === 'home';
     const { Appearance, APPEARANCE_PREFERENCES } = ChromeUtils.importESModule('resource://cyphra/modules/appearance.sys.mjs');
     const element = (tag, attrs = {}, text = '') => {
       const node = doc.createElementNS(HTML, tag);
@@ -161,30 +162,32 @@ var CyphraSettings = (() => {
     appearance.append(accents, element('h3', {}, 'Layout'));
     const layoutControls = element('div', { class: 'cyphra-setting-grid' }); appearance.append(layoutControls);
     appearanceSelect(layoutControls, 'Toolbar density', 'density', [['1','Compact'], ['0','Comfortable'], ['2','Touch']]);
-    appearanceSelect(layoutControls, 'Tool rail width', 'railWidth', [['36','Slim · 36 px'], ['39','Standard · 39 px'], ['46','Roomy · 46 px']]);
+    appearanceSelect(layoutControls, everyday ? 'Shortcut rail width' : 'Tool rail width', 'railWidth', [['36','Slim · 36 px'], ['39','Standard · 39 px'], ['46','Roomy · 46 px']]);
     appearanceSelect(layoutControls, 'Bookmarks sidebar starting width', 'sidebarWidth', [['200','Narrow · 200 px'], ['260','Standard · 260 px'], ['320','Wide · 320 px'], ['380','Extra wide · 380 px']]);
     appearanceSelect(layoutControls, 'Bookmarks toolbar', 'bookmarksToolbar', [['never','Hidden'], ['newtab','New tabs only'], ['always','Always visible']]);
-    appearanceCheck(appearance, 'Show the tool rail', 'showRail');
+    appearanceCheck(appearance, everyday ? 'Show browser shortcuts' : 'Show the tool rail', 'showRail');
     appearanceCheck(appearance, 'Focus view — hide the rail and bookmarks toolbar', 'focus');
-    appearance.append(element('p', { class: 'cyphra-setting-hint' }, 'You can still drag the bookmarks sidebar divider. Settings and Tools remain available when the rail is hidden.'));
+    appearance.append(element('p', { class: 'cyphra-setting-hint' }, everyday ? 'Drag the bookmarks sidebar divider to resize it. Settings remain available in the toolbar.' : 'You can still drag the bookmarks sidebar divider. Settings and Tools remain available when the rail is hidden.'));
     button(appearance, 'Reset appearance and new-tab layout', () => { Appearance.reset(); refreshAppearance(); status.textContent = 'Appearance and new-tab layout reset. Bookmarks and privacy settings are kept.'; }).id = 'cyphra-reset-appearance';
     const general = group('General');
     general.append(element('p', {}, 'Download behavior and the remaining browser controls for this profile.'));
     checkbox(general, 'Ask where to save downloads', 'browser.download.useDownloadDir', true);
     button(general, 'All browser settings', () => { panel.hidePopup(); win.openPreferences(); });
     const home = group('Home');
-    home.append(element('p', {}, 'Choose the layout and information on a new tab. These choices do not start news requests.'));
-    appearanceSelect(home, 'Page layout', 'homeLayout', [['balanced','Balanced · two columns'], ['wide','Wide · more room'], ['focused','Focused · one column']]);
+    home.append(element('p', {}, everyday ? 'Keep your new tab simple, or make room for more favorite sites.' : 'Choose the layout and information on a new tab. These choices do not start news requests.'));
+    appearanceSelect(home, 'Page layout', 'homeLayout', everyday ? [['balanced','Balanced'], ['wide','Wide · more favorites'], ['focused','Focused · less clutter']] : [['balanced','Balanced · two columns'], ['wide','Wide · more room'], ['focused','Focused · one column']]);
     appearanceCheck(home, 'Show Brave search', 'showSearch');
     appearanceCheck(home, 'Show pinned bookmarks', 'showPinned');
     appearanceSelect(home, 'Maximum pinned bookmarks', 'maxPins', [['4','4 bookmarks'], ['8','8 bookmarks'], ['12','12 bookmarks']]);
-    appearanceCheck(home, 'Show security briefing', 'showBriefing');
-    appearanceSelect(home, 'Maximum headlines', 'maxHeadlines', [['4','4 headlines'], ['6','6 headlines'], ['8','8 headlines']]);
-    appearanceCheck(home, 'Show publisher shortcuts', 'showPublishers');
-    appearanceCheck(home, 'Open bookmarks and articles in new tabs', 'openLinksInNewTabs');
-    home.append(element('p', { class: 'cyphra-setting-hint' }, 'Pinned sites come from the bookmarks toolbar. Security headlines refresh only when you request them; private windows never refresh news.'));
+    if (!everyday) {
+      appearanceCheck(home, 'Show security briefing', 'showBriefing');
+      appearanceSelect(home, 'Maximum headlines', 'maxHeadlines', [['4','4 headlines'], ['6','6 headlines'], ['8','8 headlines']]);
+      appearanceCheck(home, 'Show publisher shortcuts', 'showPublishers');
+    }
+    appearanceCheck(home, everyday ? 'Open pinned sites in new tabs' : 'Open bookmarks and articles in new tabs', 'openLinksInNewTabs');
+    home.append(element('p', { class: 'cyphra-setting-hint' }, everyday ? 'Pinned sites come from your bookmarks toolbar. This new tab uses local assets and makes no background news requests.' : 'Pinned sites come from the bookmarks toolbar. Security headlines refresh only when you request them; private windows never refresh news.'));
     const data = group('Data');
-    data.append(element('p', {}, 'Import bookmarks and compatible browser data when you choose. Work and Personal each keep their own profile.'));
+    data.append(element('p', {}, everyday ? 'Bring your bookmarks and compatible browser data with you.' : 'Import bookmarks and compatible browser data when you choose. Work and Personal each keep their own profile.'));
     button(data, 'Import browser data…', async () => {
       if (isPrivate()) throw new Error('Import browser data from a normal window.');
       panel.hidePopup();
@@ -192,10 +195,12 @@ var CyphraSettings = (() => {
       await MigrationUtils.showMigrationWizard(win);
     });
     const privacy = group('Privacy');
-    privacy.append(element('p', {}, 'Telemetry deny rules remain active in both profiles. Cyphra Shields and native tracking protection work alongside Global Privacy Control and HTTPS upgrades.'));
+    privacy.append(element('p', {}, everyday ? 'Ad and tracker blocking, Global Privacy Control and HTTPS upgrades are already on. Manage your history and site permissions here.' : 'Telemetry deny rules remain active in both profiles. Cyphra Shields and native tracking protection work alongside Global Privacy Control and HTTPS upgrades.'));
     checkbox(privacy, 'Keep browsing history', 'places.history.enabled');
-    checkbox(privacy, 'Enable WebGL for compatible websites', 'webgl.disabled', true);
-    checkbox(privacy, 'Stronger fingerprint resistance (may change website behavior)', 'privacy.resistFingerprinting');
+    if (!everyday) {
+      checkbox(privacy, 'Enable WebGL for compatible websites', 'webgl.disabled', true);
+      checkbox(privacy, 'Stronger fingerprint resistance (may change website behavior)', 'privacy.resistFingerprinting');
+    }
     checkbox(privacy, 'Clear selected browsing data when Cyphra closes', 'privacy.sanitize.sanitizeOnShutdown');
     button(privacy, 'Site permissions and data controls', () => { panel.hidePopup(); win.openPreferences('privacy'); });
     const dns = group('DNS');
@@ -214,14 +219,16 @@ var CyphraSettings = (() => {
       await dnsAPI().configure({ selection: resolver.value, uri: customURI.value });
       refreshDNS(); status.textContent = 'DNS choice saved for this profile.';
     }).id = 'cyphra-dns-save';
-    dns.append(element('h3', {}, 'Check resolution'));
-    const hostname = field(dns, 'Test a hostname', { type: 'text', value: 'example.com', autocomplete: 'off', id: 'cyphra-dns-host' });
-    button(dns, 'Test DNS', async () => {
-      status.textContent = 'Testing the saved DNS configuration…';
-      const { testDNS } = ChromeUtils.importESModule('resource://cyphra/modules/dns.sys.mjs');
-      const result = await testDNS(win, hostname.value);
-      status.textContent = `${result.hostname}: ${result.addresses.join(', ')} · ${result.milliseconds} ms`;
-    }).id = 'cyphra-test-dns';
+    if (!everyday) {
+      dns.append(element('h3', {}, 'Check resolution'));
+      const hostname = field(dns, 'Test a hostname', { type: 'text', value: 'example.com', autocomplete: 'off', id: 'cyphra-dns-host' });
+      button(dns, 'Test DNS', async () => {
+        status.textContent = 'Testing the saved DNS configuration…';
+        const { testDNS } = ChromeUtils.importESModule('resource://cyphra/modules/dns.sys.mjs');
+        const result = await testDNS(win, hostname.value);
+        status.textContent = `${result.hostname}: ${result.addresses.join(', ')} · ${result.milliseconds} ms`;
+      }).id = 'cyphra-test-dns';
+    }
     function refreshDNS() {
       const info = dnsAPI().info(); resolver.value = info.selection; customURI.value = info.selection === 'custom' ? info.uri : '';
       showCustom();
@@ -322,13 +329,14 @@ var CyphraSettings = (() => {
       const result = await new Promise(resolve => picker.open(resolve));
       if (result === Ci.nsIFilePicker.returnCancel) return;
       const file = picker.file;
-      const prefix = edition.assetPrefix === 'Cyphra-Public' ? 'Cyphra-Public' : 'Cyphra';
+      const prefix = ['Cyphra', 'Cyphra-Public', 'Cyphra-Home'].includes(edition.assetPrefix) ? edition.assetPrefix : '';
+      if (!prefix) throw new Error('The installed edition identity is invalid.');
       if (!new RegExp('^' + prefix + '-\\d+\\.\\d+\\.\\d+-').test(file.leafName) || !file.isFile()) throw new Error('Choose a versioned release file for this Cyphra edition.');
       launchUpdate(file);
     })); update.id = 'cyphra-install-update';
     function refresh() {
       const mode = win.CyphraModes?.info().mode;
-      context.textContent = [mode === 'work' ? 'Work profile' : mode === 'personal' ? 'Personal profile' : '', edition.public ? 'Public edition' : edition.organization || ''].filter(Boolean).join(' · ');
+      context.textContent = [everyday ? '' : mode === 'work' ? 'Work profile' : mode === 'personal' ? 'Personal profile' : '', everyday ? 'Cyphra Home' : edition.public ? 'Public edition' : edition.organization || ''].filter(Boolean).join(' · ');
       for (const node of actions) node.disabled = busy;
       for (const apply of preferenceControls) apply();
       refreshAppearance();

@@ -93,6 +93,7 @@ public abstract class MainActivity extends Activity {
     }
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
+        if(!EditionPolicy.allowsMode(BuildConfig.EDITION,mode())){finish();return;}
         RetainedTabs retained=(RetainedTabs)getLastNonConfigurationInstance();
         if(retained!=null){
             tabs.addAll(retained.tabs);current=retained.current;lastOrdinary=retained.lastOrdinary;
@@ -165,7 +166,9 @@ public abstract class MainActivity extends Activity {
         if(appearance.forward)bottom.addView(forward,new LinearLayout.LayoutParams(0,dp(appearance.toolbarHeight()),1));
         if(appearance.reload)bottom.addView(iconButton("refresh","Reload",this::reloadPage),new LinearLayout.LayoutParams(0,dp(appearance.toolbarHeight()),1));
         modeLabel=text(workMode()?"Work":"Personal",12,TEXT);modeLabel.setGravity(Gravity.CENTER);modeLabel.setTypeface(null,Typeface.BOLD);
-        modeLabel.setContentDescription("Switch Work or Personal profile");modeLabel.setBackground(selectable());modeLabel.setOnClickListener(v->showModes());bottom.addView(modeLabel,new LinearLayout.LayoutParams(0,dp(appearance.toolbarHeight()),1.5f));
+        modeLabel.setContentDescription("Switch Work or Personal profile");modeLabel.setBackground(selectable());modeLabel.setOnClickListener(v->showModes());
+        if(BuildConfig.HOME)bottom.addView(iconButton("bookmark","Bookmarks",()->showSaved(false)),new LinearLayout.LayoutParams(0,dp(appearance.toolbarHeight()),1));
+        else bottom.addView(modeLabel,new LinearLayout.LayoutParams(0,dp(appearance.toolbarHeight()),1.5f));
         tabCount=text("1",13,TEXT);tabCount.setGravity(Gravity.CENTER);tabCount.setBackground(new IconDrawable("tabs",MUTED));
         FrameLayout tabButton=new FrameLayout(this);tabButton.setContentDescription("Tabs");tabButton.setOnClickListener(v->showTabs());
         FrameLayout.LayoutParams countLayout=new FrameLayout.LayoutParams(dp(25),dp(25),Gravity.CENTER);tabButton.addView(tabCount,countLayout);
@@ -368,19 +371,33 @@ public abstract class MainActivity extends Activity {
         loading.setVisibility(View.GONE);address.setText("");showHomeView();saveTabs();
     }
     private void showHomeView(){
-        content.removeAllViews();ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);LinearLayout body=column();body.setPadding(dp(24),dp(appearance.compact()?28:42),dp(24),dp(24));scroll.addView(body);
-        LinearLayout identity=new LinearLayout(this);identity.setGravity(Gravity.CENTER_VERTICAL);
-        ImageView logo=new ImageView(this);logo.setImageResource(R.drawable.ic_logo);logo.setImageTintList(android.content.res.ColorStateList.valueOf(TEXT));identity.addView(logo,new LinearLayout.LayoutParams(dp(34),dp(34)));
-        TextView title=text("Cyphra",32,TEXT);title.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));title.setPadding(dp(13),0,0,0);identity.addView(title);body.addView(identity);
-        TextView profile=text(current!=null&&current.privateTab?"Private tab · "+mode():workMode()?"Work profile":"Personal profile",13,MUTED);profile.setPadding(0,dp(10),0,dp(appearance.compact()?20:28));body.addView(profile);
-        LinearLayout search=new LinearLayout(this);search.setGravity(Gravity.CENTER_VERTICAL);search.setPadding(dp(14),0,dp(4),0);search.setBackground(shape(PANEL,14,LINE));
-        ImageView searchIcon=new ImageView(this);searchIcon.setImageDrawable(new IconDrawable("search",MUTED));search.addView(searchIcon,new LinearLayout.LayoutParams(dp(20),dp(20)));
-        EditText query=input("Search with Brave");query.setSingleLine(true);query.setTextSize(appearance.sp(16));query.setBackgroundColor(Color.TRANSPARENT);query.setPadding(dp(12),0,0,0);
+        content.removeAllViews();
+        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setVerticalScrollBarEnabled(false);
+        FrameLayout canvas=new FrameLayout(this);scroll.addView(canvas);
+        LinearLayout body=column();body.setPadding(dp(24),dp(appearance.compact()?28:42),dp(24),dp(24));
+        int available=getResources().getDisplayMetrics().widthPixels;
+        FrameLayout.LayoutParams page=new FrameLayout.LayoutParams(Math.min(available,dp(640)),-2,Gravity.TOP|Gravity.CENTER_HORIZONTAL);canvas.addView(body,page);
+        boolean centered="center".equals(appearance.homeAlignment),privateTab=current!=null&&current.privateTab;
+        LinearLayout identity=new LinearLayout(this);identity.setGravity(Gravity.CENTER_VERTICAL|(centered?Gravity.CENTER_HORIZONTAL:Gravity.START));
+        ImageView logo=new ImageView(this);logo.setContentDescription("Cyphra new tab");logo.setImageResource(R.drawable.ic_logo);logo.setImageTintList(android.content.res.ColorStateList.valueOf(TEXT));identity.addView(logo,new LinearLayout.LayoutParams(dp(34),dp(34)));
+        TextView title=text(BuildConfig.HOME?"Cyphra Home":"Cyphra",34,TEXT);title.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));title.setLetterSpacing(-.035f);title.setPadding(dp(12),0,0,0);identity.addView(title);body.addView(identity);
+        String context=privateTab?"Private tab":BuildConfig.HOME?"Everyday browsing":BuildConfig.TEAM?"Byte Team · "+(workMode()?"Work":"Personal"):(workMode()?"Work profile":"Personal profile");
+        TextView profile=text(context,13,MUTED);profile.setGravity(centered?Gravity.CENTER_HORIZONTAL:Gravity.START);profile.setPadding(0,dp(10),0,dp(appearance.compact()?22:30));body.addView(profile);
+        LinearLayout search=new LinearLayout(this);search.setGravity(Gravity.CENTER_VERTICAL);search.setPadding(dp(16),0,dp(4),0);search.setBackground(shape(PANEL,18,LINE));
+        EditText query=input("Search with Brave");query.setSingleLine(true);query.setTextSize(appearance.sp(16));query.setBackgroundColor(Color.TRANSPARENT);query.setPadding(0,0,dp(8),0);
         query.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);query.setOnEditorActionListener((v,a,e)->{navigateInput(query.getText().toString());return true;});
         search.addView(query,new LinearLayout.LayoutParams(0,dp(appearance.compact()?52:60),1));search.addView(iconButton("search","Search with Brave",()->navigateInput(query.getText().toString())),new LinearLayout.LayoutParams(dp(48),dp(48)));body.addView(search);
+        if(appearance.quickActions){
+            LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER_VERTICAL);LinearLayout.LayoutParams actionLayout=new LinearLayout.LayoutParams(-1,-2);actionLayout.topMargin=dp(14);body.addView(actions,actionLayout);
+            homeAction(actions,"bookmark","Bookmarks",()->showSaved(false));homeAction(actions,"private","Private tab",()->newTab(true,null));
+        }
         JSONArray bookmarks=store==null?new JSONArray():store.bookmarks();
-        if(appearance.bookmarks&&bookmarks.length()>0){
+        if(appearance.bookmarks){
             section(body,"Bookmarks");LinearLayout gridRow=null;int shown=0;
+            if(bookmarks.length()==0){
+                TextView empty=text("Your saved pages will appear here.",13,MUTED);empty.setPadding(0,dp(4),0,dp(12));body.addView(empty);
+                TextView save=text("Save a page from the menu while browsing.",12,MUTED);body.addView(save);
+            }
             for(int i=0;i<Math.min(appearance.bookmarkCount,bookmarks.length());i++){
                 JSONObject bookmark=bookmarks.optJSONObject(i);if(bookmark==null)continue;String url=bookmark.optString("url");
                 if("grid".equals(appearance.homeLayout)){
@@ -397,9 +414,14 @@ public abstract class MainActivity extends Activity {
             row(body,"PortSwigger","Research and web security",()->navigate("https://portswigger.net/research"));
             row(body,"NCSC","Guidance and news",()->navigate("https://www.ncsc.gov.uk/section/keep-up-to-date/all-blogs"));
         }
-        TextView offline=text("Nothing on this page loads until you open it.",12,MUTED);offline.setPadding(0,dp(24),0,0);body.addView(offline);
+        TextView offline=text(privateTab?"Private tabs close when Cyphra exits.":"Nothing on this page loads until you open it.",12,MUTED);offline.setPadding(0,dp(28),0,dp(2));body.addView(offline);
         TextView customize=text("Customize Home",13,appearance.accentColor);customize.setMinimumHeight(dp(48));customize.setGravity(Gravity.CENTER_VERTICAL);customize.setBackground(selectable());customize.setOnClickListener(v->showAppearance());body.addView(customize);
         content.addView(scroll,new FrameLayout.LayoutParams(-1,-1));refreshButtons();
+    }
+    private void homeAction(LinearLayout parent,String icon,String label,Runnable action){
+        LinearLayout item=new LinearLayout(this);item.setGravity(Gravity.CENTER);item.setMinimumHeight(dp(48));item.setPadding(dp(6),0,dp(6),0);item.setBackground(selectable());
+        ImageView image=new ImageView(this);image.setImageDrawable(new IconDrawable(icon,MUTED));item.addView(image,new LinearLayout.LayoutParams(dp(18),dp(18)));
+        TextView title=text(label,13,TEXT);title.setPadding(dp(8),0,0,0);item.addView(title);item.setOnClickListener(v->action.run());parent.addView(item,new LinearLayout.LayoutParams(0,-2,1));
     }
     private View homeShortcut(String title,String domain,Runnable action){
         LinearLayout item=column();item.setPadding(dp(14),dp(14),dp(14),dp(14));item.setMinimumHeight(dp(82));item.setBackground(shape(PANEL,12,LINE));item.setForeground(selectable());
@@ -431,28 +453,30 @@ public abstract class MainActivity extends Activity {
             item.addView(iconButton("close","Close tab",()->{close(tab);dismissDialog(body);showTabs();}),new LinearLayout.LayoutParams(dp(48),dp(48)));body.addView(item);
         }dialog("Tabs · "+(workMode()?"Work":"Personal"),body);
     }
-    private void showModes(){dialogBuilder().setTitle("Profiles").setMessage("Work and Personal keep separate cookies, bookmarks and settings. Switching closes the current profile; its ordinary tabs are restored next time.")
+    private void showModes(){if(BuildConfig.HOME)return;dialogBuilder().setTitle("Profiles").setMessage("Work and Personal keep separate cookies, bookmarks and settings. Switching closes the current profile; its ordinary tabs are restored next time.")
         .setItems(new String[]{"Work · stricter protection","Personal · everyday browsing"},(d,w)->{
             if((w==0)==workMode())return;Intent intent=new Intent(this,LauncherActivity.class).putExtra("mode",w==0?"work":"personal").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(intent);
         }).show();}
     private void showMenu(){
-        final String[] actions={"New tab","New private tab","Reload","Forward","Bookmarks","History","Save bookmark","Desktop site","Share page","Site information","Tools","Settings"};
-        dialogBuilder().setTitle("Cyphra").setItems(actions,(d,w)->{switch(w){
-            case 0:newTab(false,null);break;case 1:newTab(true,null);break;case 2:reloadPage();break;
-            case 3:if(current!=null&&current.session!=null)current.session.goForward();break;case 4:showSaved(false);break;case 5:showSaved(true);break;case 6:bookmark();break;
-            case 7:if(current!=null&&current.session!=null){current.desktop=!current.desktop;current.session.getSettings().setUserAgentMode(current.desktop?GeckoSessionSettings.USER_AGENT_MODE_DESKTOP:GeckoSessionSettings.USER_AGENT_MODE_MOBILE);current.session.reload();}break;
-            case 8:if(current!=null&&BrowserStore.isWebURL(current.url))startActivity(Intent.createChooser(new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,current.url),"Share page"));break;
-            case 9:siteInfo();break;case 10:showTools();break;case 11:showSettings();break;
+        ArrayList<String> actions=new ArrayList<>(Arrays.asList("New tab","New private tab","Reload","Forward","Bookmarks","History","Downloads","Save bookmark","Desktop site","Share page","Site information"));
+        if(!BuildConfig.HOME)actions.add("Tools");actions.add("Settings");
+        dialogBuilder().setTitle(getString(R.string.app_name)).setItems(actions.toArray(new String[0]),(d,w)->{switch(actions.get(w)){
+            case "New tab":newTab(false,null);break;case "New private tab":newTab(true,null);break;case "Reload":reloadPage();break;
+            case "Forward":if(current!=null&&current.session!=null)current.session.goForward();break;case "Bookmarks":showSaved(false);break;case "History":showSaved(true);break;case "Save bookmark":bookmark();break;
+            case "Desktop site":if(current!=null&&current.session!=null){current.desktop=!current.desktop;current.session.getSettings().setUserAgentMode(current.desktop?GeckoSessionSettings.USER_AGENT_MODE_DESKTOP:GeckoSessionSettings.USER_AGENT_MODE_MOBILE);current.session.reload();}break;
+            case "Downloads":try{startActivity(new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS));}catch(ActivityNotFoundException e){toast("Your Android system does not provide a Downloads screen.");}break;
+            case "Share page":if(current!=null&&BrowserStore.isWebURL(current.url))startActivity(Intent.createChooser(new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,current.url),"Share page"));break;
+            case "Site information":siteInfo();break;case "Tools":showTools();break;case "Settings":showSettings();break;
         }}).show();
     }
     private void showSaved(boolean history){
         JSONArray entries=history?store.history():store.bookmarks();LinearLayout body=column();
-        if(entries.length()==0)row(body,history?"No saved history":"No bookmarks yet",history?"History is off by default in Work.":"Save a page from the menu.",null);
+        if(entries.length()==0)row(body,history?"No saved history":"No bookmarks yet",history?(workMode()?"History is off by default in Work.":"The pages you visit will appear here when history is on."):"Save a page from the menu.",null);
         for(int i=0;i<entries.length();i++){JSONObject item=entries.optJSONObject(i);if(item==null)continue;String url=item.optString("url");View entry=row(body,item.optString("title",host(url)),host(url),()->{navigate(url);dismissDialog(body);});
             if(!history)entry.setOnLongClickListener(v->{dialogBuilder().setTitle("Remove bookmark?").setMessage(item.optString("title",url)).setPositiveButton("Remove",(d,w)->{store.removeBookmark(url);dismissDialog(body);showSaved(false);}).setNegativeButton("Cancel",null).show();return true;});}
         if(history&&entries.length()>0)row(body,"Clear history","",()->{store.clearHistory();dismissDialog(body);showSaved(true);});dialog(history?"History":"Bookmarks",body);
     }
-    private void bookmark(){if(current==null||!BrowserStore.isWebURL(current.url)){toast("Open a website to save it.");return;}if(current.privateTab){toast("Bookmarks are disabled in private tabs.");return;}store.addBookmark(current.title,current.url);toast("Bookmark saved in "+mode()+".");}
+    private void bookmark(){if(current==null||!BrowserStore.isWebURL(current.url)){toast("Open a website to save it.");return;}if(current.privateTab){toast("Bookmarks are disabled in private tabs.");return;}store.addBookmark(current.title,current.url);toast(BuildConfig.HOME?"Bookmark saved.":"Bookmark saved in "+mode()+".");}
     private void showShields(){
         if(engine==null){toast("Protections are starting.");return;}
         if(activeShield!=null&&activeShield.isShowing()){renderShields();return;}
@@ -474,31 +498,39 @@ public abstract class MainActivity extends Activity {
     }
     private void showLoadError(String uri,WebRequestError error){
         loadErrorUri=uri;lastLoadError=error;
-        LinearLayout body=column();body.setPadding(dp(28),dp(44),dp(28),dp(24));body.addView(text("This page could not load",24,TEXT));row(body,host(uri),"",null);
-        row(body,"Connection error",Integer.toString(error.code),null);
-        if(engine!=null&&!engine.dnsChoice().equals("system"))row(body,"Encrypted DNS",engine.dnsUri()+"\nNo silent fallback to System DNS.",null);
-        row(body,"Retry","",()->navigate(uri));row(body,"DNS settings","",this::showDns);content.removeAllViews();content.addView(body);
+        boolean encryptedDNS=engine!=null&&!engine.dnsChoice().equals("system");
+        LoadErrorInfo info=LoadErrorInfo.from(error.code,error.category,encryptedDNS);
+        LinearLayout body=column();body.setPadding(dp(28),dp(44),dp(28),dp(24));body.addView(text(info.title,24,TEXT));row(body,host(uri),info.message,null);
+        if(info.dnsRelated&&encryptedDNS)row(body,BuildConfig.HOME?"DNS provider":"Encrypted DNS",BuildConfig.HOME?dnsLabel(engine.dnsChoice()):engine.dnsUri()+"\nNo silent fallback to System DNS.",null);
+        row(body,"Retry","",()->navigate(uri));
+        if(info.dnsRelated)row(body,"DNS settings","",this::showDns);
+        if(!BuildConfig.HOME)row(body,"Technical details","Error "+error.code+" · category "+error.category,null);
+        content.removeAllViews();content.addView(body);
     }
     private void showSettings(){
-        LinearLayout body=column();row(body,"Profiles",workMode()?"Work":"Personal",this::showModes);row(body,"DNS",engine.dnsChoice(),this::showDns);
+        LinearLayout body=column();
+        if(!BuildConfig.HOME)row(body,"Profiles",workMode()?"Work":"Personal",this::showModes);
+        section(body,"Make it yours");
         row(body,"Appearance",AppearancePanel.themeLabel(appearance.theme)+" · "+(appearance.compact()?"Compact":"Comfortable"),()->{dismissDialog(body);showAppearance();});
         row(body,"Default browser","Choose Cyphra in Android settings",()->{
             android.app.role.RoleManager roles=(android.app.role.RoleManager)getSystemService(ROLE_SERVICE);
             if(roles!=null&&roles.isRoleAvailable(android.app.role.RoleManager.ROLE_BROWSER))startActivityForResult(roles.createRequestRoleIntent(android.app.role.RoleManager.ROLE_BROWSER),53);
         });
+        section(body,"Privacy");row(body,BuildConfig.HOME?"DNS provider":"DNS",BuildConfig.HOME?dnsLabel(engine.dnsChoice()):engine.dnsChoice(),this::showDns);
         Switch history=new Switch(this);history.setText("Save browsing history");history.setTextColor(TEXT);history.setPadding(dp(16),dp(16),dp(16),dp(16));history.setChecked(store.booleanPref("save-history",!workMode()));history.setOnCheckedChangeListener((v,on)->store.setBooleanPref("save-history",on));body.addView(history);
         row(body,"Encrypted sync",sync.isPaired()?"Paired · manual sync":"Not paired",this::showSync);
-        row(body,"Updates","Manual checks · "+BuildConfig.VERSION_NAME,this::showUpdates);
-        row(body,"Clear browsing data","Cookies, website storage, cache and local history",()->dialogBuilder().setTitle("Clear "+mode()+" browsing data?").setMessage("Bookmarks and settings are kept. This signs you out of websites in this profile.")
+        section(body,"Cyphra");row(body,"Updates","Manual checks · "+BuildConfig.VERSION_NAME,this::showUpdates);
+        row(body,"Clear browsing data","Cookies, website storage, cache and local history",()->dialogBuilder().setTitle(BuildConfig.HOME?"Clear browsing data?":"Clear "+mode()+" browsing data?").setMessage("Bookmarks and settings are kept. This signs you out of websites in this profile.")
             .setPositiveButton("Clear",(d,w)->engine.runtime.getStorageController().clearData(StorageController.ClearFlags.ALL).accept(v->{store.clearHistory();toast("Browsing data cleared.");},e->toast("Could not clear browsing data."))).setNegativeButton("Cancel",null).show());
-        row(body,"About Cyphra","GeckoView · MPL-2.0 · no analytics SDK",()->dialogBuilder().setTitle("Cyphra "+BuildConfig.VERSION_NAME).setMessage((BuildConfig.TEAM?"Byte Team edition":"Public edition")+"\nGeckoView 157.0.20261005135250\n\nTelemetry and background update checks are disabled. Optional sync and updates contact only their configured services when requested.\n\nAndroid source and license notices are in the release.").setPositiveButton("Done",null).show());dialog("Settings",body);
+        row(body,"About "+getString(R.string.app_name),"Version "+BuildConfig.VERSION_NAME,()->dialogBuilder().setTitle(getString(R.string.app_name)+" "+BuildConfig.VERSION_NAME).setMessage((BuildConfig.HOME?"Home edition":BuildConfig.TEAM?"Byte Team edition":"Public edition")+"\nGeckoView 158.0.20261007201254\n\nTelemetry and background update checks are disabled. Optional sync and updates contact only their configured services when requested.\n\nAndroid source and license notices are in the release.").setPositiveButton("Done",null).show());dialog("Settings",body);
     }
+    private String dnsLabel(String choice){switch(choice){case "system":return "System DNS";case "toxitech":return "Toxitech";case "quad9":return "Quad9";case "cloudflare":return "Cloudflare";default:return "Custom provider";}}
     private void showDns(){
         String[] choices={"toxitech","system","quad9","cloudflare","custom"};String[] labels={"Toxitech · encrypted","System DNS","Quad9 · encrypted","Cloudflare · encrypted","Custom HTTPS"};int selected=Arrays.asList(choices).indexOf(engine.dnsChoice());
-        dialogBuilder().setTitle("DNS for "+mode()).setSingleChoiceItems(labels,selected,(d,w)->{
+        dialogBuilder().setTitle(BuildConfig.HOME?"DNS provider":"DNS for "+mode()).setSingleChoiceItems(labels,selected,(d,w)->{
             d.dismiss();if(w==4){EditText custom=input("https://resolver.example/dns-query");custom.setText(engine.dnsChoice().equals("custom")?engine.dnsUri():"");LinearLayout body=column();body.setPadding(dp(16),0,dp(16),0);body.addView(custom);
                 AlertDialog dialog=dialogBuilder().setTitle("Custom encrypted DNS").setView(body).setPositiveButton("Save",null).setNegativeButton("Cancel",null).create();dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(v->{try{engine.setDns("custom",custom.getText().toString());toast("Custom DNS saved.");dialog.dismiss();}catch(Exception e){custom.setError(e.getMessage());}}));dialog.show();
-            }else{try{engine.setDns(choices[w],"");toast("DNS saved for "+mode()+".");}catch(Exception e){toast(e.getMessage());}}
+            }else{try{engine.setDns(choices[w],"");toast(BuildConfig.HOME?"DNS provider saved.":"DNS saved for "+mode()+".");}catch(Exception e){toast(e.getMessage());}}
         }).setNegativeButton("Cancel",null).show();
     }
     private void showUpdates(){
@@ -536,8 +568,9 @@ public abstract class MainActivity extends Activity {
         AlertDialog d=dialogBuilder().setTitle(create?"Create encrypted vault":"Pair encrypted vault").setView(body).setPositiveButton(create?"Create":"Pair",null).setNegativeButton("Cancel",null).create();
         d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->{String server=endpoint.getText().toString(),code=secret.getText().toString();d.dismiss();busy(create?"Creating encrypted vault…":"Pairing device…",()->{if(create)return sync.create(server,code);sync.pair(server,code);return null;},result->{secret.setText("");if(create){String pairing=(String)result;dialogBuilder().setTitle("Pairing code").setMessage("Keep this secret. It gives access to your "+mode()+" vault.\n\n"+pairing).setPositiveButton("Copy",(dialog,w)->copy(pairing)).setNegativeButton("Done",null).show();}else toast("Device paired. Use Sync now to merge bookmarks.");});}));d.show();
     }
-    private void showTools(){dialogBuilder().setTitle("Tools").setItems(new String[]{"JSON format","Base64 encode","Base64 decode","URL encode","URL decode","SHA-256","Page source"},(d,w)->{if(w==6){if(current!=null&&BrowserStore.isWebURL(current.url))navigate("view-source:"+current.url);return;}tool(w);}).show();}
+    private void showTools(){if(BuildConfig.HOME)return;dialogBuilder().setTitle("Tools").setItems(new String[]{"JSON format","Base64 encode","Base64 decode","URL encode","URL decode","SHA-256","Page source"},(d,w)->{if(w==6){if(current!=null&&BrowserStore.isWebURL(current.url))navigate("view-source:"+current.url);return;}tool(w);}).show();}
     private void tool(int operation){
+        if(BuildConfig.HOME)return;
         LinearLayout body=column();body.setPadding(dp(16),0,dp(16),0);EditText input=input("Input");input.setMinLines(3);input.setMaxLines(6);body.addView(input);TextView output=text("",14,TEXT);output.setTextIsSelectable(true);body.addView(output);
         AlertDialog d=dialogBuilder().setTitle(new String[]{"JSON format","Base64 encode","Base64 decode","URL encode","URL decode","SHA-256"}[operation]).setView(body).setPositiveButton("Run",null).setNegativeButton("Close",null).setNeutralButton("Copy output",(x,w)->copy(output.getText().toString())).create();
         d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->{try{String value=input.getText().toString();if(value.length()>1024*1024)throw new IllegalArgumentException("Input is too large.");String result;

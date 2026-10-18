@@ -2,6 +2,7 @@
 'use strict';
 var CyphraTools = (() => {
   function install(win) {
+    if (win.CyphraEdition?.id === 'home') return;
     const doc = win.document, HTML = 'http://www.w3.org/1999/xhtml';
     const el = (tag, text = '', attrs = {}) => {
       const node = doc.createElementNS(HTML, tag); node.textContent = text;

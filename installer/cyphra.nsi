@@ -4,7 +4,14 @@ Unicode true
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 !include "x64.nsh"
-!ifdef PUBLIC_EDITION
+!ifdef HOME_EDITION
+  !define COMPANY_NAME "Cyphra"
+  !define APP_NAME "Cyphra Home"
+  !define INSTALL_FOLDER "CyphraHome"
+  !define SETTINGS_KEY "Software\CyphraHome"
+  !define UNINSTALL_KEY "CyphraHome"
+  !define SHORTCUT_FOLDER "Cyphra Home"
+!else ifdef PUBLIC_EDITION
   !define COMPANY_NAME "Cyphra"
   !define APP_NAME "Cyphra"
   !define INSTALL_FOLDER "CyphraPublic"
@@ -62,12 +69,14 @@ Function .onInit
   SetShellVarContext current
   ReadRegStr $0 HKCU "${SETTINGS_KEY}" "InstallLocation"
 !ifndef PUBLIC_EDITION
+!ifndef HOME_EDITION
   ${If} $0 == ""
     ReadRegStr $0 HKCU "Software\eed7efae-7f8c-5605-9829-b5b48517d4fc" "InstallLocation"
     ${If} $0 != ""
       StrCpy $INSTDIR $0
     ${EndIf}
   ${EndIf}
+!endif
 !endif
   InitPluginsDir
   SetOutPath "$PLUGINSDIR"
@@ -120,12 +129,17 @@ Section "Cyphra" SEC_MAIN
     Abort
   ${EndIf}
   CreateDirectory "$SMPROGRAMS\${SHORTCUT_FOLDER}"
+!ifdef HOME_EDITION
+  CreateShortcut "$SMPROGRAMS\${SHORTCUT_FOLDER}\Cyphra Home.lnk" "$INSTDIR\Cyphra.exe" "" "$INSTDIR\Cyphra.exe" 0
+!else
   CreateShortcut "$SMPROGRAMS\${SHORTCUT_FOLDER}\Cyphra Work.lnk" "$INSTDIR\Cyphra.exe" "--work" "$INSTDIR\Cyphra.exe" 0
   CreateShortcut "$SMPROGRAMS\${SHORTCUT_FOLDER}\Cyphra Personal.lnk" "$INSTDIR\Cyphra.exe" "--personal" "$INSTDIR\Cyphra.exe" 0
+!endif
   CreateShortcut "$SMPROGRAMS\${SHORTCUT_FOLDER}\Uninstall Cyphra.lnk" "$INSTDIR\Uninstall Cyphra.exe"
   CreateShortcut "$DESKTOP\${SHORTCUT_FOLDER}.lnk" "$INSTDIR\Cyphra.exe" "" "$INSTDIR\Cyphra.exe" 0
   WriteRegStr HKCU "${SETTINGS_KEY}" "InstallLocation" "$INSTDIR"
 !ifndef PUBLIC_EDITION
+!ifndef HOME_EDITION
   Delete "$SMPROGRAMS\${SHORTCUT_FOLDER}\Cyphra.lnk"
   ; Remove the old prototype's obsolete uninstall registration only when it
   ; pointed at the folder this installer has successfully replaced.
@@ -134,6 +148,7 @@ Section "Cyphra" SEC_MAIN
     DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\eed7efae-7f8c-5605-9829-b5b48517d4fc"
     DeleteRegKey HKCU "Software\eed7efae-7f8c-5605-9829-b5b48517d4fc"
   ${EndIf}
+!endif
 !endif
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_KEY}" "DisplayName" "${APP_NAME}"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_KEY}" "DisplayVersion" "${RELEASE_VERSION}"
@@ -169,6 +184,7 @@ Section "Uninstall"
   Delete "$DESKTOP\${SHORTCUT_FOLDER}.lnk"
   Delete "$SMPROGRAMS\${SHORTCUT_FOLDER}\Cyphra.lnk"
   Delete "$SMPROGRAMS\${SHORTCUT_FOLDER}\Uninstall Cyphra.lnk"
+  Delete "$SMPROGRAMS\${SHORTCUT_FOLDER}\Cyphra Home.lnk"
   Delete "$SMPROGRAMS\${SHORTCUT_FOLDER}\Cyphra Work.lnk"
   Delete "$SMPROGRAMS\${SHORTCUT_FOLDER}\Cyphra Personal.lnk"
   RMDir "$SMPROGRAMS\${SHORTCUT_FOLDER}"

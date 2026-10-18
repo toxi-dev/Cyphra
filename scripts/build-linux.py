@@ -50,7 +50,7 @@ def validate_cyphra_layout(stage):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--stage', type=Path, default=None)
-    parser.add_argument('--edition', choices=['team','public'])
+    parser.add_argument('--edition', choices=['team','public','home'])
     parser.add_argument('--dist', type=Path)
     args = parser.parse_args()
     config = edition_config(args.edition)
@@ -71,22 +71,26 @@ def main():
             raise RuntimeError(f'Required release notice is missing: {source}')
         shutil.copy2(source, stage / name)
     if (ROOT / 'README.md').is_file():
-        shutil.copy2(ROOT / ('docs/public.md' if config['public'] else 'README.md'), stage / 'README.md')
+        shutil.copy2(ROOT / ('docs/home.md' if config['id'] == 'home' else 'docs/public.md' if config['public'] else 'README.md'), stage / 'README.md')
     if (ROOT / 'licenses').is_dir():
         shutil.copytree(ROOT / 'licenses', stage / 'licenses', dirs_exist_ok=True)
     shutil.copy2(ROOT / 'launcher' / 'cyphra', stage / 'cyphra')
     if config['public']:
-        file = stage / 'cyphra'; file.write_text(file.read_text().replace("CYPHRA_EDITION='team'", "CYPHRA_EDITION='public'"))
+        file = stage / 'cyphra'; file.write_text(file.read_text().replace("CYPHRA_EDITION='team'", "CYPHRA_EDITION=" + repr(config['id'])))
     (stage / 'cyphra').chmod(0o755)
     shutil.copy2(ROOT / 'launcher' / 'cyphra-update', stage / 'cyphra-update')
     if config['public']:
-        file = stage / 'cyphra-update'; file.write_text(file.read_text().replace("CYPHRA_EDITION = 'team'", "CYPHRA_EDITION = 'public'"))
+        file = stage / 'cyphra-update'; file.write_text(file.read_text().replace("CYPHRA_EDITION = 'team'", "CYPHRA_EDITION = " + repr(config['id'])))
     (stage / 'cyphra-update').chmod(0o755)
     shutil.copy2(ROOT / 'launcher' / 'org.byteteam.cyphra.desktop', stage / 'org.byteteam.cyphra.desktop')
     if config['public']:
         file = stage / 'org.byteteam.cyphra.desktop'
         file.write_text(file.read_text().replace('Byte Team native Gecko browser','Cyphra Gecko browser').replace('cyphra-team-work','cyphra-public-personal'))
-        file.rename(stage / 'org.cyphra.browser.desktop')
+        if config['id'] == 'home':
+            text = file.read_text().replace('Name=Cyphra\n', 'Name=Cyphra Home\n').replace('cyphra-public-personal', 'cyphra-home-personal').replace('Actions=Work;Personal;Private;', 'Actions=Private;')
+            text = text[:text.index('[Desktop Action Work]')] + text[text.index('[Desktop Action Private]'):]
+            file.write_text(text)
+        file.rename(stage / ('org.cyphra.home.desktop' if config['id'] == 'home' else 'org.cyphra.browser.desktop'))
     if (ROOT / 'assets' / 'icon.png').is_file():
         shutil.copy2(ROOT / 'assets' / 'icon.png', stage / 'cyphra.png')
     for entry in stage.rglob('*'):

@@ -20,7 +20,7 @@ BEGIN
  BEGIN
   BLOCK "040904B0"
   BEGIN
-#ifdef CYPHRA_PUBLIC_EDITION
+#if defined(CYPHRA_PUBLIC_EDITION) || defined(CYPHRA_HOME_EDITION)
    VALUE "CompanyName", "Cyphra\0"
 #else
    VALUE "CompanyName", "Byte Team\0"
@@ -30,7 +30,11 @@ BEGIN
    VALUE "InternalName", "Cyphra\0"
    VALUE "LegalCopyright", "Copyright 2026 Cyphra contributors\0"
    VALUE "OriginalFilename", "Cyphra.exe\0"
+#ifdef CYPHRA_HOME_EDITION
+   VALUE "ProductName", "Cyphra Home\0"
+#else
    VALUE "ProductName", "Cyphra\0"
+#endif
    VALUE "ProductVersion", CYPHRA_VERSION_STRING
   END
  END

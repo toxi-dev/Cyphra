@@ -15,7 +15,7 @@ public final class LauncherActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         String requested=getIntent().getStringExtra("mode");
-        mode="work".equals(requested)||"personal".equals(requested)?requested:getPreferencesMode();
+        mode=EditionPolicy.launchMode(BuildConfig.EDITION,requested,getPreferencesMode(),BuildConfig.DEFAULT_MODE);
         url=getIntent().getDataString();
         if(url==null)url=getIntent().getStringExtra("url");
         if(!BrowserStore.isWebURL(url))url=null;

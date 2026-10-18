@@ -3,10 +3,12 @@
 
 This follow-up test never changes release assets or host networking. It verifies
 the exact tagged installer before execution, exercises the shipped launcher and
-both real profiles, then checks reinstall/uninstall profile preservation. The
+both real profiles, migrates genuine 0.7.2 data to the new engine, then checks
+reinstall/uninstall profile preservation. The
 runner account and its real Windows known folders are disposable; merely
 overriding LOCALAPPDATA would not isolate this application's native profiles.
 """
+import configparser
 import ctypes
 import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -30,6 +32,22 @@ MAX_METADATA = 2 * 1024 * 1024
 MAX_MANIFEST = 32 * 1024
 SECRET_ENV = ('GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN',
               'ACTIONS_RUNTIME_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN')
+UPGRADE_BASELINE_VERSION = '0.7.2'
+FIXTURE_OWNER_FILE = '.cyphra-windows-native-fixture.json'
+UPGRADE_BASELINES = {
+    'team': {'repository': 'toxi-dev/Cyphra-Browser', 'name': 'Cyphra-0.7.2-win-x64.exe',
+             'size': 116415498, 'sha256': '4fbae75e3fb5ac873254a26aff4cf9cad64344cee9d8a537f641202763239e9a',
+             'sourceCommit': 'a49ba8c795ee5be3cf440552825f3afa20c1e733'},
+    'public': {'repository': 'toxi-dev/Cyphra', 'name': 'Cyphra-Public-0.7.2-win-x64.exe',
+               'size': 116427924, 'sha256': '1f56d7e333250183352df3ce1d120643097c0f51adc306f157c1b459578887d9',
+               'sourceCommit': '1732ab90a5fe51eb148b196311c632450e94622d'},
+}
+CURRENT_WINDOWS_API = {'appVersion': '158.0', 'platformVersion': '158.0',
+                       'appBuildId': '20261013185353', 'platformBuildId': '20261013185353'}
+CURRENT_WINDOWS_PACKAGED_INI = {'applicationVersion': '158.0', 'platformMilestone': '158.0',
+    'applicationBuildId': '20261013185353', 'platformBuildId': '20261013200924',
+    'applicationSourceStamp': 'eb9a6e3a736802c8e080a76c44dc81f409d99d54',
+    'platformSourceStamp': 'eb9a6e3a736802c8e080a76c44dc81f409d99d54'}
 
 
 def public_environment():
@@ -94,6 +112,50 @@ def exact_asset(release, repository, name, expected_size=None):
     if asset.get('url') != expected_url:
         raise RuntimeError('The release asset belongs to an unexpected API path.')
     return asset
+
+
+def release_source(repository, version, token):
+    data, _, _ = api_download(f'https://api.github.com/repos/{repository}/git/ref/tags/v{version}', token, MAX_METADATA)
+    reference = json.loads(data)['object']
+    for _ in range(4):
+        assert re.fullmatch(r'[0-9a-f]{40}', reference['sha']), 'The published tag contains an invalid object ID.'
+        if reference['type'] == 'commit':
+            break
+        assert reference['type'] == 'tag', 'The published release tag does not resolve to a commit.'
+        data, _, _ = api_download(f'https://api.github.com/repos/{repository}/git/tags/{reference["sha"]}', token, MAX_METADATA)
+        reference = json.loads(data)['object']
+    assert reference['type'] == 'commit' and re.fullmatch(r'[0-9a-f]{40}', reference['sha'])
+    return reference['sha']
+
+
+def signed_installer(repository, version, token, scratch, baseline=None):
+    data, _, _ = api_download(f'https://api.github.com/repos/{repository}/releases/tags/v{version}', token, MAX_METADATA)
+    release = json.loads(data)
+    assert release['tag_name'] == 'v' + version and not release['draft'] and not release['prerelease']
+    assert type(release.get('id')) is int and release['id'] > 0, 'The release has no valid immutable identity.'
+    manifest_asset = exact_asset(release, repository, 'cyphra-update.json')
+    assert manifest_asset['size'] <= MAX_MANIFEST
+    manifest_path = scratch / f'cyphra-update-{version}.json'
+    api_download(manifest_asset['url'], token, MAX_MANIFEST, manifest_path, manifest_asset['size'])
+    verified = subprocess.run(['node', str(ROOT / 'tests/verify-release-native.mjs'), str(manifest_path), version],
+                              env=public_environment(), check=True, capture_output=True, text=True, timeout=30)
+    manifest = json.loads(verified.stdout)
+    assert manifest['repository'] == repository
+    signed = manifest['assets']['win-x64']
+    if baseline:
+        assert repository == baseline['repository']
+        assert signed == {name: baseline[name] for name in ('name', 'size', 'sha256')}, \
+            'The genuine older installer differs from the immutable migration baseline.'
+    source = release_source(repository, version, token)
+    if baseline:
+        assert source == baseline['sourceCommit'], 'The older release tag moved from its pinned source.'
+    asset = exact_asset(release, repository, signed['name'], signed['size'])
+    installer = scratch / signed['name']
+    _, _, digest = api_download(asset['url'], token, signed['size'], installer, signed['size'])
+    assert digest == signed['sha256'], 'The complete Windows installer differs from its signed SHA-256.'
+    return installer, {'version': version, 'tag': 'v' + version, 'repository': repository,
+                       'releaseId': release['id'], 'assetId': asset['id'], 'name': signed['name'],
+                       'size': signed['size'], 'sha256': digest, 'sourceCommit': source}
 
 
 def local_app_data():
@@ -249,6 +311,8 @@ def mode_info(driver):
       const {Modes}=ChromeUtils.importESModule('resource://cyphra/modules/modes.sys.mjs');
       const {Privacy}=ChromeUtils.importESModule('resource://cyphra/modules/privacy.sys.mjs');
       return {...Modes.info(),pid:Services.appinfo.processID,remote:Services.appinfo.remotingName,
+        engine:{appVersion:Services.appinfo.version,platformVersion:Services.appinfo.platformVersion,
+          appBuildId:Services.appinfo.appBuildID,platformBuildId:Services.appinfo.platformBuildID},
         profile:Services.dirsvc.get('ProfD',Components.interfaces.nsIFile).path,defaultShield:Privacy.defaultMode,
         rfp:Services.prefs.getBoolPref('privacy.resistFingerprinting'),webglDisabled:Services.prefs.getBoolPref('webgl.disabled'),
         locked:Services.prefs.prefIsLocked('cyphra.mode')&&Services.prefs.prefIsLocked('cyphra.edition'),
@@ -497,13 +561,235 @@ def contains_uri(mode, uri, include_pending=False):
                for window in mode['windows'] for tab in window['tabs'])
 
 
-def profile_hashes(profiles):
+def profile_hashes(profiles, include_lock=False):
     values = {}
     for mode, profile in profiles.items():
         for path in profile.rglob('*'):
-            if path.is_file() and path.name != '.cyphra-update.lock':
+            if path.is_file() and (include_lock or path.name != '.cyphra-update.lock'):
                 values[mode + '/' + path.relative_to(profile).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
     return values
+
+
+def profile_tree_sha256(values):
+    return hashlib.sha256(json.dumps(values, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
+def automation_profile_files(mode, port, owner, purpose):
+    assert mode in ('work', 'personal') and type(port) is int and 0 < port < 65536
+    assert re.fullmatch(r'[0-9a-f]{32}', owner) and purpose in ('migration', 'original-native-checks')
+    return {
+        'user.js': (f'user_pref("marionette.port",{port});\n'
+                    'user_pref("remote.prefs.recommended",false);\n').encode(),
+        FIXTURE_OWNER_FILE: json.dumps({'schema': 1, 'owner': owner, 'mode': mode, 'purpose': purpose},
+                                     sort_keys=True).encode(),
+    }
+
+
+def create_automation_profiles(profiles, ports, owner, purpose):
+    # Never adopt an existing directory, even on the disposable CI account.
+    assert not any(profile.exists() for profile in profiles.values()), \
+        'The native fixture refuses to adopt preexisting profiles.'
+    for mode, profile in profiles.items():
+        profile.mkdir(parents=True)
+        for name, content in automation_profile_files(mode, ports[mode], owner, purpose).items():
+            (profile / name).write_bytes(content)
+
+
+def isolate_profile_fixtures(profiles, ports, owner, proof):
+    """Retain complete owned migration trees; use new defaults for old checks."""
+    assert set(profiles) == {'work', 'personal'} and profiles['work'].parent == profiles['personal'].parent
+    assert profiles['work'].name == 'Profile' and profiles['personal'].name == 'Profile-Personal'
+    assert proof['newMigrationResult'].get('passed') is True, 'Migration must pass before its closed fixtures are archived.'
+    # Validate BOTH ownership stamps before moving either directory. The owner
+    # nonce originates in this run, after main's fresh-runner/absent-data checks.
+    for mode, profile in profiles.items():
+        assert profile.is_dir() and not profile.is_symlink() \
+            and not getattr(profile.lstat(), 'st_file_attributes', 0) & 0x400, \
+            'The migration archive refuses a reparse point or non-directory.'
+        stamp = profile / FIXTURE_OWNER_FILE
+        assert stamp.is_file() and not stamp.is_symlink() \
+            and stamp.read_bytes() == automation_profile_files(mode, ports[mode], owner, 'migration')[FIXTURE_OWNER_FILE], \
+            'The migration archive refuses profiles not owned by this fixture run.'
+    preserved = profile_hashes(profiles, include_lock=True)
+    assert preserved
+    archive_root = profiles['work'].parent / ('Cyphra-Native-Migration-' + uuid.uuid4().hex)
+    archive_root.mkdir()
+    archived = {mode: archive_root / mode for mode in profiles}
+    for mode, profile in profiles.items():
+        profile.rename(archived[mode])
+    assert profile_hashes(archived, include_lock=True) == preserved, \
+        'Archiving the closed migration fixtures changed profile data.'
+    isolation = proof['profileFixtureIsolation'] = {
+        'method': 'preserved-closed-profile-archive-then-fresh-native-default-profiles',
+        'migrationProfilesOwnedByThisRun': True, 'migrationProfilesArchivedByteIdentical': True,
+        'migrationProfileFiles': len(preserved), 'migrationProfileTreeSha256': profile_tree_sha256(preserved),
+    }
+    create_automation_profiles(profiles, ports, owner, 'original-native-checks')
+    expected = {mode + '/' + name: hashlib.sha256(content).hexdigest()
+                for mode in profiles for name, content in automation_profile_files(mode, ports[mode], owner, 'original-native-checks').items()}
+    assert profile_hashes(profiles, include_lock=True) == expected, \
+        'The original native checks did not start with fresh automation-only profiles.'
+    isolation.update({'freshDefaultProfiles': True, 'freshProfilesOnlyAutomationAndOwnershipFiles': True})
+    return archived
+
+
+def close_drivers(drivers, engine):
+    for driver in drivers.values():
+        try:
+            driver.set_context(driver.CONTEXT_CHROME)
+            driver.execute_script('Services.startup.quit(Components.interfaces.nsIAppStartup.eForceQuit);')
+        except Exception:
+            pass  # Orderly quit may close the automation transport before its reply.
+    drivers.clear()
+    wait_closed(engine)
+
+
+def packaged_engine_identity(application):
+    """Read installed package INIs independently of native AppInfo APIs."""
+    app = configparser.ConfigParser(interpolation=None)
+    platform = configparser.ConfigParser(interpolation=None)
+    with (application/'runtime/browser/application.ini').open(encoding='utf-8') as source:
+        app.read_file(source)
+    with (application/'runtime/platform.ini').open(encoding='utf-8') as source:
+        platform.read_file(source)
+    return {'applicationVersion': app['App']['Version'], 'platformMilestone': platform['Build']['Milestone'],
+            'applicationBuildId': app['App']['BuildID'], 'platformBuildId': platform['Build']['BuildID'],
+            'applicationSourceStamp': app['App']['SourceStamp'], 'platformSourceStamp': platform['Build']['SourceStamp']}
+
+
+def current_engine_identity(native_api, packaged_ini):
+    # nsXULAppInfo::GetPlatformBuildID returns compiled gToolkitBuildID, not
+    # platform.ini's independently generated BuildID. Require both facts.
+    assert native_api == CURRENT_WINDOWS_API, 'The native Windows AppInfo API differs from the pinned Gecko 158 compiled toolkit.'
+    assert packaged_ini == CURRENT_WINDOWS_PACKAGED_INI, 'The installed Windows application/platform INIs differ from the pinned official package.'
+
+
+def migration_identity(driver, mode, edition, profile, engine_major, packaged_ini=None):
+    observed = mode_info(driver)
+    assert observed['mode'] == mode and observed['edition'] == edition and observed['locked']
+    assert Path(observed['profile']) == profile and observed['remote'] == f'cyphra-{edition}-{mode}'
+    for name in ('appVersion', 'platformVersion'):
+        assert re.match(r'^' + str(engine_major) + r'(?:\.|$)', observed['engine'][name]), \
+            'The migration did not run the genuine expected Gecko engine generation.'
+    if engine_major == 158:
+        current_engine_identity(observed['engine'], packaged_ini)
+    assert observed['defaultShield'] == ('strict' if mode == 'work' else 'standard')
+    assert observed['rfp'] == (mode == 'work') and observed['webglDisabled'] == (mode == 'work')
+    assert observed['telemetry'] is False and observed['tls'] >= 3 and observed['sandbox'] >= 4
+    profile_lock(profile, True)
+    qualify_automation_preferences(driver)
+    return observed['engine']
+
+
+def verify_migration_data(driver, mode, url, retained):
+    driver.set_context(driver.CONTEXT_CONTENT)
+    driver.navigate(url + mode + '-verify')
+    data = driver.execute_script("return {cookie:document.cookie,storage:localStorage.getItem('cyphra-upgrade-fixture')};")
+    assert data == {'cookie': 'cyphra_upgrade_fixture=' + retained['value'], 'storage': retained['value']}, \
+        'The real older profile cookie or local storage did not survive a native restart/upgrade.'
+    driver.set_context(driver.CONTEXT_CHROME)
+    bookmark = async_call(driver, '''
+      const {PlacesUtils}=ChromeUtils.importESModule('resource://gre/modules/PlacesUtils.sys.mjs');
+      const item=await PlacesUtils.bookmarks.fetch(arguments[0]);
+      return item?{guid:item.guid,title:item.title,url:item.url.href}:null;
+    ''', [retained['bookmark']['guid']])
+    assert bookmark == retained['bookmark'], 'The real older bookmark did not survive a native restart/upgrade.'
+    foreign = async_call(driver, "const {PlacesUtils}=ChromeUtils.importESModule('resource://gre/modules/PlacesUtils.sys.mjs');return await PlacesUtils.bookmarks.fetch(arguments[0]);", [retained['foreignBookmark']])
+    assert foreign is None, 'The migration merged isolated Work and Personal bookmarks.'
+    assert appearance_state(driver) == retained['appearance'], 'The real older visual settings changed during restart/upgrade.'
+    assert appearance_security(driver) == retained['security'], 'The real older DNS/security/site exception settings changed during restart/upgrade.'
+    dns = driver.execute_script("return ChromeUtils.importESModule('resource://cyphra/modules/dns.sys.mjs').DNS.info();")
+    assert dns == retained['dns'], 'The real older per-profile DNS provider changed during restart/upgrade.'
+
+
+def qualify_real_upgrade(old_installer, old_identity, installer, new_identity, application,
+                         profiles, ports, drivers, environment, url, proof):
+    """Install and restart actual immutable 0.7.2 before migrating its real data."""
+    edition = proof['edition']
+    assert tuple(map(int, proof['version'].split('.'))) > tuple(map(int, UPGRADE_BASELINE_VERSION.split('.')))
+    assert json.loads((ROOT / 'engine-lock.json').read_text())['geckoVersion'] == '158.0'
+    launcher, engine = application / 'Cyphra.exe', application / 'runtime/librewolf.exe'
+    result = proof['newMigrationResult'] = {
+        'fromVersion': UPGRADE_BASELINE_VERSION, 'toVersion': proof['version'],
+        'fromSourceCommit': old_identity['sourceCommit'], 'toSourceCommit': new_identity['sourceCommit'],
+        'sourceInstallerSha256': old_identity['sha256'], 'targetInstallerSha256': new_identity['sha256'],
+        'oldEngineMajor': 157, 'newEngineMajor': 158, 'modes': {},
+    }
+    native_command([str(old_installer), '/S', '/D=' + str(application)], 240)
+    old_metadata = json.loads((application / 'cyphra.json').read_text())
+    assert old_metadata['edition'] == edition and old_metadata['version'] == UPGRADE_BASELINE_VERSION
+    retained = {}
+    for mode, profile in profiles.items():
+        subprocess.run([str(launcher), '--' + mode, url + mode + '-seed'], env=environment, timeout=20, check=True)
+        driver = drivers[mode] = connect(ports[mode])
+        old_engine = migration_identity(driver, mode, edition, profile, 157)
+        value = mode + '-' + uuid.uuid4().hex
+        driver.set_context(driver.CONTEXT_CONTENT)
+        driver.navigate(url + mode + '-seed')
+        empty = driver.execute_script("return {cookie:document.cookie,storage:localStorage.getItem('cyphra-upgrade-fixture')};")
+        assert empty == {'cookie': '', 'storage': None}, 'The genuine older migration profile was not empty and isolated.'
+        driver.execute_script("document.cookie='cyphra_upgrade_fixture='+arguments[0]+'; Path=/; Max-Age=86400; SameSite=Lax';localStorage.setItem('cyphra-upgrade-fixture',arguments[0]);", script_args=[value])
+        driver.set_context(driver.CONTEXT_CHROME)
+        bookmark = async_call(driver, '''
+          const {PlacesUtils}=ChromeUtils.importESModule('resource://gre/modules/PlacesUtils.sys.mjs');
+          const item=await PlacesUtils.bookmarks.insert({parentGuid:PlacesUtils.bookmarks.toolbarGuid,
+            url:arguments[0],title:arguments[1]});
+          return {guid:item.guid,title:item.title,url:item.url.href};
+        ''', [url + 'upgrade-bookmark-' + mode, 'Actual 0.7.2 ' + mode + ' migration fixture'])
+        wait_script(driver, 'return !!window.CyphraPrivacy?.ready;')
+        dns = driver.execute_script('''
+          const {DNS}=ChromeUtils.importESModule('resource://cyphra/modules/dns.sys.mjs');
+          return DNS.configure({selection:arguments[0]});
+        ''', script_args=['quad9' if mode == 'work' else 'cloudflare'])
+        driver.execute_script('window.CyphraPrivacy.setSiteMode(arguments[0],arguments[1],gBrowser.selectedBrowser.browsingContext.top.id);',
+                              script_args=[url, 'off' if mode == 'work' else 'strict'])
+        set_appearance_controls(driver, mode)
+        retained[mode] = {'value': value, 'bookmark': bookmark, 'dns': dns,
+                          'appearance': appearance_state(driver), 'security': appearance_security(driver)}
+        result['modes'][mode] = {'oldEngine': old_engine}
+    for mode, value in retained.items():
+        value['foreignBookmark'] = retained['personal' if mode == 'work' else 'work']['bookmark']['guid']
+    assert mode_info(drivers['work'])['pid'] != mode_info(drivers['personal'])['pid']
+    close_drivers(drivers, engine)
+    # Prove the fixtures are durable in the genuine old application before its
+    # installer is replaced. In-memory data is never accepted as upgrade proof.
+    for mode, profile in profiles.items():
+        profile_lock(profile, False)
+        subprocess.run([str(launcher), '--' + mode, url + mode + '-old-reopen'], env=environment, timeout=20, check=True)
+        driver = drivers[mode] = connect(ports[mode])
+        assert migration_identity(driver, mode, edition, profile, 157) == result['modes'][mode]['oldEngine']
+        verify_migration_data(driver, mode, url, retained[mode])
+        result['modes'][mode]['oldCloseReopenDurable'] = True
+    close_drivers(drivers, engine)
+    for profile in profiles.values():
+        profile_lock(profile, False)
+    preserved = profile_hashes(profiles, include_lock=True)
+    assert preserved and all(any(name.startswith(mode + '/') for name in preserved) for mode in profiles)
+    result['closedProfileFiles'] = len(preserved)
+    result['closedProfileTreeSha256'] = profile_tree_sha256(preserved)
+    native_command([str(installer), '/S', '/D=' + str(application)], 240)
+    new_metadata = json.loads((application / 'cyphra.json').read_text())
+    assert new_metadata['edition'] == edition and new_metadata['version'] == proof['version']
+    assert profile_hashes(profiles, include_lock=True) == preserved, \
+        'The real new installer changed the complete closed old profiles before first new launch.'
+    result['installerProfilesByteIdentical'] = True
+    result['newPackagedEngine'] = packaged_engine_identity(application)
+    for mode, profile in profiles.items():
+        subprocess.run([str(launcher), '--' + mode, url + mode + '-new-reopen'], env=environment, timeout=20, check=True)
+        driver = drivers[mode] = connect(ports[mode])
+        result['modes'][mode]['newEngine'] = migration_identity(driver, mode, edition, profile, 158, result['newPackagedEngine'])
+        verify_migration_data(driver, mode, url, retained[mode])
+        result['modes'][mode].update({
+            'profileIdentityPreserved': True, 'bookmarksPreserved': True,
+            'durableCookiesPreserved': True, 'localStoragePreserved': True,
+            'appearancePreserved': True, 'dnsPreserved': True,
+            'securityAndSiteExceptionsPreserved': True, 'modeIsolationPreserved': True,
+        })
+    assert mode_info(drivers['work'])['pid'] != mode_info(drivers['personal'])['pid']
+    close_drivers(drivers, engine)
+    result['passed'] = True
+    proof['checks'].append('real-immutable-0.7.2-to-current-native-engine-profile-migration-both-modes')
+    print('PASS genuine Windows upgrade: signed immutable 0.7.2/Gecko 157, durable old close/reopen, complete profiles unchanged before new launch, actual Gecko 158 preserving both modes and DNS/settings/bookmarks/cookies/storage.', flush=True)
 
 
 class Page(BaseHTTPRequestHandler):
@@ -542,18 +828,12 @@ def main():
         latest_data, _, _ = api_download(f'https://api.github.com/repos/{repository}/releases/latest', token, MAX_METADATA)
         latest = json.loads(latest_data)
         assert latest['tag_name'] == 'v' + version and latest['id'] == release['id'], 'The repository latest release differs from the edition version being qualified.'
-        manifest_asset = exact_asset(release, repository, 'cyphra-update.json')
-        assert manifest_asset['size'] <= MAX_MANIFEST
-        manifest_path = scratch / 'cyphra-update.json'
-        api_download(manifest_asset['url'], token, MAX_MANIFEST, manifest_path, manifest_asset['size'])
-        verified = subprocess.run(['node', str(ROOT / 'tests/verify-release-native.mjs'), str(manifest_path), version],
-                                  env=public_environment(), check=True, capture_output=True, text=True, timeout=30)
-        manifest = json.loads(verified.stdout)
-        signed = manifest['assets']['win-x64']
-        asset = exact_asset(release, repository, signed['name'], signed['size'])
-        installer = scratch / signed['name']
-        _, _, digest = api_download(asset['url'], token, signed['size'], installer, signed['size'])
-        assert digest == signed['sha256'], 'The complete Windows installer differs from its signed SHA-256.'
+        installer, new_identity = signed_installer(repository, version, token, scratch)
+        assert new_identity['releaseId'] == release['id'], 'The current release identity changed during verification.'
+        proof['releaseSourceCommit'] = new_identity['sourceCommit']
+        old_installer, old_identity = signed_installer(repository, UPGRADE_BASELINE_VERSION, token, scratch,
+                                                     UPGRADE_BASELINES[edition])
+        proof['oldClientIdentity'] = old_identity
         proof['checks'].append('pinned-signature-exact-tag-installer-size-and-sha256')
         print('PASS exact released Windows installer: pinned signed manifest, version/tag, complete size and SHA-256 before execution.', flush=True)
 
@@ -562,31 +842,22 @@ def main():
         profiles = {'work': profile_root / 'Profile', 'personal': profile_root / 'Profile-Personal'}
         assert not any(path.exists() for path in profiles.values()), 'The Windows runner already has Cyphra profiles; refusing to touch existing data.'
         ports = {mode: free_port() for mode in profiles}
-        for mode, profile in profiles.items():
-            profile.mkdir(parents=True)
-            (profile / 'user.js').write_text(f'user_pref("marionette.port",{ports[mode]});\n'
-                'user_pref("remote.prefs.recommended",false);\n')
-        native_command([str(installer), '/S', '/D=' + str(application)], 240)
-        assert (application / 'Cyphra.exe').is_file() and engine.is_file()
-        installed = json.loads((application / 'cyphra.json').read_text())
-        assert installed['edition'] == edition and installed['version'] == version
-
+        fixture_owner = uuid.uuid4().hex
+        create_automation_profiles(profiles, ports, fixture_owner, 'migration')
         server = HTTPServer(('127.0.0.1', 0), Page)
         thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
         url = f'http://127.0.0.1:{server.server_port}/'
         environment = dict(public_environment(), MOZ_HEADLESS='1', MOZ_MARIONETTE='1', MOZ_REMOTE_ALLOW_SYSTEM_ACCESS='1',
                            CYPHRA_MODE='spoofed', CYPHRA_EDITION='spoofed', MOZ_APP_REMOTINGNAME='spoofed')
         launcher = application / 'Cyphra.exe'
-        ref_data, _, _ = api_download(f'https://api.github.com/repos/{repository}/git/ref/tags/v{version}', token, MAX_METADATA)
-        release_ref = json.loads(ref_data)['object']
-        for _ in range(4):
-            if release_ref['type'] == 'commit':
-                break
-            assert release_ref['type'] == 'tag', 'The published release tag does not resolve to a commit.'
-            ref_data, _, _ = api_download(f'https://api.github.com/repos/{repository}/git/tags/{release_ref["sha"]}', token, MAX_METADATA)
-            release_ref = json.loads(ref_data)['object']
-        assert release_ref['type'] == 'commit' and re.fullmatch(r'[0-9a-f]{40}', release_ref['sha'])
-        proof['releaseSourceCommit'] = release_ref['sha']
+        # Preserve genuine migration data separately from the original tests'
+        # fresh-default assumptions. The shipped launcher fixes known-folder
+        # paths, so only closed, verified, run-owned profile trees are renamed;
+        # neither DNS nor visual/data preferences in those trees are reset.
+        migration_url = f'http://localhost:{server.server_port}/'
+        qualify_real_upgrade(old_installer, old_identity, installer, new_identity, application,
+                             profiles, ports, drivers, environment, migration_url, proof)
+        migration_profiles = isolate_profile_fixtures(profiles, ports, fixture_owner, proof)
         default = config['defaultMode']
         subprocess.run([str(launcher), url + 'default'], env=environment, timeout=20, check=True)
         drivers[default] = connect(ports[default])
@@ -837,6 +1108,10 @@ def main():
         while launcher.exists() and time.monotonic() < deadline:
             time.sleep(.1)
         assert not launcher.exists() and profile_hashes(profiles) == preserved, 'Uninstall removed or modified profile data.'
+        assert profile_tree_sha256(profile_hashes(migration_profiles, include_lock=True)) \
+            == proof['profileFixtureIsolation']['migrationProfileTreeSha256'], \
+            'The original native checks or uninstall changed the preserved migration profiles.'
+        proof['profileFixtureIsolation']['archivePreservedAfterOriginalChecks'] = True
         proof['checks'].append('real-silent-reinstall-settings-and-bookmarks-restored-uninstall-preserves-both-full-profiles')
         proof['checks'].append('native-appearance-and-home-choices-restored-after-real-reinstall-with-dns-security-and-site-exceptions-retained')
         print('PASS actual Windows reinstall and uninstall: both full external profiles preserved byte-for-byte; settings and bookmarks restored on native restart.', flush=True)

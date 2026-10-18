@@ -1,0 +1,13 @@
+{
+  "displayName": "Cyphra Home",
+  "repository": "toxi-dev/Cyphra-Home",
+  "assetPrefix": "Cyphra-Home",
+  "keyId": "cyphra-home-release-2026-01",
+  "updateKeySPKI": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExUAU/CnYxSROwVVOHYaH/sI49xWxIAjJClutLif6QuPURibalRr1ddGOY1xD7df2kPGtZ3+6B/2dECupt3+u/A==",
+  "id": "home",
+  "organization": "",
+  "public": true,
+  "defaultSyncEndpoint": "",
+  "defaultDNS": "system",
+  "defaultMode": "personal"
+}

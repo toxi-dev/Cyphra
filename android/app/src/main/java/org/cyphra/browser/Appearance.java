@@ -23,27 +23,29 @@ import java.util.Arrays;
 /** Native chrome preferences only. These never change Gecko, DNS or protection policy. */
 final class Appearance {
     static final String PREFIX="appearance.";
-    static final String[] KEYS={"theme","accent","density","text-scale","toolbar-forward","toolbar-reload","home-bookmarks","home-reading","home-layout","home-bookmark-count"};
-    final String theme,accent,density,scaleChoice,homeLayout,bookmarkCountChoice;
-    final boolean light,forward,reload,bookmarks,reading;
+    static final String[] KEYS={"theme","accent","density","text-scale","toolbar-forward","toolbar-reload","home-bookmarks","home-reading","home-layout","home-bookmark-count","home-quick-actions","home-alignment"};
+    final String theme,accent,density,scaleChoice,homeLayout,bookmarkCountChoice,homeAlignment;
+    final boolean light,forward,reload,bookmarks,reading,quickActions;
     final int background,panel,line,text,muted,accentColor,bookmarkCount;
     final float textScale;
 
     Appearance(Context context,BrowserStore store){
-        theme=choice(store,"theme","graphite","graphite","black","light","system");
+        theme=choice(store,"theme",BuildConfig.HOME?"system":"graphite","graphite","black","light","system");
         accent=choice(store,"accent","neutral","neutral","blue","teal","amber");
         density=choice(store,"density","comfortable","compact","comfortable");
         scaleChoice=choice(store,"text-scale","100","90","100","110","125");
-        homeLayout=choice(store,"home-layout","list","list","grid");
-        bookmarkCountChoice=choice(store,"home-bookmark-count","4","4","8","12");
+        homeLayout=choice(store,"home-layout",BuildConfig.HOME?"grid":"list","list","grid");
+        bookmarkCountChoice=choice(store,"home-bookmark-count",BuildConfig.HOME?"8":"4","4","8","12");
+        homeAlignment=choice(store,"home-alignment","start","start","center");
+        quickActions=store.booleanPref(PREFIX+"home-quick-actions",true);
         textScale=Integer.parseInt(scaleChoice)/100f;bookmarkCount=Integer.parseInt(bookmarkCountChoice);
         light="light".equals(theme)||("system".equals(theme)&&(context.getResources().getConfiguration().uiMode&Configuration.UI_MODE_NIGHT_MASK)!=Configuration.UI_MODE_NIGHT_YES);
-        if(light){background=0xfff6f7f9;panel=0xffffffff;line=0xffdadde3;text=0xff1d2026;muted=0xff59616e;}
+        if(light){background=0xfff7f7f5;panel=0xffffffff;line=0xffddddda;text=0xff20211f;muted=0xff656760;}
         else if("black".equals(theme)){background=Color.BLACK;panel=0xff111214;line=0xff292c31;text=0xfff1f2f4;muted=0xffa0a6b0;}
-        else{background=0xff101113;panel=0xff191b1f;line=0xff2a2d33;text=0xfff1f2f4;muted=0xffa0a6b0;}
+        else{background=0xff121314;panel=0xff1c1d1f;line=0xff303235;text=0xfff2f2ef;muted=0xffa8aaa6;}
         switch(accent){case "blue":accentColor=light?0xff345c93:0xff9ebce5;break;case "teal":accentColor=light?0xff226b62:0xff99c8bd;break;case "amber":accentColor=light?0xff865807:0xffd9bd83;break;default:accentColor=light?0xff424b59:0xffcad2df;}
         forward=store.booleanPref(PREFIX+"toolbar-forward",true);reload=store.booleanPref(PREFIX+"toolbar-reload",false);
-        bookmarks=store.booleanPref(PREFIX+"home-bookmarks",true);reading=store.booleanPref(PREFIX+"home-reading",true);
+        bookmarks=store.booleanPref(PREFIX+"home-bookmarks",true);reading=!BuildConfig.HOME&&store.booleanPref(PREFIX+"home-reading",true);
     }
     private static String choice(BrowserStore store,String key,String fallback,String... allowed){String value=store.stringPref(PREFIX+key,fallback);return Arrays.asList(allowed).contains(value)?value:fallback;}
     static void reset(BrowserStore store){String[] names=new String[KEYS.length];for(int i=0;i<KEYS.length;i++)names[i]=PREFIX+KEYS[i];store.removePrefs(names);}

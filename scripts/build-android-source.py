@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import importlib.util
+import json
 from pathlib import Path
 import shutil
 import stat
@@ -14,7 +15,7 @@ ROOT=Path(__file__).resolve().parents[1]
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--edition',choices=('team','public'),required=True)
+    parser.add_argument('--edition',choices=('team','public','home'),required=True)
     parser.add_argument('--version',default='0.1.2')
     parser.add_argument('--dist',type=Path,required=True)
     args=parser.parse_args()
@@ -22,14 +23,15 @@ def main():
     args.dist.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='cyphra-android-source-') as temporary:
         root=ROOT
-        if args.edition=='public' and (ROOT/'editions/team.json').exists():
+        if args.edition!='team' and json.loads((ROOT/'cyphra.json').read_text()).get('edition','team')!=args.edition:
             spec=importlib.util.spec_from_file_location('public_export',ROOT/'scripts/export-public.py')
             exporter=importlib.util.module_from_spec(spec);spec.loader.exec_module(exporter)
-            root=exporter.export_public(Path(temporary)/'public')
+            root=exporter.export_public(Path(temporary)/args.edition,args.edition)
         spec=importlib.util.spec_from_file_location('source',ROOT/'scripts/build-source.py')
         source=importlib.util.module_from_spec(spec);spec.loader.exec_module(source);source.ROOT=root
         files=source.source_files()
-        prefix='Cyphra' if args.edition=='team' else 'Cyphra-Public'
+        from edition_metadata import edition_config
+        prefix=edition_config(args.edition)['assetPrefix']
         name=f'{prefix}-{args.version}-android-source.zip'
         target=args.dist/name
         with zipfile.ZipFile(target,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=6) as archive:

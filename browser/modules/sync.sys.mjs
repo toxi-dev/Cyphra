@@ -48,7 +48,8 @@ function randomID() { return [...crypto.getRandomValues(new Uint8Array(16))].map
 export function validateScope(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length !== 2
       || !Object.hasOwn(value, 'edition') || !Object.hasOwn(value, 'mode')
-      || !['team', 'public'].includes(value.edition) || !['work', 'personal'].includes(value.mode)) {
+      || !['team', 'public', 'home'].includes(value.edition) || !['work', 'personal'].includes(value.mode)
+      || (value.edition === 'home' && value.mode !== 'personal')) {
     throw new Error('Invalid Work/Personal sync binding.');
   }
   return { edition: value.edition, mode: value.mode };
@@ -68,12 +69,12 @@ export function assertPayloadScope(payload, expected, requireScope = true) {
 export function parsePairingCode(code) {
   const input = String(code).trim();
   if (input.length > 4096) throw new Error('Enter a complete Cyphra pairing code.');
-  const scoped = /^cyphra-sync-v2\.([A-Za-z0-9_-]+)\.([a-f0-9]{32})\.([A-Za-z0-9_-]{43})\.(team|public)\.(work|personal)$/.exec(input);
+  const scoped = /^cyphra-sync-v2\.([A-Za-z0-9_-]+)\.([a-f0-9]{32})\.([A-Za-z0-9_-]{43})\.(team|public|home)\.(work|personal)$/.exec(input);
   const legacy = /^cyphra-sync-v1\.([A-Za-z0-9_-]+)\.([a-f0-9]{32})\.([A-Za-z0-9_-]{43})$/.exec(input);
   const match = scoped || legacy;
   if (!match) throw new Error('Enter a complete Cyphra pairing code.');
   return { endpoint: endpointURL(decodeUTF8.decode(unb64(match[1]))), vault: match[2], secret: match[3],
-    ...(scoped ? { scope: { edition: match[4], mode: match[5] } } : {}) };
+    ...(scoped ? { scope: validateScope({ edition: match[4], mode: match[5] }) } : {}) };
 }
 function pairingCode(endpoint, vault, secret, scope) {
   return scope ? `cyphra-sync-v2.${b64(utf8.encode(endpoint))}.${vault}.${secret}.${scope.edition}.${scope.mode}`

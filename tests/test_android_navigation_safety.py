@@ -96,6 +96,54 @@ class NavigationSafetyTest(unittest.TestCase):
         with self.assertRaises(AssertionError):
             SAFETY.NativeSafety.bound([{'text': 'Home', 'bounds': '[0,0][0,0]', 'enabled': 'true'}], 'Home')
 
+    def test_cold_start_waits_for_real_complete_hierarchy_and_enabled_address(self):
+        with tempfile.TemporaryDirectory() as folder:
+            worker = SAFETY.NativeSafety(self.arguments(folder))
+            ready = [{'content-desc': 'Address and Brave Search', 'enabled': 'true'}]
+            with patch.object(worker, 'nodes', side_effect=[AssertionError('No complete accessibility hierarchy.'), ready]):
+                self.assertEqual(worker.ready(), ready)
+            self.assertTrue(worker.report['startupHierarchyPending'])
+
+    def test_startup_protection_failure_is_never_retried_as_pending_ui(self):
+        with tempfile.TemporaryDirectory() as folder:
+            worker = SAFETY.NativeSafety(self.arguments(folder))
+            with patch.object(worker, 'nodes', return_value=[{'text': 'Protection could not start'}]) as nodes:
+                with self.assertRaisesRegex(AssertionError, 'Engine startup protections failed'):
+                    worker.ready()
+            self.assertEqual(nodes.call_count, 1)
+
+    @staticmethod
+    def native_home(package, context):
+        return [{'package': package, 'class': 'android.widget.EditText', 'content-desc': 'Address and Brave Search',
+                 'enabled': 'true', 'text': ''},
+                {'package': package, 'class': 'android.widget.ImageView', 'content-desc': 'Cyphra new tab'},
+                {'package': package, 'class': 'android.widget.TextView', 'text': context}]
+
+    def test_native_new_tab_requires_actual_marker_blank_address_and_each_edition_context(self):
+        for edition, context in [('home', 'Everyday browsing'), ('team', 'Byte Team · Personal'), ('public', 'Personal profile')]:
+            package = 'org.cyphra.browser.'+edition
+            tree = self.native_home(package, context)
+            self.assertEqual(SAFETY.native_home_observation(tree, package), {
+                'package': package, 'mode': 'personal', 'blankAddress': True,
+                'marker': 'Cyphra new tab', 'context': context})
+            for changed in ('missing-marker', 'web-marker', 'nonblank', 'disabled', 'wrong-package', 'wrong-context'):
+                with self.subTest(edition=edition, changed=changed):
+                    bad = self.native_home(package, context)
+                    if changed == 'missing-marker': bad.pop(1)
+                    elif changed == 'web-marker': bad[1]['class'] = 'android.webkit.WebView'
+                    elif changed == 'nonblank': bad[0]['text'] = 'http://localhost/loop'
+                    elif changed == 'disabled': bad[0]['enabled'] = 'false'
+                    elif changed == 'wrong-package': bad[1]['package'] = 'another.app'
+                    else: bad[2]['text'] = 'Personal profile' if edition != 'public' else 'Everyday browsing'
+                    self.assertIsNone(SAFETY.native_home_observation(bad, package))
+
+    def test_home_native_navigation_reports_only_personal_mode(self):
+        with tempfile.TemporaryDirectory() as folder:
+            args = self.arguments(folder);args.package = 'org.cyphra.browser.home'
+            worker = SAFETY.NativeSafety(args)
+            self.assertEqual(worker.report['edition'], 'home')
+            self.assertEqual(worker.report['mode'], 'personal')
+
     def test_native_material_button_labels_match_whole_casefolded_labels(self):
         for label in ('Cancel', 'Save'):
             with self.subTest(label=label):

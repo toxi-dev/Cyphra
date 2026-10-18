@@ -121,7 +121,7 @@ def close_native_input():
 def move_managed_browser_origin(window_tree):
     """Place twm's real browser frame at the desktop origin without resizing it."""
     import re
-    match = re.search(r'(0x[0-9a-f]+) "[^"]*": \("Navigator" "cyphra(?:-team|-public)?"\)', window_tree)
+    match = re.search(r'(0x[0-9a-f]+) "[^"]*": \("Navigator" "cyphra(?:-team|-public|-home)?"\)', window_tree)
     if not match:
         raise RuntimeError('The managed native Cyphra window was not found.')
     x11 = ctypes.CDLL('libX11.so.6')
@@ -197,7 +197,7 @@ def child_capture(args):
                     ['xwininfo', '-root', '-tree'], capture_output=True, text=True,
                     check=True, timeout=5
                 ).stdout
-                cyphra_window = any(f'"Navigator" "{name}"' in window_tree for name in ['cyphra', 'cyphra-team', 'cyphra-public'])
+                cyphra_window = any(f'"Navigator" "{name}"' in window_tree for name in ['cyphra', 'cyphra-team', 'cyphra-public', 'cyphra-home'])
                 if cyphra_window and (args.engine_only or ('New tab' in window_tree and 'Cyphra' in window_tree)):
                     break
                 time.sleep(.25)

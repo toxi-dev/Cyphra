@@ -1,5 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. https://mozilla.org/MPL/2.0/ */
+import { EDITION } from './edition.sys.mjs';
 import { News } from './news.sys.mjs';
 import { headlineText, safeHomeURL } from './news-policy.sys.mjs';
 import { PlacesUtils } from 'resource://gre/modules/PlacesUtils.sys.mjs';
@@ -11,7 +12,7 @@ const HOME_URI = 'resource://cyphra-home/newtab.xhtml';
 function homeLayout(appearance) {
   return {
     showSearch: appearance.showSearch, showPinned: appearance.showPinned,
-    showBriefing: appearance.showBriefing, showPublishers: appearance.showPublishers,
+    showBriefing: EDITION.id !== 'home' && appearance.showBriefing, showPublishers: EDITION.id !== 'home' && appearance.showPublishers,
     maxPins: appearance.maxPins, maxHeadlines: appearance.maxHeadlines,
     openLinksInNewTabs: appearance.openLinksInNewTabs, layout: appearance.homeLayout,
   };
@@ -67,13 +68,28 @@ export class CyphraHomeParent extends JSWindowActorParent {
       const mode = window.CyphraModes?.info().mode;
       const edition = window.CyphraEdition;
       return { news, pins, isPrivate, layout, appearance, context: {
-        mode: mode === 'work' || mode === 'personal' ? mode : null,
+        mode: EDITION.id !== 'home' && (mode === 'work' || mode === 'personal') ? mode : null,
+        everyday: EDITION.id === 'home',
         edition: edition?.displayName || 'Cyphra',
       } };
     }
     if (message.name === 'Cyphra:RefreshNews') {
+      if (EDITION.id === 'home') return { error: 'News is not part of Cyphra Home.' };
       try { return { news: await News.refresh({ isPrivate }), isPrivate }; }
       catch (error) { return { error: String(error.message || error).slice(0, 180), isPrivate }; }
+    }
+    if (message.name === 'Cyphra:OpenLibrary') {
+      // Fixed, installed Home actions only; no caller-selected URI or command.
+      if (EDITION.id !== 'home') return null;
+      if (message.data?.kind === 'bookmarks') await window.SidebarController.toggle('viewBookmarksSidebar');
+      else if (message.data?.kind === 'history') await window.SidebarController.toggle('viewHistorySidebar');
+      else if (message.data?.kind === 'downloads') {
+        const command = window.document.getElementById('Tools:Downloads');
+        if (!command) return { opened: false };
+        if (typeof command.doCommand === 'function') command.doCommand();
+        else command.dispatchEvent(new window.Event('command', { bubbles: true }));
+      } else return null;
+      return { opened: true };
     }
     if (message.name === 'Cyphra:OpenBookmarks') {
       await window.SidebarController.toggle('viewBookmarksSidebar');

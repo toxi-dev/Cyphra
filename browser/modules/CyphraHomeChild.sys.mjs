@@ -20,7 +20,10 @@ export class CyphraHomeChild extends JSWindowActorChild {
     if (event.type !== 'click' || event.button !== 0) return;
     const button = event.target.closest?.('button');
     if (!button || button.disabled) return;
-    if (button.id === 'cyphra-home-customize') {
+    if (['cyphra-home-library-bookmarks', 'cyphra-home-library-history', 'cyphra-home-library-downloads'].includes(button.id)) {
+      event.preventDefault();
+      try { await this.sendQuery('Cyphra:OpenLibrary', { kind: button.id.slice('cyphra-home-library-'.length) }); } catch {}
+    } else if (button.id === 'cyphra-home-customize') {
       event.preventDefault();
       try { await this.sendQuery('Cyphra:CustomizeHome'); } catch { /* Closing page. */ }
     } else if (button.id === 'cyphra-home-bookmarks') {
@@ -76,23 +79,24 @@ export class CyphraHomeChild extends JSWindowActorChild {
 
   applyLayout(layout) {
     const showPinned = layout?.showPinned !== false;
-    const showBriefing = layout?.showBriefing !== false;
+    const showBriefing = Boolean(this.document.getElementById('cyphra-home-briefing-section')) && layout?.showBriefing !== false;
 
     const pinned = this.document.getElementById('cyphra-home-pinned-section');
     const briefing = this.document.getElementById('cyphra-home-briefing-section');
     const grid = this.document.querySelector('.home-grid');
     this.document.getElementById('cyphra-home-search-section').hidden = layout?.showSearch === false;
     this.document.documentElement.toggleAttribute('cyphra-home-no-search', layout?.showSearch === false);
-    this.document.getElementById('cyphra-home-publishers').hidden = layout?.showPublishers === false;
+    const publishers = this.document.getElementById('cyphra-home-publishers');
+    if (publishers) publishers.hidden = layout?.showPublishers === false;
     this.document.documentElement.setAttribute('cyphra-home-layout', ['wide', 'focused'].includes(layout?.layout) ? layout.layout : 'balanced');
 
     pinned.hidden = !showPinned;
-    briefing.hidden = !showBriefing;
+    if (briefing) briefing.hidden = !showBriefing;
     grid.hidden = !showPinned && !showBriefing;
     grid.classList.toggle('single', showPinned !== showBriefing);
   }
 
-  status(text) { if (this.document?.documentURI === HOME_URI) this.document.getElementById('cyphra-home-news-status').textContent = text; }
+  status(text) { if (this.document?.documentURI === HOME_URI) this.document.getElementById('cyphra-home-news-status')?.replaceChildren(text); }
 
   renderPins(pins) {
     const list = this.document.getElementById('cyphra-home-pins');
@@ -103,11 +107,16 @@ export class CyphraHomeChild extends JSWindowActorChild {
       link.href = pin.url;
       link.title = pin.url;
       if (this._layout?.openLinksInNewTabs) { link.target = '_blank'; link.rel = 'noopener noreferrer'; }
-      link.append(this.element('span', 'pin-title', pin.title), this.element('span', 'pin-host', pin.hostname));
+      const mark = this.element('span', 'pin-mark', String(pin.hostname || '').replace(/^www\./, '').slice(0, 1).toUpperCase());
+      mark.setAttribute('aria-hidden', 'true');
+      const copy = this.element('span', 'pin-copy');
+      copy.append(this.element('span', 'pin-title', pin.title), this.element('span', 'pin-host', pin.hostname));
+      link.append(mark, copy);
       item.append(link); list.append(item);
     }
     list.hidden = !list.children.length;
     this.document.getElementById('cyphra-home-pins-empty').hidden = Boolean(list.children.length);
+    this.document.getElementById('cyphra-home-bookmarks').textContent = list.children.length ? 'Edit' : 'Add shortcut';
   }
 
   renderNews(news, isPrivate) {
@@ -135,8 +144,10 @@ export class CyphraHomeChild extends JSWindowActorChild {
     }
     list.hidden = !list.children.length;
     document.getElementById('cyphra-home-news-empty').hidden = Boolean(list.children.length);
-    document.getElementById('cyphra-home-refresh-label').textContent = news.updated ? 'Refresh' : 'Load headlines';
+    const refreshLabel = news.updated ? 'Refresh' : 'Load news';
+    document.getElementById('cyphra-home-refresh-label').textContent = refreshLabel;
     const refresh = document.getElementById('cyphra-home-refresh');
+    refresh.setAttribute('aria-label', refreshLabel);
     refresh.disabled = this._private || Boolean(news.busy);
     refresh.title = this._private ? 'Open a normal window to refresh news.' : 'Contact the three publishers to refresh RSS headlines.';
     const errors = document.getElementById('cyphra-home-news-errors');

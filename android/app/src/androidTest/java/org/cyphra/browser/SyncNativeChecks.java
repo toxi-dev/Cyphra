@@ -47,9 +47,10 @@ public final class SyncNativeChecks {
     }
 
     public static JSONObject run(Context context) throws Exception {
-        BrowserStore store = new BrowserStore(context, "work", BuildConfig.EDITION);
+        String mode=BuildConfig.HOME?"personal":"work";
+        BrowserStore store = new BrowserStore(context, mode, BuildConfig.EDITION);
         SyncClient client = new SyncClient(context, store);
-        SharedPreferences data = context.getSharedPreferences("cyphra-data-work", Context.MODE_PRIVATE);
+        SharedPreferences data = context.getSharedPreferences("cyphra-data-"+mode, Context.MODE_PRIVATE);
         Map<String, ?> original = data.getAll();
         check(!client.isPaired(), "Use a disposable unpaired profile for native sync qualification.");
         JSONArray checks = new JSONArray();
@@ -89,14 +90,14 @@ public final class SyncNativeChecks {
             check(keys.token.equals("fbPdYI9WiiXGyLxsqcaAD7TamYE1fpxi6B0TqRw45W0"), "Native HKDF/HMAC differs from desktop WebCrypto.");
             JSONObject envelope = SyncClient.encryptPayload(deleted, SECRET, VAULT);
             JSONObject plaintext = SyncClient.decryptPayload(envelope, SECRET, VAULT);
-            SyncClient.assertPayloadScope(plaintext, scope("work"));
+            SyncClient.assertPayloadScope(plaintext, scope(mode));
             check(!envelope.toString().contains("example.org"), "Plaintext entered a sync envelope.");
             rejects(() -> SyncClient.decryptPayload(envelope, SECRET, "44444444444444444444444444444444"), "Wrong-vault AAD was accepted.");
             checks.put("Native AES-GCM/HKDF/HMAC authenticates vault identity and matches desktop token");
-            String foreign = "cyphra-sync-v2.aHR0cHM6Ly9leGFtcGxlLm9yZw." + VAULT + "." + SECRET + "." + BuildConfig.EDITION + ".personal";
+            String foreign = "cyphra-sync-v2.aHR0cHM6Ly9leGFtcGxlLm9yZw." + VAULT + "." + SECRET + "." + (BuildConfig.HOME?"public":BuildConfig.EDITION) + ".personal";
             try { client.pair("https://example.org", foreign); throw new AssertionError("Foreign-mode code was accepted."); }
             catch (IllegalArgumentException expected) { check(expected.getMessage().contains("different Cyphra edition or mode"), "Pairing attempted a request before checking mode binding."); }
-            checks.put("Foreign Work/Personal binding is rejected before any server request");
+            checks.put(BuildConfig.HOME?"Foreign edition is rejected before any server request":"Foreign Work/Personal binding is rejected before any server request");
             JSONObject configuration = (JSONObject)invoke(client, "configuration", new Class<?>[]{String.class, String.class, String.class, long.class},
                 "https://example.org", VAULT, SECRET, 1L);
             invoke(client, "commitConfiguration", new Class<?>[]{JSONObject.class, JSONObject.class}, configuration, deleted);
@@ -105,16 +106,16 @@ public final class SyncNativeChecks {
             JSONObject unlocked = (JSONObject)invoke(client, "readConfiguration", new Class<?>[0]);
             check(unlocked.getString("secret").equals(SECRET), "Actual Android Keystore could not unwrap its saved configuration.");
             checks.put("Actual Android Keystore encrypts and unwraps mode-bound vault credentials");
-            BrowserStore foreignStore = new BrowserStore(context, "work", BuildConfig.TEAM ? "public" : "team");
+            BrowserStore foreignStore = new BrowserStore(context, mode, BuildConfig.TEAM ? "public" : "team");
             SyncClient foreignClient = new SyncClient(context, foreignStore);
             rejects(() -> invoke(foreignClient, "readConfiguration", new Class<?>[0]), "Copied credentials were accepted by another edition.");
             checks.put("Keystore alias and authenticated configuration refuse copied foreign-edition credentials");
             String bookmarks = data.getString("bookmarks", "[]"); client.disconnect();
             check(!client.isPaired() && data.getString("bookmarks", "[]").equals(bookmarks), "Disconnect removed local bookmarks.");
             KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore"); keyStore.load(null);
-            check(!keyStore.containsAlias(context.getPackageName() + ".sync.v2." + BuildConfig.EDITION + ".work"), "Disconnect left its fixture wrapping key.");
+            check(!keyStore.containsAlias(context.getPackageName() + ".sync.v2." + BuildConfig.EDITION + "."+mode), "Disconnect left its fixture wrapping key.");
             checks.put("Disconnect removes vault configuration and its wrapping key while preserving local bookmarks");
-            return new JSONObject().put("passed", true).put("edition", BuildConfig.EDITION).put("mode", "work").put("checks", checks);
+            return new JSONObject().put("passed", true).put("edition", BuildConfig.EDITION).put("mode", mode).put("checks", checks);
         } finally { client.disconnect(); restore(data, original); }
     }
 

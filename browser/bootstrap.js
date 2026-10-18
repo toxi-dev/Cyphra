@@ -35,7 +35,7 @@
     Privacy.start(cyphraRoot);
     const { News } = ChromeUtils.importESModule('resource://cyphra/modules/news.sys.mjs');
     const { GitHubUpdates, isActiveUpdateRequest } = ChromeUtils.importESModule('resource://cyphra/modules/github-updates.sys.mjs');
-    Privacy.addBackgroundPolicy((url, method) => News.isActiveFeedRequest(url, method));
+    if (EDITION.id !== 'home') Privacy.addBackgroundPolicy((url, method) => News.isActiveFeedRequest(url, method));
     Privacy.addBackgroundPolicy(isActiveUpdateRequest);
     ChromeUtils.registerWindowActor('CyphraHome', {
       safeForUntrustedWebProcess: true, remoteTypes: ['web'],
@@ -68,8 +68,10 @@
       Services.scriptloader.loadSubScript('resource://cyphra/chrome/settings-ui.js', scope);
       scope.CyphraSettings.install(win);
       scope.CyphraUI.install(win);
-      Services.scriptloader.loadSubScript('resource://cyphra/chrome/tools-ui.js', scope);
-      scope.CyphraTools.install(win);
+      if (EDITION.id !== 'home') {
+        Services.scriptloader.loadSubScript('resource://cyphra/chrome/tools-ui.js', scope);
+        scope.CyphraTools.install(win);
+      }
     };
     Services.obs.addObserver({
       observe(win) {

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.3 — 18 October 2026
+
+- Update the pinned desktop engine to LibreWolf 158.0-1 / Gecko 158.0, including Mozilla’s 13 October 2026 security fixes.
+- Introduce the separate public Cyphra Home edition for everyday browsing. This Public edition keeps its security tools and both Work and Personal profiles.
+- Refine new-tab spacing, bookmark shortcuts, browser controls and Shields across all three editions, retaining local customization, the original logo and actual blocking counters.
+- Refresh the bundled authenticated Mozilla OneCRL snapshot on 18 October. Candidate Gecko 158 signature and revocation-storage checks are separate from final-package qualification.
+- Retain separate Personal and Work profiles, settings, DNS choices, local protections and customization.
+- Add release qualification for genuine 0.7.2-to-0.7.3 Windows migration with durable browsing data and settings.
+
+These notes describe the prepared source. Final native qualification and publication are tracked separately in the release evidence.
+
 ## 0.7.2 — 14 October 2026
 
 - Coordinated Graphite, Black, Light and System themes with restrained accents and original logo.

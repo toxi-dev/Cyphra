@@ -6,7 +6,13 @@ STAGE="${1:-$ROOT/build/windows/Cyphra}"
 
 CYPHRA_EDITION="${2:-team}"
 CYPHRA_COMPANY="Byte Team"
-if [[ "$CYPHRA_EDITION" == "public" ]]; then CYPHRA_COMPANY="Cyphra"; fi
+CYPHRA_PRODUCT="Cyphra"
+case "$CYPHRA_EDITION" in
+    team) ;;
+    public) CYPHRA_COMPANY="Cyphra" ;;
+    home) CYPHRA_COMPANY="Cyphra"; CYPHRA_PRODUCT="Cyphra Home" ;;
+    *) echo "ERROR: Unknown Cyphra edition" >&2; exit 1 ;;
+esac
 
 ICON="$ROOT/assets/icon.ico"
 RCEDIT="${RCEDIT:-$ROOT/tools/rcedit-x64.exe}"
@@ -47,7 +53,7 @@ echo "  $ENGINE"
 WINEDEBUG=-all wine "$RCEDIT" "$ENGINE" \
   --set-icon "$ICON" \
   --set-version-string "CompanyName" "$CYPHRA_COMPANY" \
-  --set-version-string "ProductName" "Cyphra" \
+  --set-version-string "ProductName" "$CYPHRA_PRODUCT" \
   --set-version-string "FileDescription" "Cyphra Gecko Runtime" \
   --set-version-string "InternalName" "Cyphra" \
   --set-version-string "OriginalFilename" "librewolf.exe"

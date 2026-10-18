@@ -58,7 +58,7 @@ public final class SyncClient {
     private static final Pattern ID = Pattern.compile("[a-f0-9]{32}");
     private static final Pattern GUID = Pattern.compile("[A-Za-z0-9_-]{12}");
     private static final Pattern TOKEN = Pattern.compile("[A-Za-z0-9_-]{43}");
-    private static final Pattern PAIR = Pattern.compile("cyphra-sync-v2\\.([A-Za-z0-9_-]+)\\.([a-f0-9]{32})\\.([A-Za-z0-9_-]{43})\\.(team|public)\\.(work|personal)");
+    private static final Pattern PAIR = Pattern.compile("cyphra-sync-v2\\.([A-Za-z0-9_-]+)\\.([a-f0-9]{32})\\.([A-Za-z0-9_-]{43})\\.(team|public|home)\\.(work|personal)");
     private static final ConcurrentHashMap<String, Object> LOCKS = new ConcurrentHashMap<>();
     private static final SecureRandom RANDOM = new SecureRandom();
     private final Context context;
@@ -223,9 +223,10 @@ public final class SyncClient {
         if (!match.matches()) throw failure("Enter a complete Cyphra v2 pairing code with its edition and mode.");
         String secret = match.group(3);
         if (unb64(secret, 32).length != 32) throw failure("The pairing code has an invalid secret.");
+        JSONObject scope=validateScope(new JSONObject().put("edition",match.group(4)).put("mode",match.group(5)));
         return new JSONObject().put("endpoint", endpointURL(utf8(unb64(match.group(1), 2048))))
             .put("vault", match.group(2)).put("secret", secret)
-            .put("scope", new JSONObject().put("edition", match.group(4)).put("mode", match.group(5)));
+            .put("scope", scope);
     }
     private static String pairingCode(JSONObject config) throws Exception {
         JSONObject scope = config.getJSONObject("scope");
@@ -373,8 +374,8 @@ public final class SyncClient {
         } catch (Exception error) { return false; }
     }
     static JSONObject validateScope(JSONObject value) throws Exception {
-        if (value.length() != 2 || !choices("team", "public").contains(value.getString("edition"))
-            || !choices("work", "personal").contains(value.getString("mode"))) throw failure("Invalid Work/Personal sync binding.");
+        if (value.length() != 2 || !EditionPolicy.allowsMode(value.getString("edition"),value.getString("mode")))
+            throw failure("Invalid edition or profile sync binding.");
         return new JSONObject().put("edition", value.getString("edition")).put("mode", value.getString("mode"));
     }
     static void assertScope(JSONObject actual, JSONObject expected) throws Exception {

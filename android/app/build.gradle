@@ -57,6 +57,7 @@ android {
             applicationId 'org.cyphra.browser.public'
             resValue 'string', 'app_name', 'Cyphra'
             buildConfigField 'boolean', 'TEAM', 'false'
+            buildConfigField 'boolean', 'HOME', 'false'
             buildConfigField 'String', 'EDITION', '"public"'
             buildConfigField 'String', 'DEFAULT_MODE', '"personal"'
             buildConfigField 'String', 'DEFAULT_DNS', '"system"'
@@ -64,6 +65,20 @@ android {
             buildConfigField 'String', 'ASSET_PREFIX', '"Cyphra-Public"'
             buildConfigField 'String', 'UPDATE_KEY_ID', '"cyphra-public-release-2026-01"'
             buildConfigField 'String', 'UPDATE_KEY_SPKI', '"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE3vDDnNPl2fNrTboTKQ5pANzu6vVe7+vXa19+FZO99arkBpZeb80VuL59U3mSGdAJ3DrVjEeFN7YslweH/fD6Jw=="'
+        }
+        home {
+            dimension 'edition'
+            applicationId 'org.cyphra.browser.home'
+            resValue 'string', 'app_name', 'Cyphra Home'
+            buildConfigField 'boolean', 'TEAM', 'false'
+            buildConfigField 'boolean', 'HOME', 'true'
+            buildConfigField 'String', 'EDITION', '"home"'
+            buildConfigField 'String', 'DEFAULT_MODE', '"personal"'
+            buildConfigField 'String', 'DEFAULT_DNS', '"system"'
+            buildConfigField 'String', 'REPOSITORY', '"toxi-dev/Cyphra-Home"'
+            buildConfigField 'String', 'ASSET_PREFIX', '"Cyphra-Home"'
+            buildConfigField 'String', 'UPDATE_KEY_ID', '"cyphra-home-release-2026-01"'
+            buildConfigField 'String', 'UPDATE_KEY_SPKI', '"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExUAU/CnYxSROwVVOHYaH/sI49xWxIAjJClutLif6QuPURibalRr1ddGOY1xD7df2kPGtZ3+6B/2dECupt3+u/A=="'
         }
     }
     signingConfigs {

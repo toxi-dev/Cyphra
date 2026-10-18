@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. https://mozilla.org/MPL/2.0/ */
 const VALID_MODES = new Set(['work', 'personal']);
-const VALID_EDITIONS = new Set(['team', 'public']);
+const VALID_EDITIONS = new Set(['team', 'public', 'home']);
 let state;
 
 function native() {
@@ -21,8 +21,8 @@ export const Modes = Object.freeze({
     const requested = environment.get('CYPHRA_MODE');
     const installedDefault = Services.prefs.prefIsLocked('cyphra.defaultMode')
       ? Services.prefs.getStringPref('cyphra.defaultMode', '') : '';
-    const defaultMode = VALID_MODES.has(installedDefault) ? installedDefault : edition === 'public' ? 'personal' : 'work';
-    const mode = VALID_MODES.has(requested) ? requested : defaultMode;
+    const defaultMode = VALID_MODES.has(installedDefault) ? installedDefault : edition !== 'team' ? 'personal' : 'work';
+    const mode = edition === 'home' ? 'personal' : VALID_MODES.has(requested) ? requested : defaultMode;
     if (Services.prefs.prefIsLocked('cyphra.mode')) Services.prefs.unlockPref('cyphra.mode');
     Services.prefs.getDefaultBranch('').setStringPref('cyphra.mode', mode);
     Services.prefs.lockPref('cyphra.mode');
@@ -37,6 +37,7 @@ export const Modes = Object.freeze({
   },
   info() { return state || this.start(); },
   async open(mode) {
+    if (this.info().edition === 'home' && mode !== 'personal') throw new Error('Cyphra Home has one everyday browsing profile.');
     if (!VALID_MODES.has(mode)) throw new Error('Choose Work or Personal mode.');
     const { Services, Cc, Ci } = native();
     const os = Services.appinfo.OS;

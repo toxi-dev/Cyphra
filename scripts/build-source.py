@@ -56,7 +56,7 @@ def source_files():
 def main():
     global ROOT
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--edition', choices=['team', 'public'])
+    parser.add_argument('--edition', choices=['team', 'public', 'home'])
     parser.add_argument('--dist', type=Path)
     args = parser.parse_args()
     config = edition_config(args.edition)
@@ -64,12 +64,12 @@ def main():
     dist = args.dist or dist_path(version, config['id'])
     dist.mkdir(parents=True, exist_ok=True)
     public_tree = None
-    if config['public'] and json.loads((ROOT / 'cyphra.json').read_text()).get('edition') != 'public':
+    if config['public'] and json.loads((ROOT / 'cyphra.json').read_text()).get('edition') != config['id']:
         import importlib.util
         spec = importlib.util.spec_from_file_location('export_public', ROOT / 'scripts/export-public.py')
         exporter = importlib.util.module_from_spec(spec); spec.loader.exec_module(exporter)
         public_tree = tempfile.TemporaryDirectory(prefix='cyphra-public-source-')
-        ROOT = exporter.export_public(Path(public_tree.name))
+        ROOT = exporter.export_public(Path(public_tree.name), config['id'])
     version = json.loads((ROOT / 'cyphra.json').read_text(encoding='utf-8'))['version']
     if not isinstance(version, str) or not version or any(c not in '0123456789.-' for c in version):
         raise RuntimeError('Invalid Cyphra release version.')

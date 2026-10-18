@@ -1,0 +1,36 @@
+{
+  "scope": "Candidate-only native Gecko158 production-chain and revocation-storage qualification; no final-package/UI pass",
+  "testedAt": "2026-10-18T12:25:43.777332+00:00",
+  "engine": {
+    "version": "158.0",
+    "platformVersion": "158.0",
+    "appBuildId": "20261013185131",
+    "platformBuildId": "20261013185131",
+    "pid": 1635968
+  },
+  "packagedPlatformIniBuildID": "20261013200303",
+  "officialNativeFiles": {
+    "librewolf": "dd9c205f9d6dec54199cf7d76648418924b9a640ee342ad581bafa0a121ffa48",
+    "libxul.so": "24d4eaadbb865c1447089b96e244706ab83396109d2cd5b6049a1402d6eae277"
+  },
+  "networkIsolated": true,
+  "signatureAndStorage": {
+    "validProductionRootSignature": true,
+    "timestampTamperRefused": true,
+    "recordTamperRefused": true,
+    "records": 1901,
+    "enabled": 1256,
+    "disabled": 645,
+    "timestamp": 1792274405312,
+    "nativeSetRevocationsResult": 0,
+    "before": {
+      "rv": 0,
+      "out": false
+    },
+    "after": {
+      "rv": 0,
+      "out": true
+    }
+  },
+  "rawLocalReceiptSHA256": "d36bd4f70398ca2da648bcf0f5520c87aa7dabc4fe9ad07518bef7e5ad060865"
+}

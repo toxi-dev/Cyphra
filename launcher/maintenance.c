@@ -23,7 +23,12 @@
 #define PATH_LIMIT 32768
 #define MANIFEST L".cyphra-install-manifest"
 #define MAX_MANIFEST (16 * 1024 * 1024)
-#ifdef CYPHRA_PUBLIC_EDITION
+#ifdef CYPHRA_HOME_EDITION
+#define UPDATE_MUTEX L"Local\\CyphraHomeInstallationUpdate"
+#define PROFILE_ROOT L"\\CyphraHome\\Profile"
+#define EXPECTED_EDITION "home"
+#define EXPECTED_VENDOR "Vendor=Cyphra"
+#elif defined(CYPHRA_PUBLIC_EDITION)
 #define UPDATE_MUTEX L"Local\\CyphraPublicInstallationUpdate"
 #define PROFILE_ROOT L"\\Cyphra\\Profile"
 #define EXPECTED_EDITION "public"
@@ -365,7 +370,7 @@ static int edition_matches(const wchar_t *directory, int required) {
     wchar_t path[PATH_LIMIT];
     if (!concatenate(path, directory, L"cyphra.json")) return 0;
     char *data = read_file(path, 65536);
-    if (!data) return !required;
+    if (!data) return !required && (strcmp(EXPECTED_EDITION, "home") || directory_empty(directory));
     char *position = strstr(data, "\"edition\"");
     int result = 0;
     if (!position) result = !strcmp(EXPECTED_EDITION, "team");

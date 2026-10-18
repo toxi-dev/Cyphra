@@ -44,7 +44,7 @@ final class ShieldsPanel {
         LinearLayout sheet=column();
         GradientDrawable background=new GradientDrawable();
         background.setColor(appearance.panel);
-        background.setCornerRadii(new float[]{dp(22),dp(22),dp(22),dp(22),0,0,0,0});
+        background.setCornerRadii(new float[]{dp(26),dp(26),dp(26),dp(26),0,0,0,0});
         sheet.setBackground(background);
         sheet.setPadding(dp(20),dp(10),dp(20),dp(18));
         sheet.setOnApplyWindowInsetsListener((view,insets)->{
@@ -68,7 +68,7 @@ final class ShieldsPanel {
         ImageButton close=new ImageButton(activity);close.setImageDrawable(new IconDrawable("close",appearance.muted));
         close.setBackgroundColor(Color.TRANSPARENT);close.setPadding(dp(12),dp(12),dp(12),dp(12));close.setContentDescription("Close Shields");close.setOnClickListener(v->dismiss());
         heading.addView(close,new LinearLayout.LayoutParams(dp(48),dp(48)));sheet.addView(heading);
-        domain=text("No website in this tab",14,appearance.muted);domain.setMaxLines(2);domain.setEllipsize(TextUtils.TruncateAt.END);domain.setPadding(0,0,0,dp(14));sheet.addView(domain);
+        domain=text("No website in this tab",14,appearance.muted);domain.setMaxLines(2);domain.setEllipsize(TextUtils.TruncateAt.END);domain.setPadding(dp(32),0,0,dp(18));sheet.addView(domain);
 
         int usableHeight=activity.getWindow().getDecorView().getHeight();
         if(usableHeight<=0)usableHeight=activity.getResources().getDisplayMetrics().heightPixels;
@@ -83,27 +83,29 @@ final class ShieldsPanel {
         siteSwitch.setOnCheckedChangeListener((button,enabled)->{if(!updating)this.onToggle.accept(enabled);});
         divider(body);
 
-        LinearLayout summary=new LinearLayout(activity);summary.setGravity(Gravity.CENTER_VERTICAL);summary.setPadding(0,dp(12),0,dp(10));
-        total=text("0",42,appearance.text);total.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
+        LinearLayout summary=new LinearLayout(activity);summary.setGravity(Gravity.CENTER_VERTICAL);summary.setPadding(dp(18),dp(16),dp(18),dp(16));summary.setBackground(appearance.surface(activity,appearance.background,16));
+        total=text("—",44,appearance.text);total.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
         summary.addView(total,new LinearLayout.LayoutParams(-2,-2));
         LinearLayout description=column();description.setPadding(dp(18),0,0,0);
-        description.addView(text("Requests blocked in this page",14,appearance.text));
+        description.addView(text("Requests blocked",14,appearance.text));
         totalDetail=text("No page requests recorded",11,appearance.muted);totalDetail.setPadding(0,dp(4),0,0);description.addView(totalDetail);
-        summary.addView(description,new LinearLayout.LayoutParams(0,-2,1));body.addView(summary);
-        filters=counter(body,"Ads and trackers");strict=counter(body,"Strict third-party filtering");telemetry=counter(body,"Telemetry blocked");
-        TextView exceptionNote=text("Telemetry blocking stays on when site filtering is off.",11,appearance.muted);exceptionNote.setPadding(0,dp(6),0,dp(12));body.addView(exceptionNote);
-        divider(body);
-        nativeEvents=counter(body,"Native tracking protection events");
-        TextView nativeNote=text("Gecko events · counted separately from requests above",11,appearance.muted);nativeNote.setPadding(0,0,0,dp(14));body.addView(nativeNote);
+        summary.addView(description,new LinearLayout.LayoutParams(0,-2,1));LinearLayout.LayoutParams summaryLayout=new LinearLayout.LayoutParams(-1,-2);summaryLayout.topMargin=dp(14);summaryLayout.bottomMargin=dp(14);body.addView(summary,summaryLayout);
+        filters=counter(body,"Ads and trackers");
+        LinearLayout technical=column();technical.setVisibility(BuildConfig.HOME?View.GONE:View.VISIBLE);body.addView(technical);
+        strict=counter(technical,"Strict third-party filtering");telemetry=counter(technical,"Telemetry blocked");
+        TextView exceptionNote=text("Telemetry blocking stays on when site filtering is off.",11,appearance.muted);exceptionNote.setPadding(0,dp(6),0,dp(12));technical.addView(exceptionNote);
+        divider(technical);
+        nativeEvents=counter(technical,"Native tracking protection events");
+        TextView nativeNote=text("Gecko events · counted separately from requests above",11,appearance.muted);nativeNote.setPadding(0,0,0,dp(14));technical.addView(nativeNote);
 
-        TextView destinationsTitle=text("Blocked destinations",12,appearance.muted);destinationsTitle.setAccessibilityHeading(true);body.addView(destinationsTitle);
-        destinations=text("None recorded on this page",12,appearance.text);destinations.setTypeface(Typeface.MONOSPACE);destinations.setMaxLines(12);destinations.setEllipsize(TextUtils.TruncateAt.END);destinations.setPadding(0,dp(6),0,dp(14));destinations.setLineSpacing(dp(3),1);body.addView(destinations);
+        TextView destinationsTitle=text("Blocked destinations",12,appearance.muted);destinationsTitle.setAccessibilityHeading(true);technical.addView(destinationsTitle);
+        destinations=text("None recorded on this page",12,appearance.text);destinations.setTypeface(Typeface.MONOSPACE);destinations.setMaxLines(12);destinations.setEllipsize(TextUtils.TruncateAt.END);destinations.setPadding(0,dp(6),0,dp(14));destinations.setLineSpacing(dp(3),1);technical.addView(destinations);
         divider(body);
 
-        TextView dnsTitle=text("DNS",12,appearance.muted);dnsTitle.setPadding(0,dp(12),0,0);body.addView(dnsTitle);
+        TextView dnsTitle=text(BuildConfig.HOME?"DNS provider":"DNS",12,appearance.muted);dnsTitle.setPadding(0,dp(12),0,0);body.addView(dnsTitle);
         dnsName=text("",14,appearance.text);dnsName.setPadding(0,dp(4),0,0);body.addView(dnsName);
         dnsEndpoint=text("",12,appearance.muted);dnsEndpoint.setPadding(0,dp(4),0,0);body.addView(dnsEndpoint);
-        TextView profile=text(work?"Work · stricter filtering · WebGL off":"Personal · balanced filtering · WebGL available",11,appearance.muted);profile.setPadding(0,dp(18),0,0);body.addView(profile);
+        TextView profile=text(BuildConfig.HOME?"Site exceptions apply only to this browser.":work?"Work · stricter filtering · WebGL off":"Personal · balanced filtering · WebGL available",11,appearance.muted);profile.setPadding(0,dp(18),0,0);body.addView(profile);
 
         dialog.setContentView(sheet);
         Window window=dialog.getWindow();
@@ -125,15 +127,15 @@ final class ShieldsPanel {
         set(domain,website?site:"No website in this tab");
         siteControl.setVisibility(website?View.VISIBLE:View.GONE);
         updating=true;try{if(siteSwitch.isChecked()!=enabled)siteSwitch.setChecked(enabled);}finally{updating=false;}
-        set(switchDetail,enabled?"Site filtering is on.":"Site filtering is off. Telemetry blocking stays on.");
-        set(total,Integer.toString(stats==null?0:stats.blocked));
-        set(totalDetail,stats==null?"No page requests recorded":"Actual cancelled requests");
-        set(filters,Integer.toString(stats==null?0:stats.filters));set(strict,Integer.toString(stats==null?0:stats.strict));
-        set(telemetry,Integer.toString(stats==null?0:stats.telemetry));set(nativeEvents,Integer.toString(stats==null?0:stats.nativeBlocked));
+        set(switchDetail,enabled?"Site filtering is on.":BuildConfig.HOME?"Ads and trackers are allowed for this site. Core privacy protections stay on.":"Site filtering is off. Telemetry blocking stays on.");
+        set(total,stats==null?"—":Integer.toString(stats.blocked));
+        set(totalDetail,stats==null?"Open a website to see its activity":"On this page · actual cancelled requests");
+        set(filters,stats==null?"—":Integer.toString(stats.filters));set(strict,stats==null?"—":Integer.toString(stats.strict));
+        set(telemetry,stats==null?"—":Integer.toString(stats.telemetry));set(nativeEvents,stats==null?"—":Integer.toString(stats.nativeBlocked));
         set(destinations,destinationText(stats==null?null:stats.hosts));
         String name;
-        switch(dnsChoice){case "system":name="System DNS";break;case "toxitech":name="Toxitech · encrypted DNS";break;case "quad9":name="Quad9 · encrypted DNS";break;case "cloudflare":name="Cloudflare · encrypted DNS";break;default:name="Custom · encrypted DNS";}
-        set(dnsName,name);set(dnsEndpoint,"system".equals(dnsChoice)?"Uses your Android resolver":dnsUri);
+        switch(dnsChoice){case "system":name="System DNS";break;case "toxitech":name=BuildConfig.HOME?"Toxitech":"Toxitech · encrypted DNS";break;case "quad9":name=BuildConfig.HOME?"Quad9":"Quad9 · encrypted DNS";break;case "cloudflare":name=BuildConfig.HOME?"Cloudflare":"Cloudflare · encrypted DNS";break;default:name=BuildConfig.HOME?"Custom provider":"Custom · encrypted DNS";}
+        set(dnsName,name);set(dnsEndpoint,"system".equals(dnsChoice)?"Uses your Android network settings":BuildConfig.HOME?"Encrypted connection to your chosen provider":dnsUri);
         Window window=dialog.getWindow();
         if(window!=null){
             boolean secure=privateTab||(activity.getWindow().getAttributes().flags&WindowManager.LayoutParams.FLAG_SECURE)!=0;

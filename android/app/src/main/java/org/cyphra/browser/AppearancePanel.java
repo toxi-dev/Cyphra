@@ -49,7 +49,7 @@ final class AppearancePanel {
         TextView title=text("Appearance",20,appearance.text);title.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));title.setAccessibilityHeading(true);title.setPadding(dp(6),0,0,0);header.addView(title,new LinearLayout.LayoutParams(0,-2,1));root.addView(header);divider(root);
 
         scroll=new ScrollView(activity);scroll.setFillViewport(false);LinearLayout body=column();body.setPadding(dp(20),dp(18),dp(20),dp(28));scroll.addView(body);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        TextView profile=text(capitalize(store.mode())+" profile",13,appearance.muted);profile.setPadding(0,0,0,dp(12));body.addView(profile);
+        TextView profile=text(BuildConfig.HOME?"Cyphra Home":capitalize(store.mode())+" profile",13,appearance.muted);profile.setPadding(0,0,0,dp(12));body.addView(profile);
         body.addView(preview());
         section(body,"Look and feel");
         choice(body,"Theme",themeLabel(appearance.theme),"theme",new String[]{"graphite","black","light","system"},new String[]{"Graphite","Black","Light","System"},appearance.theme);
@@ -68,9 +68,11 @@ final class AppearancePanel {
         toggle(body,"Bookmarks on Home","home-bookmarks",appearance.bookmarks);
         choice(body,"Bookmark layout","grid".equals(appearance.homeLayout)?"Grid":"List","home-layout",new String[]{"list","grid"},new String[]{"List","Grid"},appearance.homeLayout);
         choice(body,"Bookmark limit",appearance.bookmarkCountChoice+" bookmarks","home-bookmark-count",new String[]{"4","8","12"},new String[]{"4 bookmarks","8 bookmarks","12 bookmarks"},appearance.bookmarkCountChoice);
-        toggle(body,"Security reading","home-reading",appearance.reading);
+        toggle(body,"Quick actions","home-quick-actions",appearance.quickActions);
+        choice(body,"Home alignment","center".equals(appearance.homeAlignment)?"Centered":"Left","home-alignment",new String[]{"start","center"},new String[]{"Left","Centered"},appearance.homeAlignment);
+        if(!BuildConfig.HOME)toggle(body,"Security reading","home-reading",appearance.reading);
         TextView homeNote=text("Home uses local bookmarks and links. Nothing loads in the background.",12,appearance.muted);homeNote.setPadding(0,dp(10),0,dp(24));body.addView(homeNote);
-        TextView reset=text("Reset appearance",14,appearance.accentColor);reset.setMinimumHeight(dp(48));reset.setGravity(Gravity.CENTER_VERTICAL);reset.setBackground(appearance.ripple());reset.setOnClickListener(v->new NativeDialogs.Builder(activity,appearance).setTitle("Reset "+store.mode()+" appearance?").setMessage("Restore the default theme, toolbar and Home layout. Browser data and protections are kept.").setPositiveButton("Reset",(d,w)->change(()->Appearance.reset(store))).setNegativeButton("Cancel",null).show());body.addView(reset);
+        TextView reset=text("Reset appearance",14,appearance.accentColor);reset.setMinimumHeight(dp(48));reset.setGravity(Gravity.CENTER_VERTICAL);reset.setBackground(appearance.ripple());reset.setOnClickListener(v->new NativeDialogs.Builder(activity,appearance).setTitle(BuildConfig.HOME?"Reset appearance?":"Reset "+store.mode()+" appearance?").setMessage("Restore the default theme, toolbar and Home layout. Browser data and protections are kept.").setPositiveButton("Reset",(d,w)->change(()->Appearance.reset(store))).setNegativeButton("Cancel",null).show());body.addView(reset);
         dialog.setContentView(root);Window window=dialog.getWindow();if(window!=null){window.setBackgroundDrawable(new ColorDrawable(appearance.background));if(dialog.isShowing())window.setLayout(-1,-1);window.getDecorView().requestApplyInsets();}
         final ScrollView target=scroll;target.post(()->target.scrollTo(0,position));
     }
@@ -78,12 +80,14 @@ final class AppearancePanel {
     private View preview(){
         LinearLayout sample=column();sample.setPadding(dp(14),dp(12),dp(14),dp(8));sample.setBackground(appearance.surface(activity,appearance.panel,14));
         TextView label=text("Preview",11,appearance.muted);label.setPadding(0,0,0,dp(12));sample.addView(label);
-        LinearLayout identity=new LinearLayout(activity);identity.setGravity(Gravity.CENTER_VERTICAL);ImageView logo=new ImageView(activity);logo.setImageResource(R.drawable.ic_logo);logo.setImageTintList(android.content.res.ColorStateList.valueOf(appearance.text));identity.addView(logo,new LinearLayout.LayoutParams(dp(27),dp(27)));
+        LinearLayout identity=new LinearLayout(activity);identity.setGravity(Gravity.CENTER_VERTICAL|("center".equals(appearance.homeAlignment)?Gravity.CENTER_HORIZONTAL:Gravity.START));ImageView logo=new ImageView(activity);logo.setImageResource(R.drawable.ic_logo);logo.setImageTintList(android.content.res.ColorStateList.valueOf(appearance.text));identity.addView(logo,new LinearLayout.LayoutParams(dp(27),dp(27)));
         TextView name=text("Cyphra",24,appearance.text);name.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));name.setPadding(dp(10),0,0,0);identity.addView(name);sample.addView(identity);
         TextView search=text("Search with Brave",14,appearance.muted);search.setPadding(dp(12),0,dp(12),0);search.setGravity(Gravity.CENTER_VERTICAL);search.setBackground(appearance.surface(activity,appearance.background,10));LinearLayout.LayoutParams searchLayout=new LinearLayout.LayoutParams(-1,dp(appearance.compact()?48:54));searchLayout.topMargin=dp(16);searchLayout.bottomMargin=dp(8);sample.addView(search,searchLayout);
         LinearLayout toolbar=new LinearLayout(activity);toolbar.setGravity(Gravity.CENTER_VERTICAL);
         previewIcon(toolbar,"back",appearance.muted);if(appearance.forward)previewIcon(toolbar,"forward",appearance.muted);if(appearance.reload)previewIcon(toolbar,"refresh",appearance.text);
-        TextView mode=text(capitalize(store.mode()),11,appearance.text);mode.setGravity(Gravity.CENTER);toolbar.addView(mode,new LinearLayout.LayoutParams(0,dp(appearance.toolbarHeight()),1.5f));previewIcon(toolbar,"tabs",appearance.text);previewIcon(toolbar,"menu",appearance.text);sample.addView(toolbar);
+        if(BuildConfig.HOME)previewIcon(toolbar,"bookmark",appearance.text);
+        else{TextView mode=text(capitalize(store.mode()),11,appearance.text);mode.setGravity(Gravity.CENTER);toolbar.addView(mode,new LinearLayout.LayoutParams(0,dp(appearance.toolbarHeight()),1.5f));}
+        previewIcon(toolbar,"tabs",appearance.text);previewIcon(toolbar,"menu",appearance.text);sample.addView(toolbar);
         sample.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);sample.setContentDescription("Preview of the selected Cyphra appearance");return sample;
     }
     private void previewIcon(LinearLayout toolbar,String icon,int color){ImageView image=new ImageView(activity);image.setImageDrawable(new IconDrawable(icon,color));image.setPadding(dp(12),dp(12),dp(12),dp(12));toolbar.addView(image,new LinearLayout.LayoutParams(0,dp(appearance.toolbarHeight()),1));}

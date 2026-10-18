@@ -28,6 +28,9 @@ def stage(platform, edition=None):
     prefs['locked']['cyphra.edition'] = config['id']
     prefs['locked']['cyphra.defaultMode'] = config['defaultMode']
     prefs['defaults']['cyphra.dns.selection'] = config['defaultDNS']
+    if config['id'] == 'home':
+        prefs['locked'].update({'devtools.policy.disabled': True, 'cyphra.home.showBriefing': False, 'cyphra.home.showPublishers': False})
+        prefs['defaults'].update({'cyphra.home.layout': 'focused', 'cyphra.home.maxPins': 8, 'cyphra.ui.theme': 'system', 'places.history.enabled': True})
     if config['defaultDNS'] == 'system':
         prefs['defaults'].update({'network.trr.mode': 5, 'network.trr.uri': '', 'network.trr.custom_uri': ''})
     archive = fetcher.fetch(platform)
@@ -82,15 +85,15 @@ def stage(platform, edition=None):
         for name in ['dns-repair.md', 'sync.md', 'github-updates.md', 'validation.md', 'audit-0.7.md']:
             path = app / 'docs' / name
             if path.exists(): path.unlink()
-        shutil.copyfile(ROOT / 'docs/public.md', app / 'README.md')
-        shutil.copyfile(ROOT / 'docs/public-updating.md', app / 'docs/updating.md')
+        shutil.copyfile(ROOT / ('docs/home.md' if config['id'] == 'home' else 'docs/public.md'), app / 'README.md')
+        shutil.copyfile(ROOT / ('docs/home-updating.md' if config['id'] == 'home' else 'docs/public-updating.md'), app / 'docs/updating.md')
     # Keep public local assets within Gecko's runtime tree: content processes
     # can read this directory without weakening the native filesystem sandbox.
     home = runtime / 'cyphra-home'
     home.mkdir(exist_ok=True)
     for name in ['newtab.css', 'logo.svg']:
         shutil.copyfile(ROOT / 'browser/chrome' / name, home / name)
-    (home / 'newtab.xhtml').write_text((ROOT / 'browser/chrome/newtab.xhtml').read_text().replace('resource://cyphra/chrome/', 'resource://cyphra-home/'))
+    (home / 'newtab.xhtml').write_text((ROOT / ('browser/chrome/newtab-home.xhtml' if config['id'] == 'home' else 'browser/chrome/newtab.xhtml')).read_text().replace('resource://cyphra/chrome/', 'resource://cyphra-home/'))
     # Preserve upstream config in this source distribution, and append our own
     # explicit overrides to the engine's actual config filename.
     base_config = (original / 'librewolf/librewolf.cfg').read_text()
@@ -117,6 +120,8 @@ def stage(platform, edition=None):
     policies['policies'].get('ExtensionSettings', {}).pop('uBlock0@raymondhill.net', None)
     policies['policies']['SearchEngines'] = brand_engine.search_policy()
     policies['policies']['DisableAppUpdate'] = True
+    if config['id'] == 'home':
+        policies['policies']['DisableDeveloperTools'] = True
     policies['policies']['DisableTelemetry'] = True
     policies['policies']['DisableFirefoxStudies'] = True
     policies['policies']['DisableDefaultBrowserAgent'] = True
@@ -135,7 +140,7 @@ def stage(platform, edition=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('platform', nargs='*', choices=['windows', 'linux'])
-    parser.add_argument('--edition', choices=['team', 'public'])
+    parser.add_argument('--edition', choices=['team', 'public', 'home'])
     args = parser.parse_args()
     for platform in args.platform or ['windows', 'linux']:
         stage(platform, args.edition)

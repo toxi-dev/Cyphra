@@ -88,6 +88,7 @@ public final class Engine {
 
     /** Activities may be recreated; Gecko itself must not be created twice in one process. */
     public static synchronized Engine get(Context context,boolean work,boolean team,Listener listener){
+        if(!EditionPolicy.allowsMode(BuildConfig.EDITION,work?"work":"personal")||team!=BuildConfig.TEAM)throw new IllegalArgumentException("Invalid edition runtime profile.");
         if(Looper.myLooper()!=Looper.getMainLooper())throw new IllegalStateException("Create Gecko on the main thread.");
         if(instance==null)instance=new Engine(context.getApplicationContext(),work,team);
         if(instance.work!=work||instance.team!=team)throw new IllegalStateException("A profile cannot change modes inside its process.");

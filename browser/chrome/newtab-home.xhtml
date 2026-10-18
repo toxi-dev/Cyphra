@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src resource:; img-src resource:; form-action https://search.brave.com; base-uri 'none'; object-src 'none'" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#101115" />
+    <title>New tab — Cyphra Home</title>
+    <link rel="stylesheet" href="resource://cyphra-home/newtab.css" />
+  </head>
+  <body class="edition-home">
+    <main class="home-shell">
+      <header class="topbar">
+        <a class="brand" href="resource://cyphra-home/newtab.xhtml" aria-label="Cyphra home">
+          <img src="resource://cyphra-home/logo.svg" width="22" height="24" alt="" />
+          <strong>Cyphra <span class="brand-edition">Home</span></strong>
+        </a>
+        <div class="topbar-actions">
+          <span id="cyphra-home-context" class="profile-context"></span>
+          <button id="cyphra-home-customize" class="quiet-action" type="button" aria-label="Customize this new tab">Customize</button>
+        </div>
+      </header>
+
+      <section id="cyphra-home-search-section" class="focus" aria-label="Search">
+        <form class="search" action="https://search.brave.com/search" method="get" aria-label="Web search">
+          <span class="search-leading" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="10.7" cy="10.7" r="6.6"/><path d="m15.8 15.8 4.2 4.2"/></svg>
+          </span>
+          <input id="cyphra-home-search" name="q" type="search" placeholder="Search the web" aria-label="Search the web" autocomplete="off" spellcheck="false" required="required" />
+          <button type="submit" class="search-submit" aria-label="Search" title="Search">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.7" cy="10.7" r="6.6"/><path d="m15.8 15.8 4.2 4.2"/></svg>
+          </button>
+        </form>
+
+
+      </section>
+
+      <nav class="home-quick-actions" aria-label="Your browser">
+        <button type="button" id="cyphra-home-library-bookmarks"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v17l-6-4-6 4V4Z"/></svg>Bookmarks</button>
+        <button type="button" id="cyphra-home-library-history"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7M12 7v5l3 2"/></svg>History</button>
+        <button type="button" id="cyphra-home-library-downloads"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>Downloads</button>
+      </nav>
+      <section class="home-grid single">
+        <section id="cyphra-home-pinned-section" class="home-section pins-section" aria-labelledby="bookmarks-heading">
+          <div class="section-heading">
+            <h2 id="bookmarks-heading">Pinned</h2>
+            <button id="cyphra-home-bookmarks" class="quiet-action" type="button">Add shortcut</button>
+          </div>
+          <ul id="cyphra-home-pins" class="pins" hidden="hidden"></ul>
+          <p id="cyphra-home-pins-empty" class="empty-state">Your favorite sites, within reach. Add sites to the bookmarks toolbar to pin them here.</p>
+        </section>
+
+
+      </section>
+
+      <footer>
+        <span id="cyphra-home-edition">Cyphra Home</span>
+        <span>Search with Brave</span>
+      </footer>
+    </main>
+  </body>
+</html>

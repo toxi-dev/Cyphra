@@ -82,14 +82,14 @@ def main():
     parser.add_argument('--version')
     parser.add_argument('--published', help='UTC ISO8601 publication timestamp; defaults to now')
     parser.add_argument('--output', type=Path)
-    parser.add_argument('--edition', choices=['team','public'])
+    parser.add_argument('--edition', choices=['team','public','home'])
     args = parser.parse_args()
     config = edition_config(args.edition)
     version = args.version or json.loads((ROOT / 'cyphra.json').read_text(encoding='utf-8'))['version']
     if not re.fullmatch(r'(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})', version):
         raise ValueError('The release version is invalid.')
     args.dist = args.dist or dist_path(version, config['id'])
-    args.key = args.key or (DEFAULT_KEY if not config['public'] else DEFAULT_KEY.with_name('public-release-p256.pem'))
+    args.key = args.key or (DEFAULT_KEY if not config['public'] else DEFAULT_KEY.with_name(config['id'] + '-release-p256.pem'))
     published = args.published or datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
     parsed_date = datetime.fromisoformat(published.replace('Z', '+00:00'))
     if parsed_date.tzinfo is None:

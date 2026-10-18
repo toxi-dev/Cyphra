@@ -39,11 +39,19 @@ jobs:
         run: npm test
       - name: Test Linux archive updates and rollback
         run: python3 -m unittest discover -s tests -p test_updates.py -v
+      - name: Test strict OneCRL metadata envelopes without network access
+        run: python3 -m unittest discover -s tests -p test_refresh_security_data.py -v
       - name: Test pinned Android engine overlay assembly and package guards
         run: python3 -m unittest discover -s tests -p test_android_engine_patch.py -v
       - name: Test native navigation safety supervisor without ADB or services
         run: python3 -m unittest discover -s tests -p test_android_navigation_safety.py -v
+      - name: Test bounded navigation clock proofs without ADB or services
+        run: python3 -m unittest discover -s tests -p test_android_navigation_clock.py -v
+      - name: Test Home and security-edition native lifecycle proof boundaries without ADB
+        run: python3 -m unittest discover -s tests -p test_android_native_lifecycle.py -v
       - name: Test local sync HTTP behavior and concurrent writes
         run: python3 tests/sync-server.test.py
+      - name: Test Home Windows ownership and release identity refusals without running Windows
+        run: python3 -m unittest discover -s tests -p test_windows_home_native.py -v
       - name: Check Python source syntax
         run: python3 -m compileall -q scripts server tests

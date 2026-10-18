@@ -22,8 +22,7 @@ public final class BrowserStore {
     private final String edition;
 
     public BrowserStore(Context context, String mode, String edition) {
-        if (!"work".equals(mode) && !"personal".equals(mode)) throw new IllegalArgumentException("Invalid browser mode.");
-        if (!"team".equals(edition) && !"public".equals(edition)) throw new IllegalArgumentException("Invalid browser edition.");
+        if (!EditionPolicy.allowsMode(edition,mode)) throw new IllegalArgumentException("Invalid edition or browser mode.");
         this.mode = mode;
         this.edition = edition;
         preferences = context.getApplicationContext().getSharedPreferences("cyphra-data-" + mode, Context.MODE_PRIVATE);

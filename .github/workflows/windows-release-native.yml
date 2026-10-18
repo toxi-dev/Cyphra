@@ -26,7 +26,26 @@ jobs:
       - name: Install pinned Marionette driver
         run: python -m pip install --disable-pip-version-check --no-input marionette_driver==3.7.1
       - name: Qualify the signed Windows release and isolated profile customization
+        id: qualify
         env:
           GH_TOKEN: ${{ github.token }}
           PYTHONUNBUFFERED: '1'
-        run: python tests/windows-release-native.py
+        shell: pwsh
+        run: |
+          $edition = (Get-Content cyphra.json -Raw | ConvertFrom-Json).edition
+          if ($edition -eq 'home') {
+            'home=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            python tests/windows-home-native.py
+          } else {
+            'home=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            python tests/windows-release-native.py
+          }
+          exit $LASTEXITCODE
+      - name: Preserve actual Home Windows qualification result
+        if: ${{ always() && steps.qualify.outputs.home == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cyphra-home-windows-native-${{ github.run_id }}
+          path: ${{ runner.temp }}/cyphra-windows-home-native-proof.json
+          if-no-files-found: warn
+          retention-days: 14

@@ -25,7 +25,21 @@ def require(value, message):
         raise AssertionError(message)
 
 
+def edition_for_package(package):
+    match = re.fullmatch(r'org\.cyphra\.browser\.(public|team|home)(\.debug)?', package)
+    require(match is not None, 'Unexpected target package.')
+    return match[1]
+
+
+def modes_for_package(package):
+    # Home has one shipped mode. Keep both original mode processes mandatory
+    # for Team and Public instead of changing the shared MODES inventory.
+    return ('personal',) if edition_for_package(package) == 'home' else MODES
+
+
 def validate_case(case, package, mode, scenario, run=None):
+    require(mode in modes_for_package(package) and scenario in SCENARIOS,
+            'Lifecycle case claims an unshipped mode or unknown scenario.')
     require(case.get('schema') == 'cyphra-android-lifecycle-case-v1', 'Unknown native lifecycle case schema.')
     require(case.get('package') == package and case.get('mode') == mode and case.get('scenario') == scenario, 'Native proof identity mismatch.')
     require(case.get('process') == package+':'+mode and type(case.get('pid')) is int and case['pid'] > 0, 'Proof was produced in the wrong Android process.')
@@ -83,8 +97,7 @@ def validate_proof(proof):
     require(proof.get('schema') == SCHEMA and proof.get('kind') == 'recreation'
             and proof.get('passed') is True and 'failure' not in proof, 'Invalid aggregate lifecycle proof.')
     package = proof['package']
-    require(re.fullmatch(r'org\.cyphra\.browser\.(public|team)(\.debug)?', package), 'Unexpected target package.')
-    require(proof.get('edition') == ('team' if '.team' in package else 'public'), 'Lifecycle edition mismatch.')
+    require(proof.get('edition') == edition_for_package(package), 'Lifecycle edition mismatch.')
     require(proof.get('device') == {'uid': '0', 'qemu': '1'}, 'Lifecycle qualification requires the disposable rooted emulator.')
     cleanup = proof.get('cleanup', {})
     require(cleanup.get('passed') is True and cleanup.get('fixtureStopped') is True
@@ -94,8 +107,9 @@ def validate_proof(proof):
     require(set(sources) == {'native_lifecycle_qualification.py', 'native_lifecycle_fixture.py'}
             and all(isinstance(value, str) and re.fullmatch(r'[0-9a-f]{64}', value) for value in sources.values()),
             'Lifecycle host/fixture source digests are missing.')
-    require(set(proof['modes']) == set(MODES), 'Both mode processes must be qualified.')
-    for mode in MODES:
+    expected_modes = modes_for_package(package)
+    require(set(proof['modes']) == set(expected_modes), 'Every shipped mode process must be qualified, with no unshipped mode claim.')
+    for mode in expected_modes:
         require(set(proof['modes'][mode]) == set(SCENARIOS), 'All lifecycle scenarios are required in '+mode)
         for scenario in SCENARIOS:
             case = validate_case(proof['modes'][mode][scenario], package, mode, scenario)
@@ -235,7 +249,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--port', type=int, default=8766)
     args = parser.parse_args()
-    require(re.fullmatch(r'org\.cyphra\.browser\.(team|public)(\.debug)?', args.package), 'Use an installed Cyphra package.')
+    edition = edition_for_package(args.package)
     require(adb('shell', 'id', '-u').stdout.strip() == '0', 'Use an authorized disposable rooted emulator for release APK evidence.')
     require(adb('shell', 'getprop', 'ro.kernel.qemu').stdout.strip() == '1', 'Lifecycle qualification must not run on a physical device.')
     require(1 <= args.port <= 65535, 'Invalid loopback port.')
@@ -243,7 +257,7 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     fixture_source = Path(__file__).with_name('native_lifecycle_fixture.py')
     proof = {'schema': SCHEMA, 'kind': 'recreation', 'package': args.package,
-             'edition': 'team' if '.team' in args.package else 'public', 'modes': {},
+             'edition': edition, 'modes': {},
              'device': {'uid': '0', 'qemu': '1'},
              'sourceSha256': {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
                               for path in (Path(__file__), fixture_source)}}
@@ -274,7 +288,7 @@ def main():
         require(ready, 'The owned loopback fixture did not become ready.')
         adb('reverse', f'tcp:{args.port}', f'tcp:{args.port}')
         reverse_created = True
-        for mode in MODES:
+        for mode in modes_for_package(args.package):
             proof['modes'][mode] = {}
             for scenario in SCENARIOS:
                 run_case(args, proof, mode, scenario)

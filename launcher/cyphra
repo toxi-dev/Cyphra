@@ -5,7 +5,7 @@ set -euo pipefail
 # Replaced by the edition-aware builder; never read this value from the caller.
 CYPHRA_EDITION='team'
 cyphra_mode='work'
-[[ "$CYPHRA_EDITION" != 'public' ]] || cyphra_mode='personal'
+[[ "$CYPHRA_EDITION" == 'team' ]] || cyphra_mode='personal'
 cyphra_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 if [[ ${EUID} -eq 0 ]]; then
     printf '%s\n' 'Run Cyphra as an ordinary desktop user, with the Gecko sandbox enabled.' >&2
@@ -23,7 +23,12 @@ fi
 cyphra_arguments=()
 for cyphra_argument in "$@"; do
     case "$cyphra_argument" in
-        --work|-work) cyphra_mode='work'; continue ;;
+        --work|-work)
+            if [[ "$CYPHRA_EDITION" == 'home' ]]; then
+                printf '%s\n' 'Cyphra Home has one everyday browsing profile.' >&2
+                exit 1
+            fi
+            cyphra_mode='work'; continue ;;
         --personal|-personal) cyphra_mode='personal'; continue ;;
     esac
     if [[ "$cyphra_argument" == '--private-window' ]]; then
@@ -47,7 +52,7 @@ for cyphra_argument in "$@"; do
     cyphra_arguments+=("$cyphra_argument")
 done
 cyphra_profile_root='cyphra'
-[[ "$CYPHRA_EDITION" != 'public' ]] || cyphra_profile_root='cyphra-public'
+[[ "$CYPHRA_EDITION" == 'team' ]] || cyphra_profile_root="cyphra-$CYPHRA_EDITION"
 cyphra_profile="${XDG_CONFIG_HOME:-${HOME:?}/.config}/$cyphra_profile_root/profile"
 [[ "$cyphra_mode" != 'personal' ]] || cyphra_profile+='-personal'
 export CYPHRA_MODE="$cyphra_mode" CYPHRA_EDITION

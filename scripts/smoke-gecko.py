@@ -17,11 +17,12 @@ from marionette_driver.marionette import Marionette
 
 ROOT = Path(__file__).resolve().parent.parent
 EDITION = os.environ.get('CYPHRA_TEST_EDITION', json.loads((ROOT / 'cyphra.json').read_text()).get('edition', 'team'))
-assert EDITION in ('team', 'public'), 'CYPHRA_TEST_EDITION must be team or public.'
+assert EDITION in ('team', 'public', 'home'), 'CYPHRA_TEST_EDITION must be team, public or home.'
 METADATA = json.loads((ROOT / 'editions' / f'{EDITION}.json').read_text())
 MODE = os.environ.get('CYPHRA_TEST_MODE', METADATA['defaultMode'])
 assert MODE in ('work', 'personal'), 'CYPHRA_TEST_MODE must be work or personal.'
-stage = ROOT / 'build/linux/Cyphra' if EDITION == 'team' else ROOT / 'build/public/linux/Cyphra'
+assert EDITION != 'home' or MODE == 'personal', 'Cyphra Home has one Personal profile.'
+stage = ROOT / 'build/linux/Cyphra' if EDITION == 'team' else ROOT / 'build' / EDITION / 'linux/Cyphra'
 ENGINE_VERSION = json.loads((ROOT / 'engine-lock.json').read_text())['geckoVersion']
 scratch = Path(tempfile.mkdtemp(prefix='cyphra-gecko-smoke-'))
 child = None
@@ -115,7 +116,7 @@ try:
     else:
         assert checks['dnsMode'] == 3 and checks['dns'] == 'https://dns.toxitechnetwork.org/dns-query'
     assert driver.execute_script('return CyphraModes.info();') == {'mode': MODE, 'edition': EDITION, 'profileIsolation': True}
-    assert checks['telemetry'] is False and checks['history'] is False and checks['sandbox'] > 0
+    assert checks['telemetry'] is False and checks['history'] is (EDITION == 'home') and checks['sandbox'] > 0
     assert initial['version'] == ENGINE_VERSION and initial['name'] == 'Cyphra'
     flags = driver.execute_script('const {AppConstants}=ChromeUtils.importESModule("resource://gre/modules/AppConstants.sys.mjs");return Object.fromEntries(["MOZ_DATA_REPORTING","MOZ_TELEMETRY_REPORTING","MOZ_CRASHREPORTER","MOZ_NORMANDY","MOZ_UPDATER","MOZ_SANDBOX"].map(k=>[k,AppConstants[k]]));')
     assert all(value is False for key, value in flags.items() if key != 'MOZ_SANDBOX') and flags['MOZ_SANDBOX'] is True, flags
@@ -176,7 +177,10 @@ try:
     driver.execute_script('document.getElementById("cyphra-shields-details").open=true;')
     panel = driver.execute_script('const p=document.getElementById("cyphra-shields-panel"),i=document.getElementById("cyphra-shields").querySelector(".toolbarbutton-icon");return {stats:[...p.querySelectorAll("dd")].map(n=>n.textContent),width:i.getBoundingClientRect().width,padding:getComputedStyle(i).paddingLeft};')
     assert panel['width'] == 18 and panel['padding'] == '0px', panel
-    assert int(panel['stats'][1].replace(',', '')) >= 1, panel
+    if EDITION == 'home':
+        assert len(panel['stats']) == 1 and int(panel['stats'][0].replace(',', '')) == counts()['blocked'], panel
+    else:
+        assert int(panel['stats'][1].replace(',', '')) >= 1, panel
     (ROOT / f'artifacts/cyphra-{EDITION}-{MODE}-gecko-shields.png').write_bytes(base64.b64decode(driver.screenshot()))
     driver.execute_script('document.getElementById("cyphra-shields-panel").hidePopup();')
     driver.find_element('id', 'cyphra-bookmarks').click()
@@ -184,12 +188,16 @@ try:
     driver.find_element('id', 'cyphra-bookmarks').click()
     wait(lambda: driver.execute_script('return !SidebarController.isOpen;'), 'native bookmark sidebar close')
     print('PASS: native Shield popup shows real counters; toolbar and bookmarks rail controls work.', flush=True)
-    driver.find_element('id', 'cyphra-developer-tools').click()
-    toolbox = 'const {DevToolsShim}=ChromeUtils.importESModule("chrome://devtools-startup/content/DevToolsShim.sys.mjs");return !!DevToolsShim.getToolboxForTab(gBrowser.selectedTab)?.isReady;'
-    wait(lambda: driver.execute_script(toolbox), 'native developer tools toolbox')
-    driver.find_element('id', 'cyphra-developer-tools').click()
-    wait(lambda: not driver.execute_script(toolbox), 'native developer tools close')
-    print('PASS: toolbar opens and closes native Gecko developer tools.', flush=True)
+    if EDITION == 'home':
+        assert driver.execute_script('return !document.getElementById("cyphra-developer-tools") && !document.getElementById("cyphra-tools") && !document.getElementById("cyphra-mode") && Services.prefs.prefIsLocked("devtools.policy.disabled") && Services.prefs.getBoolPref("devtools.policy.disabled");')
+        print('PASS: Home omits Work and research tools; the installed developer-tools policy is locked.', flush=True)
+    else:
+        driver.find_element('id', 'cyphra-developer-tools').click()
+        toolbox = 'const {DevToolsShim}=ChromeUtils.importESModule("chrome://devtools-startup/content/DevToolsShim.sys.mjs");return !!DevToolsShim.getToolboxForTab(gBrowser.selectedTab)?.isReady;'
+        wait(lambda: driver.execute_script(toolbox), 'native developer tools toolbox')
+        driver.find_element('id', 'cyphra-developer-tools').click()
+        wait(lambda: not driver.execute_script(toolbox), 'native developer tools close')
+        print('PASS: toolbar opens and closes native Gecko developer tools.', flush=True)
     before = counts()['telemetry']
     driver.execute_script('window.CyphraPrivacy.setSiteMode(gBrowser.selectedBrowser.currentURI.spec,"off",gBrowser.selectedBrowser.browsingContext.id);')
     driver.set_context(driver.CONTEXT_CONTENT)
@@ -198,25 +206,28 @@ try:
     wait(lambda: counts()['telemetry'] > before, 'telemetry remains blocked with Shields off')
     print('PASS: telemetry remains blocked with Shields off.', flush=True)
     driver.execute_script('window.CyphraPrivacy.setSiteMode(gBrowser.selectedBrowser.currentURI.spec,"standard",gBrowser.selectedBrowser.browsingContext.id);')
-    normal_tab = driver.current_window_handle
-    old_tabs = set(driver.window_handles)
-    driver.find_element('id', 'cyphra-containers').click()
-    wait(lambda: driver.execute_script('return document.getElementById("cyphra-containers-menu").state;') == 'open', 'native container menu')
-    driver.execute_script('[...document.querySelectorAll("#cyphra-containers-menu menuitem")].find(n=>!n.disabled&&n.getAttribute("label")==="New research container tab").doCommand();document.getElementById("cyphra-containers-menu").hidePopup();')
-    container_tab = wait(lambda: list(set(driver.window_handles) - old_tabs), 'native Research container tab')[0]
-    assert driver.execute_script('return gBrowser.selectedBrowser.browsingContext.originAttributes.userContextId;') > 0
-    driver.set_context(driver.CONTEXT_CONTENT)
-    driver.switch_to_window(container_tab)
-    driver.navigate(url + 'container')
-    assert driver.execute_script('return document.title;') == 'Gecko fixture'
-    container_headers = next(header for header in headers if header['_path'] == '/container')
-    assert 'Cookie' not in container_headers, container_headers
-    driver.set_context(driver.CONTEXT_CHROME)
-    driver.execute_script('gBrowser.removeTab(gBrowser.selectedTab);')
-    driver.set_context(driver.CONTEXT_CONTENT)
-    driver.switch_to_window(normal_tab)
-    driver.set_context(driver.CONTEXT_CHROME)
-    print('PASS: native Research container has a separate cookie jar.', flush=True)
+    if EDITION == 'home':
+        assert driver.execute_script('return !document.getElementById("cyphra-containers") && !document.getElementById("cyphra-containers-menu");')
+    else:
+        normal_tab = driver.current_window_handle
+        old_tabs = set(driver.window_handles)
+        driver.find_element('id', 'cyphra-containers').click()
+        wait(lambda: driver.execute_script('return document.getElementById("cyphra-containers-menu").state;') == 'open', 'native container menu')
+        driver.execute_script('[...document.querySelectorAll("#cyphra-containers-menu menuitem")].find(n=>!n.disabled&&n.getAttribute("label")==="New research container tab").doCommand();document.getElementById("cyphra-containers-menu").hidePopup();')
+        container_tab = wait(lambda: list(set(driver.window_handles) - old_tabs), 'native Research container tab')[0]
+        assert driver.execute_script('return gBrowser.selectedBrowser.browsingContext.originAttributes.userContextId;') > 0
+        driver.set_context(driver.CONTEXT_CONTENT)
+        driver.switch_to_window(container_tab)
+        driver.navigate(url + 'container')
+        assert driver.execute_script('return document.title;') == 'Gecko fixture'
+        container_headers = next(header for header in headers if header['_path'] == '/container')
+        assert 'Cookie' not in container_headers, container_headers
+        driver.set_context(driver.CONTEXT_CHROME)
+        driver.execute_script('gBrowser.removeTab(gBrowser.selectedTab);')
+        driver.set_context(driver.CONTEXT_CONTENT)
+        driver.switch_to_window(normal_tab)
+        driver.set_context(driver.CONTEXT_CHROME)
+        print('PASS: native Research container has a separate cookie jar.', flush=True)
     normal_window = driver.current_chrome_window_handle
     old_windows = set(driver.chrome_window_handles)
     private_totals = driver.execute_script('return Services.prefs.getStringPref("cyphra.privacy.totals","{}");')

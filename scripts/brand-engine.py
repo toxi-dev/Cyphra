@@ -124,7 +124,10 @@ def rewrite_jar(path, version, platform, edition=None):
                                 'after_sha256': None, 'removed': True})
                 continue
             if name.startswith(('localization/', 'chrome/')) and suffix in ('.ftl', '.dtd', '.properties') and not any(p in name for p in LEGAL):
-                replacement = localized(raw.decode('utf-8'), suffix, edition.get('organization') or 'Cyphra Project').encode('utf-8')
+                text = localized(raw.decode('utf-8'), suffix, edition.get('organization') or 'Cyphra Project')
+                if edition.get('id') == 'home':
+                    text = re.sub(r'\bCyphra\b(?! Project| Home)', 'Cyphra Home', text)
+                replacement = text.encode('utf-8')
             elif name.startswith('chrome/') and suffix in ('.xhtml', '.html') and not any(p in name for p in LEGAL):
                 replacement = markup(raw.decode('utf-8')).encode('utf-8')
             if name == SEARCH_DATA:
@@ -151,6 +154,8 @@ def rewrite_jar(path, version, platform, edition=None):
                     if edition['public']:
                         replacement = replacement.replace(b'A private browser for Byte Team.', b'Cyphra is an independent Gecko browser.')
                         replacement = replacement.replace(b'Install team releases', b'Install verified releases')
+                    if edition.get('id') == 'home' and suffix == '.xhtml':
+                        replacement = replacement.replace(b'About Cyphra', b'About Cyphra Home').replace(b'value="Cyphra"', b'value="Cyphra Home"').replace(b'Cyphra is an independent Gecko browser.', b'An everyday browser, built on Gecko.')
             elif name == 'chrome/browser/content/browser/preferences/config/about-firefox.mjs':
                 replacement = raw.replace(b'let version = AppConstants.MOZ_APP_VERSION_DISPLAY;',
                     ('let version = ' + json.dumps(version + ' (Gecko ' + gecko_version + ')') + ';').encode())

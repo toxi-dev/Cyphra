@@ -121,7 +121,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--stage', type=Path, default=None)
     parser.add_argument('--makensis')
-    parser.add_argument('--edition', choices=['team','public'])
+    parser.add_argument('--edition', choices=['team','public','home'])
     parser.add_argument('--dist', type=Path)
     args = parser.parse_args()
     config = edition_config(args.edition)
@@ -140,7 +140,7 @@ def main():
             raise RuntimeError(f'Required release notice is missing: {source}')
         shutil.copy2(source, stage / name)
     if (ROOT / 'README.md').is_file():
-        shutil.copy2(ROOT / ('docs/public.md' if config['public'] else 'README.md'), stage / 'README.md')
+        shutil.copy2(ROOT / ('docs/home.md' if config['id'] == 'home' else 'docs/public.md' if config['public'] else 'README.md'), stage / 'README.md')
     if (ROOT / 'licenses').is_dir():
         shutil.copytree(ROOT / 'licenses', stage / 'licenses', dirs_exist_ok=True)
     if not (ROOT / 'assets' / 'icon.ico').is_file():
@@ -158,15 +158,15 @@ def main():
             f'#define CYPHRA_VERSION_MINOR {components[1]}\n'
             f'#define CYPHRA_VERSION_PATCH {components[2]}\n'
             f'#define CYPHRA_VERSION_STRING "{version}"\n', encoding='utf-8')
-        subprocess.run([windres, *(['-DCYPHRA_PUBLIC_EDITION'] if config['public'] else []), '-I', str(ROOT), '-I', str(work),
+        subprocess.run([windres, *(['-DCYPHRA_HOME_EDITION'] if config['id'] == 'home' else ['-DCYPHRA_PUBLIC_EDITION'] if config['public'] else []), '-I', str(ROOT), '-I', str(work),
                         str(ROOT / 'launcher' / 'resource.rc'), '-O', 'coff', '-o', str(resources)], cwd=ROOT, check=True)
-        subprocess.run([gcc, *(['-DCYPHRA_PUBLIC_EDITION'] if config['public'] else []), '-municode', '-mwindows', '-Os', '-s', '-Wall', '-Wextra', '-Werror',
+        subprocess.run([gcc, *(['-DCYPHRA_HOME_EDITION'] if config['id'] == 'home' else ['-DCYPHRA_PUBLIC_EDITION'] if config['public'] else []), '-municode', '-mwindows', '-Os', '-s', '-Wall', '-Wextra', '-Werror',
                         '-Wl,--dynamicbase,--nxcompat,--high-entropy-va', str(ROOT / 'launcher' / 'windows.c'),
                         str(resources), '-o', str(stage / 'Cyphra.exe'), '-lshell32', '-lole32', '-luuid', '-lwinhttp'], check=True)
         if pe_machine(stage / 'Cyphra.exe') != 0x8664:
             raise RuntimeError('The compiled Cyphra launcher is not a native x64 Windows executable.')
         helper = stage / 'Cyphra-maintenance.exe'
-        subprocess.run([gcc, *(['-DCYPHRA_PUBLIC_EDITION'] if config['public'] else []), '-municode', '-mwindows', '-Os', '-s', '-Wall', '-Wextra', '-Werror',
+        subprocess.run([gcc, *(['-DCYPHRA_HOME_EDITION'] if config['id'] == 'home' else ['-DCYPHRA_PUBLIC_EDITION'] if config['public'] else []), '-municode', '-mwindows', '-Os', '-s', '-Wall', '-Wextra', '-Werror',
                         '-Wl,--dynamicbase,--nxcompat,--high-entropy-va', str(ROOT / 'launcher' / 'maintenance.c'),
                         '-o', str(helper), '-lshell32', '-lbcrypt'], check=True)
         if pe_machine(helper) != 0x8664:
@@ -193,7 +193,7 @@ def main():
         uninstall_list.write_text('\n'.join(commands) + '\n', encoding='utf-8')
         compiler, environment = find_makensis(args.makensis)
         installer = dist / f'{config["assetPrefix"]}-{version}-win-x64.exe'
-        subprocess.run([str(compiler), *(['-DPUBLIC_EDITION'] if config['public'] else []), '-V2', f'-DSTAGE_DIR={stage}', f'-DOUTPUT_FILE={installer}',
+        subprocess.run([str(compiler), *(['-DHOME_EDITION'] if config['id'] == 'home' else ['-DPUBLIC_EDITION'] if config['public'] else []), '-V2', f'-DSTAGE_DIR={stage}', f'-DOUTPUT_FILE={installer}',
                         f'-DICON_FILE={ROOT / "assets" / "icon.ico"}', f'-DLICENSE_FILE={ROOT / "LICENSE"}',
                         f'-DRELEASE_VERSION={version}', f'-DMAINTENANCE_HELPER={helper}',
                         f'-DUNINSTALL_LIST={uninstall_list}', str(ROOT / 'installer' / 'cyphra.nsi')],
