@@ -36,6 +36,32 @@ def atomic_json(path, value):
     temporary.replace(path)
 
 
+def capture_failure_ui(prefix, output, seconds=3):
+    """Best-effort diagnostic before app cleanup; never replace the worker error."""
+    diagnostic = {'captured': False, 'beforeForceStop': True, 'timeoutSeconds': seconds}
+    try:
+        result = subprocess.run([*prefix, 'exec-out', 'uiautomator', 'dump', '/dev/tty'],
+                                capture_output=True, timeout=seconds)
+        raw = output / 'failure-ui.raw.txt'
+        raw.write_bytes(result.stdout + result.stderr)
+        diagnostic['rawPath'] = raw.name
+        need(result.returncode == 0, 'Failure UI command exited ' + str(result.returncode))
+        text = result.stdout.decode(errors='replace')
+        start, end = text.find('<?xml'), text.find('</hierarchy>')
+        need(start >= 0 and end >= start, 'Failure UI command returned no complete hierarchy.')
+        xml = text[start:end + len('</hierarchy>')]
+        tree = list(ET.fromstring(xml).iter('node'))
+        path = output / 'failure-ui.xml'
+        path.write_text(xml + '\n')
+        diagnostic.update(captured=True, path=path.name, buttons=[
+            {key: node.get(key, '') for key in ('text', 'content-desc', 'resource-id', 'class',
+                                                'enabled', 'clickable', 'bounds')}
+            for node in tree if node.get('class') == 'android.widget.Button'])
+    except BaseException as error:
+        diagnostic['error'] = type(error).__name__ + ': ' + str(error)
+    return diagnostic
+
+
 class NativeSafety:
     def __init__(self, args):
         self.args = args
@@ -83,8 +109,13 @@ class NativeSafety:
 
     @staticmethod
     def bound(tree, label):
-        matches = [node for node in tree if node.get('content-desc') == label or node.get('text') == label]
+        # Material dialogs expose transformed text such as CANCEL/SAVE. Match
+        # the whole label, retaining uniqueness and enabled-state requirements.
+        folded = label.casefold()
+        matches = [node for node in tree if node.get('content-desc', '').casefold() == folded
+                   or node.get('text', '').casefold() == folded]
         need(len(matches) == 1, 'Expected exactly one visible native/content control: ' + label)
+        need(matches[0].get('enabled') == 'true', 'Native/content control is disabled: ' + label)
         coordinates = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', matches[0].get('bounds', ''))
         need(coordinates is not None, 'Missing bounds: ' + label)
         x1, y1, x2, y2 = map(int, coordinates.groups())
@@ -325,6 +356,7 @@ class NativeSafety:
             ])
         except BaseException as error:
             self.report['error'] = type(error).__name__ + ': ' + str(error)
+            self.report['failureUI'] = capture_failure_ui(self.prefix, self.args.output)
             raise
         finally:
             self.report['finished'] = datetime.now(timezone.utc).isoformat()
@@ -365,6 +397,11 @@ def supervised(args):
     prefix = [args.adb] + (['-s', args.serial] if args.serial else [])
     if code or timed_out or report.get('passed') is not True:
         report.update(passed=False, hostTimedOut=timed_out, forceStopCleanupUsed=True, nativeRecoveryClaimed=False)
+        if 'failureUI' not in report:
+            remaining = deadline - time.monotonic()
+            report['failureUI'] = (capture_failure_ui(prefix, args.output, seconds=min(3, remaining))
+                                   if remaining > 0 else {'captured': False, 'beforeForceStop': True,
+                                                          'error': 'No remaining host diagnostic deadline.'})
         process = report.get('lastLoopProcess', '')
         if re.fullmatch(r'\d+', process):
             try:

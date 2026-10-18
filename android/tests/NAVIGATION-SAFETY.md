@@ -57,6 +57,14 @@ cleanup may force-stop the named package; it never counts as native recovery.
 The failure report and local log remain available. The runner never clears a
 profile or upgrades a failed proof to a pass.
 
+Native controls match complete casefolded labels, including Android Material's
+uppercase `CANCEL`/`SAVE` button text. A match must still be unique, enabled and
+have nonempty bounds. On failure, the worker attempts to save the actual UI XML
+and native button labels before closing its fixture or the supervisor stopping
+the app. This diagnostic has a three-second deadline; a failed capture is
+recorded separately and never replaces the original failure. The supervisor
+also attempts a bounded capture if the worker exited without one.
+
 Successful `proof.json` fields for the `engine-navigation` evidence kind:
 
 - `passed`, `package`, `edition`, `overlaySHA256`, `processHangMonitor=true`,

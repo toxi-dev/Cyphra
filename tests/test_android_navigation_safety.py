@@ -28,7 +28,7 @@ class NavigationSafetyTest(unittest.TestCase):
             args = self.arguments(folder)
             (args.output / 'report.json').write_text(json.dumps({'passed': True, 'ownedReversePort': 12345}))
             child = SimpleNamespace(pid=123, wait=lambda timeout: 1)
-            completed = SimpleNamespace(returncode=0, stdout=b'')
+            completed = SimpleNamespace(returncode=0, stdout=b'', stderr=b'')
             with patch.object(SAFETY.subprocess, 'Popen', return_value=child), patch.object(SAFETY.subprocess, 'run', return_value=completed) as cleanup:
                 self.assertEqual(SAFETY.supervised(args), 1)
             proof = json.loads((args.output / 'proof.json').read_text())
@@ -37,17 +37,21 @@ class NavigationSafetyTest(unittest.TestCase):
             self.assertTrue(proof['forceStopCleanupUsed'])
             commands = [call.args[0] for call in cleanup.call_args_list]
             self.assertEqual(commands, [
+                ['never-execute-adb', '-s', 'test-serial', 'exec-out', 'uiautomator', 'dump', '/dev/tty'],
                 ['never-execute-adb', '-s', 'test-serial', 'shell', 'am force-stop org.cyphra.browser.public'],
                 ['never-execute-adb', '-s', 'test-serial', 'reverse', '--remove', 'tcp:12345'],
             ])
-            self.assertTrue(all(call.kwargs['timeout'] == 8 for call in cleanup.call_args_list))
+            self.assertEqual(cleanup.call_args_list[0].kwargs['timeout'], 3)
+            self.assertTrue(all(call.kwargs['timeout'] == 8 for call in cleanup.call_args_list[1:]))
+            self.assertTrue(proof['failureUI']['beforeForceStop'])
+            self.assertFalse(proof['failureUI']['captured'])
 
     def test_supervisor_timeout_terminates_owned_host_process_group_and_fails(self):
         with tempfile.TemporaryDirectory() as folder:
             args = self.arguments(folder)
             child = SimpleNamespace(pid=321)
             child.wait = unittest.mock.Mock(side_effect=[subprocess.TimeoutExpired('worker', 300), -15])
-            with patch.object(SAFETY.subprocess, 'Popen', return_value=child), patch.object(SAFETY.subprocess, 'run', return_value=SimpleNamespace(returncode=0, stdout=b'')), patch.object(SAFETY.os, 'killpg') as terminate:
+            with patch.object(SAFETY.subprocess, 'Popen', return_value=child), patch.object(SAFETY.subprocess, 'run', return_value=SimpleNamespace(returncode=0, stdout=b'', stderr=b'')), patch.object(SAFETY.os, 'killpg') as terminate:
                 self.assertEqual(SAFETY.supervised(args), 1)
             terminate.assert_called_once_with(321, signal.SIGTERM)
             proof = json.loads((args.output / 'proof.json').read_text())
@@ -85,12 +89,85 @@ class NavigationSafetyTest(unittest.TestCase):
             self.assertEqual(fixture.snapshot('other'), [])
             self.assertEqual(len(fixture.snapshot('run')), 2)
             self.assertIsNone(fixture.server)
-        node = {'content-desc': 'Home', 'bounds': '[10,20][110,80]'}
+        node = {'content-desc': 'Home', 'bounds': '[10,20][110,80]', 'enabled': 'true'}
         self.assertEqual(SAFETY.NativeSafety.bound([node], 'Home'), [60, 50])
         with self.assertRaises(AssertionError):
             SAFETY.NativeSafety.bound([node, node], 'Home')
         with self.assertRaises(AssertionError):
-            SAFETY.NativeSafety.bound([{'text': 'Home', 'bounds': '[0,0][0,0]'}], 'Home')
+            SAFETY.NativeSafety.bound([{'text': 'Home', 'bounds': '[0,0][0,0]', 'enabled': 'true'}], 'Home')
+
+    def test_native_material_button_labels_match_whole_casefolded_labels(self):
+        for label in ('Cancel', 'Save'):
+            with self.subTest(label=label):
+                button = {'text': label.upper(), 'bounds': '[397,724][550,820]', 'enabled': 'true'}
+                self.assertEqual(SAFETY.NativeSafety.bound([button], label), [473, 772])
+                with self.assertRaisesRegex(AssertionError, 'exactly one'):
+                    SAFETY.NativeSafety.bound([button], label[:-1])
+        control = {'text': 'HOME', 'content-desc': 'Home', 'bounds': '[10,20][110,80]', 'enabled': 'true'}
+        self.assertEqual(SAFETY.NativeSafety.bound([control], 'home'), [60, 50])
+
+    def test_casefolded_duplicates_are_ambiguous_even_when_one_is_disabled(self):
+        first = {'text': 'CANCEL', 'bounds': '[10,20][110,80]', 'enabled': 'true'}
+        second = {'content-desc': 'Cancel', 'bounds': '[120,20][220,80]', 'enabled': 'false'}
+        with self.assertRaisesRegex(AssertionError, 'exactly one'):
+            SAFETY.NativeSafety.bound([first, second], 'Cancel')
+
+    def test_disabled_or_missing_enabled_state_cannot_be_tapped(self):
+        for enabled in ('false', None):
+            with self.subTest(enabled=enabled):
+                button = {'text': 'SAVE', 'bounds': '[10,20][110,80]'}
+                if enabled is not None:
+                    button['enabled'] = enabled
+                with self.assertRaisesRegex(AssertionError, 'disabled'):
+                    SAFETY.NativeSafety.bound([button], 'Save')
+
+    def test_failure_ui_captures_actual_native_labels_with_a_short_deadline(self):
+        xml = ('<?xml version="1.0"?><hierarchy><node text="CANCEL" resource-id="android:id/button2" '
+               'class="android.widget.Button" enabled="true" clickable="true" bounds="[10,20][110,80]"/></hierarchy>')
+        with tempfile.TemporaryDirectory() as folder:
+            result = SimpleNamespace(returncode=0, stdout=(xml+'\nUI hierarchy dumped').encode(), stderr=b'')
+            with patch.object(SAFETY.subprocess, 'run', return_value=result) as command:
+                diagnostic = SAFETY.capture_failure_ui(['never-execute-adb'], Path(folder))
+            self.assertTrue(diagnostic['captured'])
+            self.assertTrue(diagnostic['beforeForceStop'])
+            self.assertEqual((Path(folder)/'failure-ui.xml').read_text(), xml+'\n')
+            self.assertEqual(diagnostic['buttons'][0]['text'], 'CANCEL')
+            self.assertEqual(diagnostic['buttons'][0]['resource-id'], 'android:id/button2')
+            self.assertEqual(command.call_args.kwargs['timeout'], 3)
+
+    def test_diagnostic_timeout_preserves_original_worker_failure_and_precedes_fixture_cleanup(self):
+        with tempfile.TemporaryDirectory() as folder:
+            worker = SAFETY.NativeSafety(self.arguments(folder))
+            order = []
+            def timeout(*args, **kwargs):
+                order.append('capture')
+                self.assertEqual(kwargs['timeout'], 3)
+                raise subprocess.TimeoutExpired('uiautomator', 3)
+            with patch.object(worker, 'setup', side_effect=AssertionError('Original missing control')), \
+                    patch.object(SAFETY.subprocess, 'run', side_effect=timeout), \
+                    patch.object(worker.fixture, 'close', side_effect=lambda: order.append('fixture-close')):
+                with self.assertRaisesRegex(AssertionError, '^Original missing control$'):
+                    worker.run()
+            report = json.loads((Path(folder)/'report.json').read_text())
+            self.assertEqual(report['error'], 'AssertionError: Original missing control')
+            self.assertFalse(report['failureUI']['captured'])
+            self.assertIn('TimeoutExpired', report['failureUI']['error'])
+            self.assertEqual(order, ['capture', 'fixture-close'])
+
+    def test_supervisor_preserves_worker_ui_capture_before_force_stop(self):
+        with tempfile.TemporaryDirectory() as folder:
+            args = self.arguments(folder)
+            diagnostic = {'captured': True, 'beforeForceStop': True, 'path': 'failure-ui.xml'}
+            (args.output/'report.json').write_text(json.dumps({'passed': False, 'error': 'Original failure', 'failureUI': diagnostic}))
+            child = SimpleNamespace(pid=123, wait=lambda timeout: 1)
+            with patch.object(SAFETY.subprocess, 'Popen', return_value=child), \
+                    patch.object(SAFETY.subprocess, 'run', return_value=SimpleNamespace(returncode=0, stdout=b'')) as cleanup:
+                self.assertEqual(SAFETY.supervised(args), 1)
+            self.assertEqual(len(cleanup.call_args_list), 1)
+            self.assertIn('am force-stop', cleanup.call_args.args[0][-1])
+            proof = json.loads((args.output/'proof.json').read_text())
+            self.assertEqual(proof['failureUI'], diagnostic)
+            self.assertEqual(proof['error'], 'Original failure')
 
 
 if __name__ == '__main__':
