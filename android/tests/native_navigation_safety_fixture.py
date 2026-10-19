@@ -72,14 +72,17 @@ async function warmupClock(){
 async function calibrate(phase){
  const observedPrecisionNs=observedPrecision();
  for(let i=0;i<3;i++){
-  const challenge=nonce(),b0Ns=ns();
-  const response=await fetch('/clock?run='+encodeURIComponent(run),{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({kind:'clock-calibration',...identity(),nonce:challenge,phase,b0Ns})});
-  if(!response.ok)throw new Error('Clock echo HTTP '+response.status);
-  const reply=await response.json(),b1Ns=ns();
-  if(reply.nonce!==challenge||typeof reply.h0Ns!=='string'||typeof reply.h1Ns!=='string')throw new Error('Clock nonce/time acknowledgement mismatch');
-  if(b1Ns<b0Ns||b1Ns-b0Ns>150000000)throw new Error('Clock echo uncertainty exceeds 150ms');
-  bounded(clockSamples,{nonce:challenge,phase,b0Ns,b1Ns,h0Ns:reply.h0Ns,h1Ns:reply.h1Ns,observedPrecisionNs},9);
+  const challenge=nonce(),controller=new AbortController(),b0Ns=ns();
+  const timeout=setTimeout(()=>controller.abort(),2000);
+  try{
+   const response=await fetch('/clock?run='+encodeURIComponent(run),{method:'POST',keepalive:true,signal:controller.signal,headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({kind:'clock-calibration',...identity(),nonce:challenge,phase,b0Ns})});
+   if(!response.ok)throw new Error('Clock echo HTTP '+response.status);
+   const reply=await response.json(),b1Ns=ns();
+   if(reply.nonce!==challenge||typeof reply.h0Ns!=='string'||typeof reply.h1Ns!=='string')throw new Error('Clock nonce/time acknowledgement mismatch');
+   if(b1Ns<b0Ns||b1Ns-b0Ns>2000000000)throw new Error('Clock echo exceeded its 2s transport deadline');
+   bounded(clockSamples,{nonce:challenge,phase,b0Ns,b1Ns,h0Ns:reply.h0Ns,h1Ns:reply.h1Ns,observedPrecisionNs},9);
+  }finally{clearTimeout(timeout);}
  }
 }
 function pulse(){

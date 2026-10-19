@@ -9,23 +9,34 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const documents = JSON.parse(execFileSync('python3', ['-c', `import sys,json;sys.path.insert(0,'android/tests');from native_navigation_safety_fixture import render_document;print(json.dumps({kind:render_document(kind,'offline-run','offline-token') for kind in ('timer','sentinel','loop')}))`], { cwd: root, encoding: 'utf8' }));
 
 async function fixture(kind, options = {}) {
-  const events = [], delivered = [], callbacks = {}, intervals = [], cleared = [];
-  let now = 0, random = 0;
+  const events = [], delivered = [], callbacks = {}, intervals = [], cleared = [], timeouts = [], clockSignals = [];
+  let now = 0, random = 0, calibrations = 0;
   const context = vm.createContext({
     location: { href: 'http://localhost/fixture' },
     document: { title: kind, getElementById: id => ({ addEventListener: (event, callback) => { callbacks[id + ':' + event] = callback; } }) },
     addEventListener: (event, callback) => { callbacks[event] = callback; },
     performance: { now: () => { now += .02; return now; } },
     crypto: { getRandomValues: bytes => { bytes.fill(++random); return bytes; } },
-    TextEncoder, AbortController, setTimeout, clearTimeout,
+    TextEncoder, AbortController,
+    setTimeout: (callback, milliseconds) => { const timer = { callback, milliseconds, cleared: false }; timeouts.push(timer); return timer; },
+    clearTimeout: timer => { timer.cleared = true; },
     setInterval: (callback, milliseconds) => { intervals.push({ callback, milliseconds }); return 17; },
     clearInterval: id => cleared.push(id),
     fetch: async (url, request) => {
       const body = JSON.parse(request.body); events.push(body);
       if (url.startsWith('/clock')) {
+        clockSignals.push(request.signal);
         if (body.kind === 'clock-warmup' && options.holdWarmup) await new Promise(resolve => { callbacks.releaseWarmup = resolve; });
         if (body.kind === 'clock-warmup') now += options.warmupRoundTripMilliseconds ?? 0;
-        if (body.kind === 'clock-calibration' && options.slowCalibration) now += 151;
+        if (body.kind === 'clock-calibration') {
+          const index = calibrations++;
+          if (options.holdCalibration) await new Promise((resolve, reject) => {
+            callbacks.releaseCalibration = resolve;
+            request.signal.addEventListener('abort', () => { const error = new Error('Clock request aborted'); error.name = 'AbortError'; reject(error); }, { once: true });
+          });
+          const durations = options.calibrationRoundTripMilliseconds ?? [0];
+          now += durations[index % durations.length];
+        }
         delivered.push(body); return { ok: true, json: async () => ({
         nonce: (options.badClockNonce && body.kind === 'clock-calibration') || options.badWarmupNonce && body.kind === 'clock-warmup' ? 'wrong' : body.nonce,
         h0Ns: String(10000000000000 + body.b0Ns), h1Ns: String(10000000000000 + body.b0Ns + 1),
@@ -41,7 +52,7 @@ async function fixture(kind, options = {}) {
   vm.runInContext(script, context, { timeout: 1000 });
   const settle = async () => { for (let index = 0; index < 30; index++) await Promise.resolve(); };
   await settle();
-  return { events, delivered, callbacks, intervals, cleared, settle, context };
+  return { events, delivered, callbacks, intervals, cleared, timeouts, clockSignals, settle, context };
 }
 
 test('timer fixture uses one ordinary finite interval and preserves static identity', async () => {
@@ -93,19 +104,52 @@ test('one acknowledged cold-connection warmup precedes three strict samples and 
   assert.equal(ready.clockWarmup.acknowledged, true);
   assert.ok(ready.clockWarmup.roundTripNs >= 199000000);
   assert.equal(ready.clockSamples.length, 3);
-  assert.ok(ready.clockSamples.every(sample => sample.phase === 'before' && sample.b1Ns - sample.b0Ns <= 150000000));
+  assert.ok(ready.clockSamples.every(sample => sample.phase === 'before' && sample.b1Ns - sample.b0Ns <= 2000000000));
   assert.equal(timer.events.filter(event => event.kind === 'clock-warmup').length, 1);
   assert.equal(vm.runInContext('Object.isFrozen(clockWarmup)', timer.context), true);
 });
 
-test('failed warmup or a slow actual calibration fails without any timer, retry or rearm', async () => {
-  for (const options of [{ badWarmupNonce: true }, { warmupRoundTripMilliseconds: 2001 }, { slowCalibration: true }]) {
+test('failed warmup or calibration beyond its transport deadline fails without any timer, retry or rearm', async () => {
+  for (const options of [{ badWarmupNonce: true }, { warmupRoundTripMilliseconds: 2001 }, { calibrationRoundTripMilliseconds: [2001] }]) {
     const timer = await fixture('timer', options);
     assert.equal(timer.intervals.length, 0);
     assert.equal(timer.events.filter(event => event.kind === 'clock-warmup').length, 1);
     assert.ok(timer.events.find(event => event.kind === 'ready').clockErrors.length);
     assert.ok(timer.events.filter(event => event.kind === 'clock-calibration').length <= 1);
   }
+});
+
+test('fixed sequential slow echoes are all retained for the separate host boundary precision gate', async () => {
+  const timer = await fixture('timer', { calibrationRoundTripMilliseconds: [48, 377, 42] });
+  const ready = timer.events.find(event => event.kind === 'ready');
+  assert.equal(timer.intervals.length, 1);
+  assert.equal(ready.clockSamples.length, 3);
+  assert.ok(ready.clockSamples[1].b1Ns - ready.clockSamples[1].b0Ns >= 377000000);
+  assert.equal(ready.clockErrors.length, 0);
+  await timer.callbacks['inspect:click'](); await timer.settle();
+  const inspected = timer.events.findLast(event => event.kind === 'inspect');
+  assert.equal(inspected.clockSamples.length, 6);
+  assert.equal(timer.events.filter(event => event.kind === 'clock-calibration').length, 6);
+  assert.equal(new Set(inspected.clockSamples.map(sample => sample.nonce)).size, 6);
+  for (const samples of [inspected.clockSamples.slice(0, 3), inspected.clockSamples.slice(3)]) {
+    assert.ok(samples.slice(1).every((sample, index) => samples[index].b1Ns <= sample.b0Ns));
+  }
+  assert.ok(timer.timeouts.every(timeout => timeout.milliseconds === 2000 && timeout.cleared));
+  assert.equal(timer.intervals.length, 1);
+});
+
+test('a pending clock fetch is actually aborted at its deadline without retry or timer creation', async () => {
+  const timer = await fixture('timer', { holdCalibration: true });
+  assert.equal(timer.intervals.length, 0);
+  const pending = timer.timeouts.filter(timeout => !timeout.cleared);
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].milliseconds, 2000);
+  pending[0].callback(); await timer.settle();
+  assert.equal(timer.clockSignals.at(-1).aborted, true);
+  assert.ok(timer.events.find(event => event.kind === 'ready').clockErrors.some(error => /AbortError/.test(error.message)));
+  assert.equal(timer.events.filter(event => event.kind === 'clock-calibration').length, 1);
+  assert.equal(timer.intervals.length, 0);
+  assert.ok(timer.timeouts.every(timeout => timeout.cleared));
 });
 
 test('infinite script is armed only by a separate explicit button and the sentinel can report fresh JS', async () => {

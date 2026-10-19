@@ -65,9 +65,9 @@ The nine-sample ring retains startup, Cancel and Save samples. Host nanoseconds
 travel as decimal strings to preserve precision beyond JavaScript's integer
 range. Every echoed nonce and timestamp must match the independent server log.
 
-`native_navigation_clock.py` uses an explicit bounded-clock model: host/guest
+`native_navigation_clock.py` uses the explicit `cyphra-navigation-clock-v2` model: host/guest
 monotonic rates differ by at most **1,000 ppm**, each browser timestamp has a
-**5ms precision budget**, an echo round trip is at most **150ms**, and samples
+**5ms precision budget**, each echo has a **two-second transport deadline**, and samples
 are at most **30 seconds** from the qualified point. Before/after precision
 probes must observe positive resolution within that budget; all echoes must be
 consistent with the model. This declares a clock-rate assumption, not a claim
@@ -77,11 +77,29 @@ are qualified. Inconsistent, stale, imprecise or ambiguous measurements fail.
 For each actual browser start/end, causal echo constraints produce lower and
 upper possible host times. Elapsed intervals are expanded for both timestamp
 precision and rate drift, with outward rounding in either time direction.
+All six echo envelopes are intersected at each actual callback boundary. Both
+the start's and the end's resulting host-time intervals must independently be
+no wider than **150ms**, including precision and drift. A slow echo is retained
+with all other samples; it is never discarded, retried or replaced. Each fetch
+uses a real two-second AbortController deadline, and its measured round trip
+must also remain within two seconds. All three echoes in each phase are fixed,
+sequential and awaited.
+
+This changes the sample-admission policy from v1's individual 150ms round-trip
+cap. An individual transport cap did not bound final uncertainty to 150ms once
+precision and drift were included. V2 instead explicitly limits uncertainty at
+both points actually being qualified; it can accept a slower transport sample
+only when the complete conservative intersection remains sufficiently precise.
+V1 failures and earlier proof windows remain failed and are not reused as V2
+qualification. No native correctness result is implied by this clock protocol
+change or its offline tests.
+
 The actual attachment GET must be strictly **after the latest possible callback
 start and before the earliest possible callback end**. Midpoints, nominal 800ms
 timing assumptions and delayed completion-POST arrival times cannot prove that
 condition. Release qualification independently recomputes the same constraints
-using exact rational arithmetic. The limits are not widened to obtain a pass.
+using exact rational arithmetic. Slow transport cannot qualify wide or ambiguous
+actual callback bounds; both validators enforce the pinned final precision cap.
 
 Separate pages start a deliberately infinite script only after the supervised
 test explicitly taps its button. Native Back, Home and address/newURI recovery

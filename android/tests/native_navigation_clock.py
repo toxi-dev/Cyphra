@@ -7,8 +7,9 @@ observations fail closed. Network arrival is never used as callback completion.
 """
 import re
 
-MODEL = {'schema': 'cyphra-navigation-clock-v1', 'maximumRateErrorPPM': 1000,
-         'browserPrecisionBudgetNs': 5_000_000, 'maximumEchoRoundTripNs': 150_000_000,
+MODEL = {'schema': 'cyphra-navigation-clock-v2', 'maximumRateErrorPPM': 1000,
+         'browserPrecisionBudgetNs': 5_000_000, 'maximumEchoRoundTripNs': 2_000_000_000,
+         'maximumPointUncertaintyNs': 150_000_000,
          'maximumSampleDistanceNs': 30_000_000_000, 'samplesPerPhase': 3}
 
 
@@ -175,12 +176,20 @@ def validate_overlap(evidence, identity, run, tick, attachment):
                     and sample['b0Ns'] > end['browserNs'] and h0 > request_ns
                     and sample['b1Ns'] <= body['browserReportedNs'], 'After calibration is stale, replayed or precedes actual callback completion.')
         require(sample in body.get('clockSamples', []), 'Carrier did not actually acknowledge this clock sample.')
+    for phase in phases:
+        require(all(first['b1Ns'] <= second['b0Ns']
+                    and decimal(first['h1Ns']) <= decimal(second['h0Ns'])
+                    for first, second in zip(phase, phase[1:])),
+                'Clock phase echoes are not sequential in browser and host observations.')
     # Cross-check every send/receive point, not only the event being qualified.
     for sample in samples:
         require(bounds(sample['b0Ns'], samples)['lowerNs'] <= decimal(sample['h0Ns'])
                 and bounds(sample['b1Ns'], samples)['upperNs'] >= decimal(sample['h1Ns']),
                 'Clock echoes violate the declared rate/precision model.')
     start_bounds, end_bounds = bounds(start['browserNs'], samples), bounds(end['browserNs'], samples)
+    require(all(point['upperNs']-point['lowerNs'] <= MODEL['maximumPointUncertaintyNs']
+                for point in (start_bounds, end_bounds)),
+            'Actual callback start/end clock uncertainty exceeds 150ms.')
     require(start_bounds['upperNs'] < request_ns < end_bounds['lowerNs'],
             'Actual attachment request is outside or ambiguous within the conservative callback interval.')
     result = {'startBounds': start_bounds, 'endBounds': end_bounds, 'requestNs': request_ns,
