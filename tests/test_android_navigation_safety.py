@@ -9,6 +9,7 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'android/tests'))
@@ -119,23 +120,60 @@ class NavigationSafetyTest(unittest.TestCase):
                 {'package': package, 'class': 'android.widget.ImageView', 'content-desc': 'Cyphra new tab'},
                 {'package': package, 'class': 'android.widget.TextView', 'text': context}]
 
+    @staticmethod
+    def accessibility_nodes(tree, representation):
+        if representation == 'dict':
+            return tree
+        hierarchy = ET.Element('hierarchy')
+        for attributes in tree:
+            ET.SubElement(hierarchy, 'node', attributes)
+        # The worker reads XML attributes through Element.get(), rather than
+        # dictionary indexing. Parse serialized XML exactly as nodes() does.
+        return list(ET.fromstring(ET.tostring(hierarchy)).iter('node'))
+
     def test_native_new_tab_requires_actual_marker_blank_address_and_each_edition_context(self):
         for edition, context in [('home', 'Everyday browsing'), ('team', 'Byte Team · Personal'), ('public', 'Personal profile')]:
             package = 'org.cyphra.browser.'+edition
-            tree = self.native_home(package, context)
-            self.assertEqual(SAFETY.native_home_observation(tree, package), {
-                'package': package, 'mode': 'personal', 'blankAddress': True,
-                'marker': 'Cyphra new tab', 'context': context})
-            for changed in ('missing-marker', 'web-marker', 'nonblank', 'disabled', 'wrong-package', 'wrong-context'):
-                with self.subTest(edition=edition, changed=changed):
-                    bad = self.native_home(package, context)
-                    if changed == 'missing-marker': bad.pop(1)
-                    elif changed == 'web-marker': bad[1]['class'] = 'android.webkit.WebView'
-                    elif changed == 'nonblank': bad[0]['text'] = 'http://localhost/loop'
-                    elif changed == 'disabled': bad[0]['enabled'] = 'false'
-                    elif changed == 'wrong-package': bad[1]['package'] = 'another.app'
-                    else: bad[2]['text'] = 'Personal profile' if edition != 'public' else 'Everyday browsing'
-                    self.assertIsNone(SAFETY.native_home_observation(bad, package))
+            for representation in ('dict', 'xml'):
+                with self.subTest(edition=edition, representation=representation):
+                    tree = self.accessibility_nodes(self.native_home(package, context), representation)
+                    self.assertEqual(SAFETY.native_home_observation(tree, package), {
+                        'package': package, 'mode': 'personal', 'blankAddress': True,
+                        'marker': 'Cyphra new tab', 'context': context})
+                for changed in ('missing-marker', 'web-marker', 'nonblank', 'disabled', 'wrong-package',
+                                'wrong-context', 'missing-address', 'missing-text', 'wrong-address-class',
+                                'wrong-address-package', 'duplicate-address', 'duplicate-marker', 'duplicate-context'):
+                    with self.subTest(edition=edition, representation=representation, changed=changed):
+                        bad = self.native_home(package, context)
+                        if changed == 'missing-marker': bad.pop(1)
+                        elif changed == 'web-marker': bad[1]['class'] = 'android.webkit.WebView'
+                        elif changed == 'nonblank': bad[0]['text'] = 'http://localhost/loop'
+                        elif changed == 'disabled': bad[0]['enabled'] = 'false'
+                        elif changed == 'wrong-package': bad[1]['package'] = 'another.app'
+                        elif changed == 'wrong-context': bad[2]['text'] = 'Personal profile' if edition != 'public' else 'Everyday browsing'
+                        elif changed == 'missing-address': bad.pop(0)
+                        elif changed == 'missing-text': bad[0].pop('text')
+                        elif changed == 'wrong-address-class': bad[0]['class'] = 'android.widget.TextView'
+                        elif changed == 'wrong-address-package': bad[0]['package'] = 'another.app'
+                        elif changed == 'duplicate-address': bad.append(dict(bad[0]))
+                        elif changed == 'duplicate-marker': bad.append(dict(bad[1]))
+                        else: bad.append(dict(bad[2]))
+                        self.assertIsNone(SAFETY.native_home_observation(self.accessibility_nodes(bad, representation), package))
+
+    def test_native_home_observation_reads_worker_parsed_accessibility_elements(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for edition, context in [('home', 'Everyday browsing'), ('team', 'Byte Team · Personal'), ('public', 'Personal profile')]:
+                with self.subTest(edition=edition):
+                    args = self.arguments(folder); args.package = 'org.cyphra.browser.'+edition
+                    worker = SAFETY.NativeSafety(args)
+                    hierarchy = ET.Element('hierarchy')
+                    for attributes in self.native_home(args.package, context):
+                        ET.SubElement(hierarchy, 'node', attributes)
+                    raw = '<?xml version="1.0"?>'+ET.tostring(hierarchy, encoding='unicode')+'\nUI hierarchy dumped'
+                    with patch.object(worker, 'command', return_value=raw):
+                        nodes = worker.nodes()
+                    self.assertTrue(all(isinstance(node, ET.Element) for node in nodes))
+                    self.assertEqual(SAFETY.native_home_observation(nodes, args.package)['context'], context)
 
     def test_home_native_navigation_reports_only_personal_mode(self):
         with tempfile.TemporaryDirectory() as folder:

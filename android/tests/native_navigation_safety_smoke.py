@@ -50,7 +50,7 @@ def native_home_observation(tree, package):
     markers = [node for node in tree if node.get('content-desc') == 'Cyphra new tab' and native(node, 'ImageView')]
     context = [node for node in tree if node.get('text') == contexts[package] and native(node, 'TextView')]
     empty = len(addresses) == 1 and isinstance(addresses[0].get('text'), str) \
-        and addresses[0]['text'] in ('', addresses[0].get('hint'))
+        and addresses[0].get('text') in ('', addresses[0].get('hint'))
     if empty and len(markers) == len(context) == 1:
         return {'package': package, 'mode': 'personal', 'blankAddress': True,
                 'marker': 'Cyphra new tab', 'context': contexts[package]}
