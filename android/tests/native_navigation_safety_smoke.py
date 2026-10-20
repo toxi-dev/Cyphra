@@ -24,11 +24,75 @@ from native_navigation_safety_fixture import DOWNLOAD_BYTES, Fixture, TIMER_BUSY
 from native_navigation_clock import MODEL as CLOCK_MODEL, validate_overlap
 
 ROOT = Path(__file__).resolve().parents[2]
+HANG_PREFERENCES = {
+    'dom.ipc.processHangMonitor': True,
+    'dom.ipc.reportProcessHangs': True,
+    'dom.max_script_run_time': 20,
+    'dom.max_script_run_time.require_critical_input': False,
+}
+HANG_STARTUP_READBACK = ('processHangMonitor=true reportProcessHangs=true '
+                         'maxScriptRunTimeSeconds=20 requireCriticalInput=false verified before browsing')
+RECOVERY_LIMIT_SECONDS = {'Back': 40, 'Home': 20, 'Address': 40}
+HEALTHY_BACK_LIMIT_SECONDS = 20
+EMPTY_OVERRIDES = 'No matching persisted overrides'
 
 
 def need(condition, message):
     if not condition:
         raise AssertionError(message)
+
+
+def typed_preference(value, expected, label):
+    need(type(value) is type(expected) and value == expected,
+         'Wrong hang-monitor preference type/value: ' + label)
+
+
+def parse_hang_policy(policy, overrides):
+    """Read the managed YAML scalars and relevant persisted JS preferences."""
+    startup, persisted, raw = {}, {}, {}
+    for key, expected in HANG_PREFERENCES.items():
+        matches = re.findall(r'^\s*"' + re.escape(key) + r'":\s*(.*?)\s*$', policy, re.MULTILINE)
+        need(len(matches) == 1, 'Missing or duplicate startup hang-monitor preference: ' + key)
+        try:
+            startup[key] = json.loads(matches[0])
+        except ValueError:
+            raise AssertionError('Malformed startup hang-monitor preference: ' + key)
+        typed_preference(startup[key], expected, key)
+    for name in ('prefs.js', 'user.js'):
+        values, lines = {}, []
+        for line in overrides[name].splitlines():
+            line = line.strip()
+            if line.startswith('//') or not any(re.search(r'[\"\']' + re.escape(key) + r'[\"\']', line)
+                                                for key in HANG_PREFERENCES):
+                continue
+            match = re.fullmatch(r'user_pref\(\s*([\"\'])(.*?)\1\s*,\s*(.*?)\s*\);\s*(?://.*)?', line)
+            need(match is not None and match[2] in HANG_PREFERENCES,
+                 'Malformed persisted hang-monitor preference in ' + name)
+            key = match[2]
+            need(key not in values, 'Duplicate persisted hang-monitor preference: ' + key)
+            try:
+                values[key] = json.loads(match[3])
+            except ValueError:
+                raise AssertionError('Malformed persisted hang-monitor preference: ' + key)
+            typed_preference(values[key], HANG_PREFERENCES[key], name + ':' + key)
+            lines.append(line)
+        persisted[name], raw[name] = values, '\n'.join(lines) or EMPTY_OVERRIDES
+    return startup, persisted, raw
+
+
+def document_event(event, kind, run, uri, after, before=None):
+    """Require fresh fixture JavaScript at the exact requested history target."""
+    body = event.get('body', {})
+    need(event.get('method') == 'POST' and event.get('path') == '/event' and event.get('run') == run
+         and body.get('kind') == kind, 'Unexpected browser document event: ' + kind)
+    observed = event.get('monotonicNs')
+    need(type(observed) is int and after < observed and (before is None or observed < before),
+         'Stale or late browser document event: ' + kind)
+    need(body.get('url') == uri, 'Browser document event has the wrong URI: ' + kind)
+    need(isinstance(body.get('token'), str) and bool(body['token'])
+         and isinstance(body.get('title'), str) and bool(body['title']),
+         'Browser document event lacks its actual identity: ' + kind)
+    return event
 
 
 def atomic_json(path, value):
@@ -90,12 +154,13 @@ class NativeSafety:
         self.fixture = Fixture(args.output / 'fixture-events.jsonl')
         self.port = None
         self.reverse_owned = False
+        self.action_deadline = None
         self.report = {'passed': False, 'package': args.package, 'edition': args.package.rsplit('.', 1)[1], 'mode': 'personal',
                        'started': datetime.now(timezone.utc).isoformat(),
                        'timer': {'intervalMilliseconds': TIMER_INTERVAL_MS, 'busyMilliseconds': TIMER_BUSY_MS,
                                  'maxCallbacks': TIMER_MAX_CALLBACKS},
                        'timerTrials': [], 'nativeRecovery': [], 'forceStopCleanupUsed': False,
-                       'hostTimeoutSeconds': args.timeout, 'nativeRecoveryLimitSeconds': 20,
+                       'hostTimeoutSeconds': args.timeout, 'nativeRecoveryLimitsSeconds': dict(RECOVERY_LIMIT_SECONDS),
                        'existingDownloadAndContextTestsChanged': False}
         self.deadline = time.monotonic() + args.timeout - 30
 
@@ -103,7 +168,7 @@ class NativeSafety:
         atomic_json(self.args.output / 'report.json', self.report)
 
     def command(self, *args, seconds=8):
-        remaining = self.deadline - time.monotonic()
+        remaining = min(self.deadline, self.action_deadline or self.deadline) - time.monotonic()
         need(remaining > 0, 'Native safety worker deadline expired.')
         return subprocess.check_output([*self.prefix, *args], stderr=subprocess.STDOUT,
                                        timeout=min(seconds, remaining)).decode().strip()
@@ -112,10 +177,10 @@ class NativeSafety:
         return self.command('shell', command, seconds=seconds)
 
     def wait(self, callback, label, seconds=10):
-        end = min(self.deadline, time.monotonic() + seconds)
+        end = min(self.deadline, self.action_deadline or self.deadline, time.monotonic() + seconds)
         while time.monotonic() < end:
             result = callback()
-            if result:
+            if result and time.monotonic() < end:
                 return result
             time.sleep(.05)
         raise AssertionError(label)
@@ -197,23 +262,22 @@ class NativeSafety:
 
     def policy(self):
         base = '/data/user/0/' + self.args.package + '/files/gecko/personal/'
-        key = shlex.quote('"dom.ipc.processHangMonitor"')
-        policy = self.shell('grep -F ' + key + ' ' + shlex.quote(base + 'policy.yaml'))
-        need(re.fullmatch(r'"dom\.ipc\.processHangMonitor":\s*true', policy), 'Startup hang-monitor policy is not explicitly true.')
+        policy = self.shell('cat ' + shlex.quote(base + 'policy.yaml'))
         overrides = {}
         for name in ('prefs.js', 'user.js'):
-            value = self.shell('if test -f ' + shlex.quote(base + 'profile/' + name) + '; then grep -F '
-                               + key + ' ' + shlex.quote(base + 'profile/' + name) + ' || true; fi')
-            need(not re.search(r'processHangMonitor"\s*,\s*false', value), 'A persisted profile override disables the hang monitor.')
-            overrides[name] = value or 'No override; pinned true default'
+            path = shlex.quote(base + 'profile/' + name)
+            overrides[name] = self.shell('if test -f ' + path + '; then cat ' + path + '; fi')
+        startup, persisted, raw = parse_hang_policy(policy, overrides)
         process = self.shell('pidof ' + self.args.package + ':personal')
         self.report['lastLoopProcess'] = process
         need(re.fullmatch(r'\d+', process), 'Missing Personal process for policy readback evidence.')
         log = self.command('logcat', '-d', '--pid=' + process, '-v', 'brief', '-s', 'CyphraEngine:I')
-        readback = [line for line in log.splitlines() if 'processHangMonitor=true verified before browsing' in line]
-        need(readback, 'No positive live processHangMonitor=true readback for the current Personal process.')
+        readback = [line for line in log.splitlines() if line.endswith(HANG_STARTUP_READBACK)]
+        need(readback, 'No complete startup hang-monitor readback for the current Personal process.')
         return {'startupPolicyTrue': True, 'engineReadyAfterMandatoryLivePreferenceReadback': True,
-                'currentProcess': process, 'positiveReadback': readback[-1], 'persistedOverrides': overrides}
+                'currentProcess': process, 'positiveReadback': readback[-1], 'persistedOverrides': raw,
+                'startupPreferences': startup, 'persistedOverrideValues': persisted,
+                'readbackPhase': 'startup-before-browsing'}
 
     def setup(self):
         spec = importlib.util.spec_from_file_location('engine_patch', ROOT / 'scripts/patch-android-engine.py')
@@ -326,62 +390,124 @@ class NativeSafety:
             self.write()
         self.home(self.toolbar['Home'])
 
+    def inspect_sentinel(self, run, uri, after, seconds, label):
+        def prior_document():
+            tree = self.nodes()
+            return tree if any(node.get('text') == 'Inspect recovered document' for node in tree) else None
+        tree = self.wait(prior_document, label, seconds=seconds)
+        inspection_started = time.monotonic_ns()
+        self.tap(self.bound(tree, 'Inspect recovered document'))
+        inspected = self.event(run, 'sentinel-inspect', after=inspection_started, seconds=5)
+        before = int(self.action_deadline * 1_000_000_000) if self.action_deadline is not None else None
+        document_event(inspected, 'sentinel-inspect', run, uri, max(after, inspection_started), before)
+        return inspection_started, inspected
+
+    def healthy_back(self, run, sentinel_run, sentinel, loop, process, row):
+        # Enabled Back also has a native Home fallback. An actual Back and fresh
+        # prior-URI JavaScript prove a working history target before every hang.
+        point = self.bound(self.nodes(), 'Back')
+        started = time.monotonic_ns()
+        baseline = {'control': 'Back', 'run': run, 'sentinelRun': sentinel_run,
+                    'expectedPriorURI': sentinel['body']['url'], 'priorDocument': sentinel,
+                    'fromDocument': loop, 'backTapStartedNs': started, 'processBefore': process,
+                    'recoveryLimitSeconds': HEALTHY_BACK_LIMIT_SECONDS,
+                    'recovered': False, 'forceStopUsedForRecovery': False}
+        row['healthyBackBaseline'] = baseline
+        self.write()
+        self.action_deadline = min(self.deadline, started / 1_000_000_000 + HEALTHY_BACK_LIMIT_SECONDS)
+        try:
+            self.tap(point)
+            baseline['nativeInputTapSeconds'] = (time.monotonic_ns() - started) / 1_000_000_000
+            need(baseline['nativeInputTapSeconds'] < 4, 'Healthy Back input exceeded its declared deadline.')
+            inspected_at, inspected = self.inspect_sentinel(sentinel_run, baseline['expectedPriorURI'], started, 12,
+                'Healthy native Back did not expose its prior document.')
+            baseline.update(inspectionTapStartedNs=inspected_at, freshJavaScriptAfterBack=inspected)
+            self.same_process(process)
+            completed = time.monotonic_ns()
+            elapsed = (completed - started) / 1_000_000_000
+            baseline.update(recoveryCompletedNs=completed, recoverySeconds=elapsed, processAfter=process)
+            need(elapsed < HEALTHY_BACK_LIMIT_SECONDS, 'Healthy Back exceeded its declared deadline.')
+            baseline['recovered'] = True
+            return baseline
+        finally:
+            self.action_deadline = None
+
     def recovery(self, control):
         run = 'navloop-' + str(time.time_ns()) + '-' + control.lower()
         sentinel_run = run + '-sentinel'
-        self.open(self.url('sentinel', sentinel_run))
-        sentinel = self.event(sentinel_run, 'sentinel-ready')
+        sentinel_uri, loop_uri = self.url('sentinel', sentinel_run), self.url('loop', run)
+        opened = time.monotonic_ns()
+        self.open(sentinel_uri)
+        sentinel = document_event(self.event(sentinel_run, 'sentinel-ready', after=opened),
+                                  'sentinel-ready', sentinel_run, sentinel_uri, opened)
         self.ready()
-        sentinel_bounds = self.bound(self.nodes(), 'Inspect recovered document')
-        self.open(self.url('loop', run))
-        self.event(run, 'loop-ready')
-        # Capture native controls while Gecko is still healthy. There are no
-        # accessibility queries after arming until the direct recovery tap.
-        tree = self.nodes()
-        points = {label: self.bound(tree, label) for label in ('Home', 'Back', 'Address and Brave Search', 'Start supervised loop')}
-        need(control != 'Back' or any(node.get('content-desc') == 'Back' and node.get('enabled') == 'true' for node in tree), 'Back has no healthy history target.')
+        opened = time.monotonic_ns()
+        self.open(loop_uri)
+        first_loop = document_event(self.event(run, 'loop-ready', after=opened),
+                                    'loop-ready', run, loop_uri, opened)
         process = self.shell('pidof ' + self.args.package + ':personal')
-        row = {'control': control, 'run': run, 'capturedHealthyBounds': points, 'processBefore': process,
+        limit = RECOVERY_LIMIT_SECONDS[control]
+        row = {'control': control, 'run': run, 'sentinelRun': sentinel_run, 'expectedPriorURI': sentinel_uri,
+               'priorDocument': sentinel, 'processBefore': process, 'recoveryLimitSeconds': limit,
                'recovered': False, 'forceStopUsedForRecovery': False}
         self.report['nativeRecovery'].append(row)
         self.write()
-        self.tap(points['Start supervised loop'])
-        row['loopStarted'] = self.event(run, 'loop-start', seconds=4)
-        time.sleep(.4)
-        start = time.monotonic()
-        self.tap(points['Address and Brave Search' if control == 'Address' else control])
-        row['nativeInputTapSeconds'] = round(time.monotonic() - start, 3)
-        need(row['nativeInputTapSeconds'] < 4, 'Native control input exceeded its declared deadline.')
-        if control == 'Back':
-            # A direct tap into the previous page proves fresh JS execution,
-            # independently of any stale address/title accessibility nodes.
-            self.wait(lambda: any(node.get('text') == 'Inspect recovered document' for node in self.nodes()), 'Native Back did not expose its prior document.', seconds=12)
-            self.tap(sentinel_bounds)
-            inspected = self.event(sentinel_run, 'sentinel-inspect', after=row['loopStarted']['monotonicNs'], seconds=5)
-            need(inspected['body']['url'] == sentinel['body']['url'], 'Back recovered an unexpected document.')
-            row['freshJavaScriptAfterBack'] = inspected
-        elif control == 'Home':
-            # Home was already tapped using captured bounds; query only now.
-            row['nativeHome'] = self.wait(lambda: native_home_observation(self.nodes(), self.args.package),
-                'Native Home did not recover from the infinite script.', seconds=12)
-        else:
-            destination_run = run + '-new-uri'
-            destination = self.url('sentinel', destination_run)
-            # The existing address control selects all on focus. Explicit
-            # Ctrl+A additionally avoids relying on a stale selection.
-            self.shell('input keycombination KEYCODE_CTRL_LEFT KEYCODE_A', seconds=4)
-            self.shell('input text ' + shlex.quote(destination), seconds=4)
-            self.shell('input keyevent KEYCODE_ENTER', seconds=4)
-            reached = self.event(destination_run, 'sentinel-ready', seconds=12)
-            need(reached['body']['url'] == destination, 'Address navigation did not reach the requested new URI.')
-            row['newURIDocument'] = reached
-            log = self.command('logcat', '-d', '--pid=' + process, '-v', 'threadtime', seconds=6)
-            (self.args.output / (run + '-hang.logcat.txt')).write_text(log + '\n')
-            row['hangReportLines'] = [line for line in log.splitlines() if any(word in line for word in ('GeckoView:HangReport', 'HangReport', 'ProcessHang'))]
-            row['hangReportObserved'] = bool(row['hangReportLines'])
+        self.healthy_back(run, sentinel_run, sentinel, first_loop, process, row)
+        # Reopen explicitly while healthy instead of depending on the optional
+        # Forward toolbar button. The first loop-ready cannot satisfy this load.
+        opened = time.monotonic_ns()
+        self.open(loop_uri)
+        loop = document_event(self.event(run, 'loop-ready', after=opened), 'loop-ready', run, loop_uri, opened)
+        tree = self.nodes()
+        points = {label: self.bound(tree, label) for label in ('Home', 'Back', 'Address and Brave Search', 'Start supervised loop')}
         self.same_process(process)
-        row.update(recovered=True, recoverySeconds=round(time.monotonic() - start, 3), processAfter=process)
-        need(row['recoverySeconds'] < 20, 'Native recovery exceeded its declared deadline.')
+        row.update(loopReady=loop, capturedHealthyBounds=points)
+        self.write()
+        armed = time.monotonic_ns()
+        self.tap(points['Start supervised loop'])
+        row['loopStarted'] = document_event(self.event(run, 'loop-start', after=armed, seconds=4),
+                                          'loop-start', run, loop_uri, armed)
+        need(all(row['loopStarted']['body'][key] == loop['body'][key] for key in ('token', 'url', 'title')),
+             'The infinite script did not start in the prepared loop document.')
+        time.sleep(.4)
+        # One total budget includes native input, UI observation, fresh JS and
+        # the same-process check. No stage receives a new 40-second window.
+        started = time.monotonic_ns()
+        row['recoveryTapStartedNs'] = started
+        self.action_deadline = min(self.deadline, started / 1_000_000_000 + limit)
+        try:
+            self.tap(points['Address and Brave Search' if control == 'Address' else control])
+            row['nativeInputTapSeconds'] = (time.monotonic_ns() - started) / 1_000_000_000
+            need(row['nativeInputTapSeconds'] < 4, 'Native control input exceeded its declared deadline.')
+            if control == 'Back':
+                inspected_at, inspected = self.inspect_sentinel(sentinel_run, sentinel_uri, started, limit,
+                    'Native Back did not expose its prior document.')
+                row.update(inspectionTapStartedNs=inspected_at, freshJavaScriptAfterBack=inspected)
+            elif control == 'Home':
+                row['nativeHome'] = self.wait(lambda: native_home_observation(self.nodes(), self.args.package),
+                    'Native Home did not recover from the infinite script.', seconds=12)
+            else:
+                destination_run = run + '-new-uri'
+                destination = self.url('sentinel', destination_run)
+                self.shell('input keycombination KEYCODE_CTRL_LEFT KEYCODE_A', seconds=4)
+                self.shell('input text ' + shlex.quote(destination), seconds=4)
+                self.shell('input keyevent KEYCODE_ENTER', seconds=4)
+                reached = self.event(destination_run, 'sentinel-ready', after=started, seconds=limit)
+                row['newURIDocument'] = document_event(reached, 'sentinel-ready', destination_run, destination, started,
+                    int(self.action_deadline * 1_000_000_000))
+            self.same_process(process)
+            completed = time.monotonic_ns()
+            elapsed = (completed - started) / 1_000_000_000
+            row.update(recoveryCompletedNs=completed, recoverySeconds=elapsed, processAfter=process)
+            need(elapsed < limit, 'Native recovery exceeded its declared deadline.')
+            row['recovered'] = True
+        finally:
+            self.action_deadline = None
+        # Diagnostic collection is outside the measured recovery interval.
+        log = self.command('logcat', '-d', '--pid=' + process, '-v', 'threadtime', seconds=6)
+        (self.args.output / (run + '-hang.logcat.txt')).write_text(log + '\n')
+        row['hangReportLines'] = [line for line in log.splitlines() if any(word in line for word in ('GeckoView:HangReport', 'HangReport', 'ProcessHang'))]
+        row['hangReportObserved'] = bool(row['hangReportLines'])
         self.write()
         if control != 'Home':
             self.home(points['Home'])

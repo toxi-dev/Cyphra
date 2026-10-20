@@ -141,6 +141,13 @@ test('upstream modules and patch are exact pinned sources; APK overlay and norma
   assert.doesNotMatch(engine, /cancel_content_js_when_navigating/);
   assert.match(engine, /expected\.put\("dom\.ipc\.processHangMonitor",true\)/);
   assert.match(engine, /prefs\.put\("dom\.ipc\.processHangMonitor",true\)/);
+  assert.match(engine, /expected\.put\("dom\.ipc\.reportProcessHangs",true\)/);
+  assert.match(engine, /prefs\.put\("dom\.ipc\.reportProcessHangs",true\)/);
+  assert.match(engine, /expected\.put\("dom\.max_script_run_time",20\)/);
+  assert.match(engine, /prefs\.put\("dom\.max_script_run_time",20\)/);
+  assert.match(engine, /expected\.put\("dom\.max_script_run_time\.require_critical_input",false\)/);
+  assert.match(engine, /prefs\.put\("dom\.max_script_run_time\.require_critical_input",false\)/);
+  assert.match(engine, /processHangMonitor=true reportProcessHangs=true maxScriptRunTimeSeconds=20 requireCriticalInput=false verified before browsing/);
   assert.match(engine, /"-purgecaches"/);
   assert.match(engine, /compiledStartupCacheEngineSHA256/);
   assert.match(engine, /compiledStartupCacheApkUpdateTime/);

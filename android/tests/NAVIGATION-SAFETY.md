@@ -13,7 +13,7 @@ python3 android/tests/native_navigation_safety_smoke.py \
   --package org.cyphra.browser.team \
   --apk /path/to/sealed/Cyphra-0.1.2-android-universal.apk \
   --adb /path/to/android-sdk/platform-tools/adb \
-  --serial emulator-5554 --trials 3 --timeout 300 \
+  --serial emulator-5554 --trials 3 --timeout 420 \
   --output /path/to/new/team-engine-navigation
 ```
 
@@ -102,23 +102,59 @@ using exact rational arithmetic. Slow transport cannot qualify wide or ambiguous
 actual callback bounds; both validators enforce the pinned final precision cap.
 
 Separate pages start a deliberately infinite script only after the supervised
-test explicitly taps its button. Native Back, Home and address/newURI recovery
-must each complete in under 20 seconds in the same Personal Android process.
-Input taps must return in under four seconds. Control bounds are captured while
-Gecko is healthy; after arming, the runner directly taps those bounds before any
-accessibility query. Back additionally requires fresh JavaScript in its previous
-document. Address entry must actually load the requested new local URI. The app
-has no Stop control: the unchanged Stop API path has source/offline coverage
-only, with no native Stop recovery claim.
+test explicitly taps its button. Before each recovery case, the runner first
+loads a unique sentinel and an unarmed loop, taps native Back, and requires a new
+inspection event from JavaScript at the exact sentinel URI in the same Personal
+process. This healthy baseline has a 20-second total limit and a 12-second prior
+document observation window. Back's enabled accessibility state is insufficient:
+the app also uses Back to return to native Home when there is no history. A
+history return may reload the sentinel, so its newly observed token is recorded
+without requiring the original token to survive. The runner then explicitly
+reopens the loop while healthy and requires a new ready event before arming it.
+No Forward toolbar setting is required, and no attachment/timer fixture changes.
 
-The live preference readback code emits the boolean-only native log
-`processHangMonitor=true verified before browsing` after all expected preferences
-have matched. The runner requires that positive line from the current Personal
-PID before and after the cases, explicit true policy and no false persisted
-override. It does not record URLs or script names in that app log. Available
-GeckoView `HangReport`/`ProcessHang` log lines and raw local logcat are captured;
-release logging may suppress event names, and the proof records whether any
-were actually observed.
+Native Back and address/newURI recovery must complete in under 40 seconds, and
+native Home must complete in under 20 seconds, all in the same Personal Android
+process. Home retains its 12-second observation window. Back and Address allow
+the pinned engine's ordinary 20-second slow-script watchdog to report and stop
+the loop. Gecko waits two half-timeout periods before reporting; STOP can be
+consumed at a later half-timeout callback (`XPCJSContext.cpp:705–719`,
+`ProcessHangMonitor.cpp:550–555,726–759` at the pinned revision). Forty seconds
+allows those stages plus scheduling and document restoration. It is a
+qualification deadline, not an upstream latency guarantee or a change to the
+engine timeout. Earlier runs that failed the shorter guard remain failed. These
+longer windows do not qualify an Address input command that itself times out.
+
+Every native input command retains its four-second bound. The single recovery
+budget starts before the native control tap and includes address typing/Enter,
+UI observation, fresh JavaScript where required, and the same-process check.
+Subsequent stages receive only the remaining budget. Back requires fresh prior
+URI JavaScript after the inspection tap, and Address must load the requested new
+local URI. A stale baseline event or an event arriving at/after the total deadline
+cannot qualify. Control bounds are recaptured while Gecko is healthy; after
+arming, the runner directly taps those bounds before any accessibility query.
+The app has no Stop control: the unchanged Stop API path has source/offline
+coverage only, with no native Stop recovery claim.
+
+The runner strictly parses four managed startup preferences with their actual
+types: `dom.ipc.processHangMonitor=true`, `dom.ipc.reportProcessHangs=true`,
+`dom.max_script_run_time=20` (integer), and
+`dom.max_script_run_time.require_critical_input=false`. Missing/duplicate values,
+wrong types, or conflicting persisted `prefs.js`/`user.js` overrides fail. The
+engine emits this value-only native log after its mandatory live startup
+readback has matched every expected preference:
+
+`processHangMonitor=true reportProcessHangs=true maxScriptRunTimeSeconds=20 requireCriticalInput=false verified before browsing`
+
+The runner requires the complete tuple from the current Personal PID before the
+cases and re-observes it after them. The final observation proves that the same
+process's startup verification remains available; it is not a fresh end-of-run
+live preference query. The proof records `readbackPhase=startup-before-browsing`
+and the actual managed/persisted values. The native log contains no URLs or
+script names. Available GeckoView `HangReport`/`ProcessHang` lines and raw local
+logcat are captured outside the measured recovery interval for every control;
+the proof records whether any were actually observed. Absence of a line does not
+establish that a callback ran or that monitoring was disabled.
 
 The supervising host process enforces a total timeout with reserved cleanup
 time; every ADB command has its own shorter deadline. Any worker error, native
@@ -138,7 +174,8 @@ also attempts a bounded capture if the worker exited without one.
 Successful `proof.json` fields for the `engine-navigation` evidence kind:
 
 - `passed`, `package`, `edition`, `overlaySHA256`, `processHangMonitor=true`,
-  `hangMonitorEvidence.before/after.positiveReadback` and current process.
+  `hangMonitorEvidence.before/after.positiveReadback`, typed `startupPreferences`,
+  `persistedOverrideValues`, startup `readbackPhase`, and current process.
 - `busyTimerAttachment.passed`, `trialCount=3`, and three trials with identity
   plus ordered Cancel/Save actions. Each action includes its original start
   report, actual attachment request, two continued document events and
@@ -147,8 +184,16 @@ Successful `proof.json` fields for the `engine-navigation` evidence kind:
   server reply, and recomputable strict host
   bounds. `actualOverlapComplete` host-arrival evidence is no longer accepted.
 - `hungBack`, `hungHome`, `hungAddress`: `recovered=true`,
-  `recoverySeconds<20`, `nativeInputTapSeconds<4`, equal before/after process,
-  and `forceStopUsedForRecovery=false`.
+  `recoverySeconds<40` for Back/Address and `<20` for Home,
+  `nativeInputTapSeconds<4`, equal before/after process,
+  `recoveryTapStartedNs`/`recoveryCompletedNs`, and
+  `forceStopUsedForRecovery=false`. The top-level `nativeRecoveryLimitsSeconds`
+  and each row's `recoveryLimitSeconds` record the fixed per-control limits.
+- Each recovery includes its actual `healthyBackBaseline`, prior sentinel,
+  first unarmed loop, fresh baseline inspection and completion, and newly
+  reopened `loopReady`. The actual `loopStarted` must have that ready document's
+  token/URL/title. Freshness and exact target URI remain mandatory even when a
+  history return creates a new sentinel token.
 - `forceStopCleanupUsed=false`. Address includes its actual new-URI event;
   Back includes its fresh post-loop inspection event.
 

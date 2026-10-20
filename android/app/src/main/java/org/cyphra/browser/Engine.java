@@ -381,6 +381,9 @@ public final class Engine {
         Map<String,Object> expected=new LinkedHashMap<>();
         expected.put("cyphra.android.policy",1);
         expected.put("dom.ipc.processHangMonitor",true);
+        expected.put("dom.ipc.reportProcessHangs",true);
+        expected.put("dom.max_script_run_time",20);
+        expected.put("dom.max_script_run_time.require_critical_input",false);
         expected.put("toolkit.telemetry.enabled",false);
         expected.put("toolkit.telemetry.unified",false);
         expected.put("toolkit.telemetry.server","data:,");
@@ -398,9 +401,9 @@ public final class Engine {
                 android.util.Log.e("CyphraEngine","Privacy policy verification failed for "+entry.getKey());
                 fail("Gecko did not apply its privacy policy.");return;
             }
-            // A boolean-only native policy trace provides positive readback
-            // evidence without recording URLs, script names or profile data.
-            android.util.Log.i("CyphraEngine","processHangMonitor=true verified before browsing");
+            // This fixed policy trace proves live startup readback without
+            // recording URLs, script names or profile data.
+            android.util.Log.i("CyphraEngine","processHangMonitor=true reportProcessHangs=true maxScriptRunTimeSeconds=20 requireCriticalInput=false verified before browsing");
             preferencesVerified=true;maybeReady();
         },e->fail("Gecko's privacy policy could not be verified."));
     }
@@ -434,6 +437,9 @@ public final class Engine {
         Map<String,Object> prefs=new LinkedHashMap<>();
         prefs.put("cyphra.android.policy",1);
         prefs.put("dom.ipc.processHangMonitor",true);
+        prefs.put("dom.ipc.reportProcessHangs",true);
+        prefs.put("dom.max_script_run_time",20);
+        prefs.put("dom.max_script_run_time.require_critical_input",false);
         for(String key:Arrays.asList("toolkit.telemetry.enabled","toolkit.telemetry.unified",
             "toolkit.telemetry.archive.enabled","toolkit.telemetry.newProfilePing.enabled",
             "toolkit.telemetry.firstShutdownPing.enabled","toolkit.telemetry.shutdownPingSender.enabled",

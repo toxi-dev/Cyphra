@@ -1,4 +1,5 @@
 """Offline checks of failure cleanup and deadlines; no ADB/server (MPL-2.0)."""
+import copy
 import importlib
 import json
 from pathlib import Path
@@ -23,6 +24,164 @@ class NavigationSafetyTest(unittest.TestCase):
         return SimpleNamespace(output=Path(folder), adb='never-execute-adb', serial='test-serial',
                                package='org.cyphra.browser.public', timeout=300, trials=3,
                                apk=Path(folder) / 'never-open.apk')
+
+    @staticmethod
+    def policy_text(values=None):
+        return 'prefs:\n' + '\n'.join('  ' + json.dumps(key) + ': ' + json.dumps(value)
+                                      for key, value in (values or SAFETY.HANG_PREFERENCES).items())
+
+    def test_policy_requires_each_managed_preference_with_exact_boolean_or_integer_type(self):
+        empty = {'prefs.js': '', 'user.js': ''}
+        values, overrides, raw = SAFETY.parse_hang_policy(self.policy_text(), empty)
+        self.assertEqual(values, SAFETY.HANG_PREFERENCES)
+        self.assertEqual(overrides, {'prefs.js': {}, 'user.js': {}})
+        self.assertTrue(all(value == SAFETY.EMPTY_OVERRIDES for value in raw.values()))
+        for key, expected in SAFETY.HANG_PREFERENCES.items():
+            wrong = [str(expected), None, not expected] if type(expected) is bool else ['20', 20.0, True, 0]
+            for value in wrong:
+                with self.subTest(key=key, value=value):
+                    changed = dict(SAFETY.HANG_PREFERENCES); changed[key] = value
+                    with self.assertRaisesRegex(AssertionError, 'type/value'):
+                        SAFETY.parse_hang_policy(self.policy_text(changed), empty)
+            text = self.policy_text()
+            matching = next(line for line in text.splitlines() if json.dumps(key) + ':' in line)
+            for changed in (text.replace(matching, ''), text + '\n' + matching):
+                with self.subTest(key=key, duplicate=changed.endswith(matching)):
+                    with self.assertRaisesRegex(AssertionError, 'Missing or duplicate'):
+                        SAFETY.parse_hang_policy(changed, empty)
+
+    def test_persisted_policy_tampering_cannot_hide_behind_true_startup_yaml(self):
+        for name in ('prefs.js', 'user.js'):
+            for key, expected in SAFETY.HANG_PREFERENCES.items():
+                for value in (not expected, str(expected), 20.0 if type(expected) is int else int(expected)):
+                    with self.subTest(name=name, key=key, value=value):
+                        overrides = {'prefs.js': '', 'user.js': ''}
+                        overrides[name] = 'user_pref(' + json.dumps(key) + ', ' + json.dumps(value) + ');'
+                        with self.assertRaisesRegex(AssertionError, 'type/value'):
+                            SAFETY.parse_hang_policy(self.policy_text(), overrides)
+        matching = 'user_pref("dom.max_script_run_time", 20);'
+        values, persisted, raw = SAFETY.parse_hang_policy(self.policy_text(), {'prefs.js': matching, 'user.js': ''})
+        self.assertEqual(persisted['prefs.js'], {'dom.max_script_run_time': 20})
+        self.assertEqual(raw['prefs.js'], matching)
+        for changed in (matching + '\n' + matching, matching.replace('20', 'not_a_number')):
+            with self.assertRaisesRegex(AssertionError, 'Duplicate|Malformed'):
+                SAFETY.parse_hang_policy(self.policy_text(), {'prefs.js': changed, 'user.js': ''})
+
+    def test_policy_reobserves_the_complete_startup_tuple_in_the_same_current_pid(self):
+        with tempfile.TemporaryDirectory() as folder:
+            worker = SAFETY.NativeSafety(self.arguments(folder))
+            def shell(command):
+                if command.startswith('pidof '): return '42'
+                if command.startswith('cat '): return self.policy_text()
+                return ''
+            for message, accepted in [(SAFETY.HANG_STARTUP_READBACK, True),
+                                      ('processHangMonitor=true verified before browsing', False),
+                                      (SAFETY.HANG_STARTUP_READBACK.replace('=20 ', '="20" '), False),
+                                      (SAFETY.HANG_STARTUP_READBACK + ' stale suffix', False)]:
+                with self.subTest(message=message), patch.object(worker, 'shell', side_effect=shell), \
+                        patch.object(worker, 'command', return_value='I/CyphraEngine( 42): ' + message) as logcat:
+                    if accepted:
+                        observed = worker.policy()
+                        self.assertEqual(observed['startupPreferences'], SAFETY.HANG_PREFERENCES)
+                        self.assertEqual(observed['readbackPhase'], 'startup-before-browsing')
+                        self.assertEqual(observed['currentProcess'], '42')
+                        self.assertIn('--pid=42', logcat.call_args.args)
+                    else:
+                        with self.assertRaisesRegex(AssertionError, 'complete startup'):
+                            worker.policy()
+
+    @staticmethod
+    def document(kind='sentinel-inspect', run='case-sentinel', when=102, uri=None, token='reloaded-document'):
+        return {'method': 'POST', 'path': '/event', 'run': run, 'monotonicNs': when,
+                'body': {'kind': kind, 'url': uri or 'http://localhost:123/sentinel?run=' + run,
+                         'token': token, 'title': 'Fixture document'}}
+
+    def test_fresh_history_event_requires_the_exact_uri_run_and_post_tap_timestamp(self):
+        good = self.document()
+        uri = good['body']['url']
+        self.assertIs(SAFETY.document_event(good, 'sentinel-inspect', 'case-sentinel', uri, 100, 110), good)
+        for change in ('uri', 'run', 'stale', 'late', 'ready-only', 'missing-token'):
+            with self.subTest(change=change):
+                event = copy.deepcopy(good)
+                if change == 'uri': event['body']['url'] += '-wrong'
+                elif change == 'run': event['run'] = 'another-run'
+                elif change == 'stale': event['monotonicNs'] = 100
+                elif change == 'late': event['monotonicNs'] = 110
+                elif change == 'ready-only': event['body']['kind'] = 'sentinel-ready'
+                else: event['body']['token'] = ''
+                with self.assertRaises(AssertionError):
+                    SAFETY.document_event(event, 'sentinel-inspect', 'case-sentinel', uri, 100, 110)
+
+    def test_action_deadline_caps_adb_and_late_callback_cannot_restart_its_budget(self):
+        with tempfile.TemporaryDirectory() as folder:
+            worker = SAFETY.NativeSafety(self.arguments(folder))
+            worker.deadline = 100
+            worker.action_deadline = 40
+            with patch.object(SAFETY.time, 'monotonic', return_value=39), \
+                    patch.object(SAFETY.subprocess, 'check_output', return_value=b'ok') as adb:
+                worker.command('shell', 'unused', seconds=4)
+                self.assertEqual(adb.call_args.kwargs['timeout'], 1)
+            with patch.object(SAFETY.time, 'monotonic', return_value=40), \
+                    patch.object(SAFETY.subprocess, 'check_output') as adb:
+                with self.assertRaisesRegex(AssertionError, 'deadline expired'):
+                    worker.command('shell', 'unused', seconds=4)
+                adb.assert_not_called()
+            now = [39.0]
+            def late_success():
+                now[0] = 40.0
+                return True
+            with patch.object(SAFETY.time, 'monotonic', side_effect=lambda: now[0]), \
+                    patch.object(SAFETY.time, 'sleep'):
+                with self.assertRaisesRegex(AssertionError, 'late result'):
+                    worker.wait(late_success, 'late result', seconds=40)
+
+    def test_healthy_back_runs_actual_taps_and_allows_a_reloaded_prior_document(self):
+        with tempfile.TemporaryDirectory() as folder:
+            worker = SAFETY.NativeSafety(self.arguments(folder))
+            now = [1_000_000_000]
+            def tap(point):
+                now[0] += 10_000_000
+                if point == [45, 5]:
+                    worker.fixture.events.append(self.document(when=now[0]))
+            back = {'content-desc': 'Back', 'enabled': 'true', 'bounds': '[10,0][20,10]'}
+            inspect = {'text': 'Inspect recovered document', 'enabled': 'true', 'bounds': '[40,0][50,10]'}
+            row = {}
+            original = self.document('sentinel-ready', when=1, token='original-document')
+            with patch.object(SAFETY.time, 'monotonic_ns', side_effect=lambda: now[0]), \
+                    patch.object(SAFETY.time, 'monotonic', side_effect=lambda: now[0] / 1e9), \
+                    patch.object(worker, 'nodes', side_effect=[[back], [inspect]]), \
+                    patch.object(worker, 'tap', side_effect=tap) as taps, \
+                    patch.object(worker, 'shell', return_value='42'):
+                baseline = worker.healthy_back('case', 'case-sentinel', original, {}, '42', row)
+            self.assertEqual([call.args[0] for call in taps.call_args_list], [[15, 5], [45, 5]])
+            self.assertTrue(baseline['recovered'])
+            self.assertEqual(baseline['freshJavaScriptAfterBack']['body']['url'], original['body']['url'])
+            self.assertNotEqual(baseline['freshJavaScriptAfterBack']['body']['token'], original['body']['token'])
+            self.assertIs(row['healthyBackBaseline'], baseline)
+            self.assertIsNone(worker.action_deadline)
+
+    def test_healthy_back_rejects_wrong_uri_and_stale_inspection_without_recovery_claim(self):
+        for changed in ('wrong-uri', 'stale'):
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as folder:
+                worker = SAFETY.NativeSafety(self.arguments(folder))
+                now = [1_000_000_000]
+                back = {'content-desc': 'Back', 'enabled': 'true', 'bounds': '[10,0][20,10]'}
+                inspect = {'text': 'Inspect recovered document', 'enabled': 'true', 'bounds': '[40,0][50,10]'}
+                def tap(point):
+                    now[0] += 10_000_000
+                    if point == [45, 5] and changed == 'wrong-uri':
+                        worker.fixture.events.append(self.document(when=now[0], uri='http://localhost/wrong'))
+                worker.fixture.events.append(self.document(when=100))
+                row = {}
+                with patch.object(SAFETY.time, 'monotonic_ns', side_effect=lambda: now[0]), \
+                        patch.object(SAFETY.time, 'monotonic', side_effect=lambda: now[0] / 1e9), \
+                        patch.object(SAFETY.time, 'sleep', side_effect=lambda seconds: now.__setitem__(0, now[0] + int(seconds * 1e9))), \
+                        patch.object(worker, 'nodes', side_effect=[[back], [inspect]]), \
+                        patch.object(worker, 'tap', side_effect=tap), patch.object(worker, 'shell', return_value='42'):
+                    with self.assertRaisesRegex(AssertionError, 'wrong URI|Missing browser event'):
+                        worker.healthy_back('case', 'case-sentinel', self.document('sentinel-ready', when=1), {}, '42', row)
+                self.assertFalse(row['healthyBackBaseline']['recovered'])
+                self.assertIsNone(worker.action_deadline)
 
     def test_failed_worker_cannot_become_recovery_even_with_stale_success_report(self):
         with tempfile.TemporaryDirectory() as folder:
