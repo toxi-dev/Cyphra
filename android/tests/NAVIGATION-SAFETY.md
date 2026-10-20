@@ -136,6 +136,18 @@ arming, the runner directly taps those bounds before any accessibility query.
 The app has no Stop control: the unchanged Stop API path has source/offline
 coverage only, with no native Stop recovery claim.
 
+After native Home's UI marker and same-PID recovery have completed, a separate
+functional gate opens one unique local sentinel as the user's next ordinary
+page. It requires fresh JavaScript at that exact URI, exactly one new GET, and
+the same Personal PID within one eight-second total window from opening through
+the PID check. `homeFreshFollowup` records the raw request/ready event, actual
+token/URL/title, start/completion timestamps and elapsed load time. It does not
+extend or relabel Home's original 20-second total or 12-second UI observation
+metric. No sleep, reload, retry, force-stop, or runtime restart can repair this
+gate. After success, the runner returns to native Home through its ordinary
+control before the next case. Back, Home and Address retain their original
+order; a subsequent-page failure cannot be hidden by moving Home last.
+
 The runner strictly parses four managed startup preferences with their actual
 types: `dom.ipc.processHangMonitor=true`, `dom.ipc.reportProcessHangs=true`,
 `dom.max_script_run_time=20` (integer), and
@@ -150,11 +162,29 @@ The runner requires the complete tuple from the current Personal PID before the
 cases and re-observes it after them. The final observation proves that the same
 process's startup verification remains available; it is not a fresh end-of-run
 live preference query. The proof records `readbackPhase=startup-before-browsing`
-and the actual managed/persisted values. The native log contains no URLs or
-script names. Available GeckoView `HangReport`/`ProcessHang` lines and raw local
-logcat are captured outside the measured recovery interval for every control;
-the proof records whether any were actually observed. Absence of a line does not
-establish that a callback ran or that monitoring was disabled.
+and the actual managed/persisted values. The startup verification log contains no
+URLs or script names.
+
+While each loop is still healthy, after its healthy Back baseline and before
+arming it, the runner snapshots exact `GeckoSession` parent-PID
+`handleMessage GeckoView:HangReport uri=...` event lines. After recovery it saves
+the complete raw log and reports only exact event lines absent from that snapshot.
+Preference/configuration text, startup messages, related event names, other PIDs,
+and previously available identical lines cannot count. Both log reads are outside
+the measured recovery interval. `hangReportBaselineLines` retains the comparison
+set; `hangReportLines` and `hangReportObserved` describe newly available matching
+parent-PID lines, not events attributed to the target page. No log clearing or
+wall-clock/host-monotonic conversion is used. A newly available line can describe
+a delayed event from another document, and an unavailable/suppressed line cannot
+establish that monitoring was disabled.
+
+Failure capture also retains its full raw log. If a healthy pre-arm snapshot
+exists for the current PID, `failureHangReportBaselineRun` identifies the latest
+available baseline and `failureHangReportLines` records the same exact-line delta.
+This may be a preceding case when the failure occurred during preparation of the
+next case. Without a baseline, `failureHangReportBaselineAvailable=false` and no
+new-event claim is made. `hangReportObservationScope` and the corresponding
+failure scope field make these diagnostic limits explicit.
 
 The supervising host process enforces a total timeout with reserved cleanup
 time; every ADB command has its own shorter deadline. Any worker error, native
@@ -189,6 +219,12 @@ Successful `proof.json` fields for the `engine-navigation` evidence kind:
   `recoveryTapStartedNs`/`recoveryCompletedNs`, and
   `forceStopUsedForRecovery=false`. The top-level `nativeRecoveryLimitsSeconds`
   and each row's `recoveryLimitSeconds` record the fixed per-control limits.
+- `hungHome.homeFreshFollowup`: `completed=true`, `loadLimitSeconds=8`,
+  `loadSeconds<8`, raw `openStartedNs`/`loadCompletedNs`, one `documentRequest`
+  with `documentFetches=1`, its exact fresh `documentReady`, equal before/after
+  process, and `forceStopUsedForRecovery=false`. This followup starts after
+  Home's measured `recoveryCompletedNs`; its separate eight-second window
+  includes ordinary navigation, fresh JavaScript and the final PID check.
 - Each recovery includes its actual `healthyBackBaseline`, prior sentinel,
   first unarmed loop, fresh baseline inspection and completion, and newly
   reopened `loopReady`. The actual `loopStarted` must have that ready document's

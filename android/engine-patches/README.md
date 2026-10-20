@@ -1,4 +1,4 @@
-# GeckoView app URI interruption integration
+# GeckoView navigation and session-close integration
 
 This is a custom GeckoView source-module overlay, based on official GeckoView
 `158.0.20261007201254`, native Mozilla revision
@@ -48,8 +48,32 @@ text-directive activation, schemeless-input and app-link handling remain in
 their original paths. Ordinary wrapper callers, `loadURI`, back/forward/index,
 reload and Stop retain upstream behavior. The startup policy explicitly sets
 and reads back `dom.ipc.processHangMonitor=true`; normal process hang monitoring
-stays enabled. No website timer repair, attachment refetch or test-assertion
-relaxation is included.
+stays enabled. Attachment identity, no-refetch and timer-progression assertions remain
+mandatory. The native timing budgets and their watchdog rationale are documented
+in [NAVIGATION-SAFETY.md](../tests/NAVIGATION-SAFETY.md).
+
+A definite session close now requests cancellation through the same per-tab
+`RemoteWebNavigation` epoch wrapper from `GeckoViewNavigation.onDestroy`.
+`about:blank` supplies cancellation metadata; the hook sends no load request.
+The call runs in the ordinary unload group before the browser element is reset
+and before the hang-monitor module removes its observer. Missing remote actors
+and teardown races are guarded, and the hook is idempotent. Remoteness changes
+and ordinary app loads retain their existing paths. All official native
+libraries remain unchanged.
+
+This addresses an observed Home transition: the next page fetched once, but its
+fresh JavaScript ran only 30.577 seconds later after the ordinary watchdog.
+That failed eight-second observation is retained as a diagnostic. The new signed
+APK must independently prove native Home recovery followed by one exact fresh
+page within a separate eight-second total budget, including same-process
+verification. Source/offline tests alone do not qualify the fix.
+
+Pinned close-order contracts: [GeckoView module manager](https://hg.mozilla.org/releases/mozilla-release/file/eb9a6e3a736802c8e080a76c44dc81f409d99d54/mobile/shared/chrome/geckoview/geckoview.js),
+[docshell destruction](https://hg.mozilla.org/releases/mozilla-release/file/eb9a6e3a736802c8e080a76c44dc81f409d99d54/docshell/base/nsDocShell.cpp),
+and the browser URI wrapper linked below. The original 20-second content-script
+timeout and process hang reporting remain explicitly enabled and verified before
+browsing. Available report events are compared with a healthy pre-arm snapshot;
+configuration text and reports from an earlier control do not qualify as new.
 
 The initially considered direct BrowsingContext call was rejected: it would
 also bypass the nonremote `isNavigating` wrapper and would omit the cancellation
@@ -93,7 +117,7 @@ duplicate module entries.
 | Container | SHA-256 |
 | --- | --- |
 | Upstream `assets/omni.ja` | `f57a01ec39057d63058018dc36ece9ffade201de99db464c3fe6ff7d536c89f9` |
-| Generated `assets/omni.ja` | `a70bc0ce798434038ba80dc159cdc9b11bc4f676d3adbb4d49a6f2ceb4bc8619` |
+| Generated `assets/omni.ja` | `87c1f391e360a3388d3eb3b424b9da5f1875ea96c1dac33db77c4882acd97d26` |
 
 Original/final module hashes, patch hash, the official Java bridge JAR hash and
 all 39 official native-library hashes are in `android/engine-lock.json`.
@@ -155,7 +179,7 @@ Every derived release must satisfy these checks on its exact signed APKs:
 1. Preserve the causal diagnostic and unchanged original attachment assertions.
    A pass in a broad hang-monitor-disabled arm is diagnostic only.
 2. Build in the isolated tree, check merged asset precedence using `verify-apk`
-   on both editions, run Java tests/lint, and verify signatures/ABIs/alignment.
+   on each edition, run Java tests/lint, and verify signatures/ABIs/alignment.
 3. Warm the previously published Gecko 157 profiles first. Install the new
    same-signer Gecko 158 APK without clearing app data; verify first-start cache
    canary removal, both profiles reach ready, markers match the overlay/package
@@ -176,7 +200,7 @@ Every derived release must satisfy these checks on its exact signed APKs:
    The app exposes no native Stop control. Its unchanged GeckoSession Stop API
    path has source/offline coverage only; do not describe Home or force-stop
    cleanup as an observed Stop recovery.
-5. Freeze both source heads again, rebuild matching source archives and update
+5. Freeze the edition source heads again, rebuild matching source archives and update
    envelopes, and begin a new exact-APK qualification window. The current sealed
    upstream APK receipts cannot qualify this modified engine.
 

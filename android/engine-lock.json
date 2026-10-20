@@ -23,19 +23,19 @@
   "reportingPolicy": "Runtime reporting preferences disabled and critical values read back before browsing; known telemetry requests denied; no crash-upload delegate. Reporting classes have not been compiled out.",
   "nativePageAlignment": "arm64-v8a and x86_64 LOAD segments verified at 16384 bytes; armeabi-v7a at 4096 bytes. Physical devices remain unqualified.",
   "integration": {
-    "id": "cyphra-app-uri-no-interrupt-v1",
+    "id": "cyphra-app-uri-no-interrupt-v2",
     "kind": "generated-apk-asset-override",
     "modifiedUpstreamEngine": true,
     "patchFile": "android/engine-patches/app-uri-no-interrupt.patch",
-    "patchSha256": "fa1b46b86d9d31eb131d72d3f8df44a00b864c51f14a2164173b4f691d03ffc3",
+    "patchSha256": "fdcced0c416a5be811ea42789bb0faedbddb9300fddf29b2b968378f564cbe6d",
     "upstreamOmniSha256": "f57a01ec39057d63058018dc36ece9ffade201de99db464c3fe6ff7d536c89f9",
-    "patchedOmniSha256": "a70bc0ce798434038ba80dc159cdc9b11bc4f676d3adbb4d49a6f2ceb4bc8619",
+    "patchedOmniSha256": "87c1f391e360a3388d3eb3b424b9da5f1875ea96c1dac33db77c4882acd97d26",
     "modules": [
       {
         "archivePath": "modules/GeckoViewNavigation.sys.mjs",
         "upstreamSource": "android/engine-patches/upstream/GeckoViewNavigation.sys.mjs",
         "upstreamSha256": "fb5926acbf81a405929309b39076f1ef86c4e407795f8903963d3f15158f208c",
-        "patchedSha256": "83a45bbe5337f47822b5e17eef16dbf075a9e9263149aec57c151cf8dc7ff9dd",
+        "patchedSha256": "b39381a6f9bc5feca7fc98c4726a8c885170d0323ae69a0d9b82e83040fc1d64",
         "sourcePath": "mobile/shared/modules/geckoview/GeckoViewNavigation.sys.mjs",
         "sourceUrl": "https://hg.mozilla.org/releases/mozilla-release/raw-file/eb9a6e3a736802c8e080a76c44dc81f409d99d54/mobile/shared/modules/geckoview/GeckoViewNavigation.sys.mjs"
       },

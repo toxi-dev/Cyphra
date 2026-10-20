@@ -1,5 +1,6 @@
 """Offline checks of failure cleanup and deadlines; no ADB/server (MPL-2.0)."""
 import copy
+from contextlib import contextmanager
 import importlib
 import json
 from pathlib import Path
@@ -9,7 +10,7 @@ import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,6 +25,154 @@ class NavigationSafetyTest(unittest.TestCase):
         return SimpleNamespace(output=Path(folder), adb='never-execute-adb', serial='test-serial',
                                package='org.cyphra.browser.public', timeout=300, trials=3,
                                apk=Path(folder) / 'never-open.apk')
+
+    @contextmanager
+    def followup_worker(self, folder, changed=None):
+        worker = SAFETY.NativeSafety(self.arguments(folder)); worker.port = 123
+        row = {'run': 'case-home', 'recoverySeconds': 2.5, 'recoveryCompletedNs': 900_000_000,
+               'nativeHome': {'marker': 'Cyphra new tab'}, 'recovered': True}
+        now = [1_000_000_000]
+        def open_document(uri):
+            run = 'case-home-home-followup'
+            now[0] += 100_000_000
+            request = {'method': 'GET', 'path': '/sentinel', 'run': run, 'monotonicNs': now[0]}
+            if changed == 'stale-get': request['monotonicNs'] = 999_999_999
+            if changed == 'wrong-get-path': request['path'] = '/loop'
+            if changed != 'no-get': worker.fixture.events.append(request)
+            if changed == 'duplicate-get': worker.fixture.events.append(dict(request))
+            now[0] += 100_000_000
+            ready = self.document('sentinel-ready', run, now[0], uri, token='a' * 32)
+            ready['body']['title'] = 'Cyphra native Back sentinel'
+            if changed == 'wrong-uri': ready['body']['url'] += '-wrong'
+            if changed == 'stale-ready': ready['monotonicNs'] = 999_999_999
+            if changed == 'late-ready': ready['monotonicNs'] = 9_000_000_000
+            if changed != 'no-ready': worker.fixture.events.append(ready)
+        worker.open = Mock(side_effect=open_document)
+        def pid(command, **kwargs):
+            self.assertEqual(command, 'pidof org.cyphra.browser.public:personal')
+            now[0] = 9_000_000_000 if changed == 'late-pid' else now[0] + 100_000_000
+            return '99' if changed == 'wrong-pid' else '42'
+        worker.shell = Mock(side_effect=pid)
+        with patch.object(SAFETY.time, 'monotonic_ns', side_effect=lambda: now[0]), \
+                patch.object(SAFETY.time, 'monotonic', side_effect=lambda: now[0] / 1e9), \
+                patch.object(SAFETY.time, 'sleep', side_effect=lambda seconds: now.__setitem__(0, now[0] + int(seconds * 1e9))):
+            yield worker, row
+
+    def test_home_followup_proves_one_fresh_document_without_relabelling_native_home_time(self):
+        with tempfile.TemporaryDirectory() as folder, self.followup_worker(folder) as (worker, row):
+            native = copy.deepcopy(row)
+            worker.home_followup(row, '42')
+            followup = row['homeFreshFollowup']
+            self.assertTrue(followup['completed'])
+            self.assertEqual(followup['documentFetches'], 1)
+            self.assertEqual(followup['loadLimitSeconds'], 8)
+            self.assertAlmostEqual(followup['loadSeconds'], 0.3)
+            self.assertEqual(followup['processBefore'], followup['processAfter'])
+            self.assertLess(row['recoveryCompletedNs'], followup['openStartedNs'])
+            self.assertLess(followup['openStartedNs'], followup['documentRequest']['monotonicNs'])
+            self.assertLess(followup['documentRequest']['monotonicNs'], followup['documentReady']['monotonicNs'])
+            self.assertLess(followup['documentReady']['monotonicNs'], followup['loadCompletedNs'])
+            self.assertEqual(followup['documentReady']['body']['url'], followup['expectedURI'])
+            worker.open.assert_called_once_with(followup['expectedURI'])
+            self.assertEqual({key: row[key] for key in native}, native)
+            self.assertIsNone(worker.action_deadline)
+
+    def test_home_followup_rejects_replay_wrong_target_refetch_restart_and_late_pid_without_retry(self):
+        cases = {'wrong-uri': 'wrong URI', 'stale-ready': 'Missing browser event',
+                 'late-ready': 'Stale or late', 'no-ready': 'Missing browser event',
+                 'duplicate-get': 'more or less than once', 'no-get': 'more or less than once',
+                 'stale-get': 'fresh exact sentinel request', 'wrong-get-path': 'fresh exact sentinel request',
+                 'wrong-pid': 'restarted or lost', 'late-pid': 'total load deadline'}
+        for changed, message in cases.items():
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as folder, \
+                    self.followup_worker(folder, changed) as (worker, row):
+                native = copy.deepcopy(row)
+                with self.assertRaisesRegex(AssertionError, message):
+                    worker.home_followup(row, '42')
+                self.assertFalse(row['homeFreshFollowup']['completed'])
+                self.assertEqual({key: row[key] for key in native}, native)
+                worker.open.assert_called_once()
+                self.assertIsNone(worker.action_deadline)
+
+    @staticmethod
+    def hang_line(when='15:34:05.061', process='42', uri='null'):
+        return '10-20 ' + when + '    ' + process + '    43 D GeckoSession: handleMessage GeckoView:HangReport uri=' + uri
+
+    def test_hang_report_parser_requires_exact_callback_tag_event_and_parent_pid(self):
+        actual = self.hang_line()
+        unrelated = [
+            '10-20 15:34:05.061    42    42 I CyphraEngine: processHangMonitor=true verified before browsing',
+            '10-20 15:34:05.061    42    42 D GeckoDebugConfig: Adding prefs: {dom.ipc.reportProcessHangs=true}',
+            actual.replace('GeckoView:HangReport uri=', 'GeckoView:HangReportStop uri='),
+            actual.replace('GeckoView:HangReport uri=', 'GeckoView:HangReportWait uri='),
+            actual.replace('GeckoSession:', 'OtherTag:'),
+            actual.replace('handleMessage GeckoView:', 'onSlowScript GeckoView:'),
+            actual.replace('D GeckoSession:', 'I GeckoSession:'),
+            self.hang_line(process='420'), self.hang_line(process='41'),
+            'configuration mentions ' + actual,
+        ]
+        self.assertEqual(SAFETY.hang_report_event_lines('\n'.join(unrelated + [actual]), '42'), [actual])
+        for malformed_pid in ('', '42 43', '42.*'):
+            with self.subTest(pid=malformed_pid), self.assertRaisesRegex(AssertionError, 'parent PID'):
+                SAFETY.hang_report_event_lines(actual, malformed_pid)
+
+    def test_hang_report_delta_excludes_prior_cases_and_repeated_identical_lines(self):
+        prior = self.hang_line()
+        new = self.hang_line('15:34:55.123')
+        log = '\n'.join([prior, prior, new, self.hang_line('15:34:56.000', process='99')])
+        self.assertEqual(SAFETY.new_hang_report_lines(log, '42', [prior]), [new])
+        self.assertEqual(SAFETY.new_hang_report_lines(prior, '42', [prior]), [])
+        self.assertEqual(SAFETY.new_hang_report_lines(log, '42', [prior, new]), [])
+
+    def test_hang_report_delta_describes_line_availability_without_wall_clock_attribution(self):
+        prior = self.hang_line('15:34:05.061')
+        delayed = self.hang_line('15:33:59.000', uri='http://localhost/another-document')
+        # A newly available exact line is retained even with an earlier wall
+        # timestamp. It is not converted to host time or assigned to this page.
+        self.assertEqual(SAFETY.new_hang_report_lines(prior + '\n' + delayed, '42', [prior]), [delayed])
+        self.assertIn('not attributed to a target page', SAFETY.HANG_REPORT_SCOPE)
+
+    def test_failure_hang_delta_uses_the_last_available_same_pid_baseline_and_retains_raw_log(self):
+        with tempfile.TemporaryDirectory() as folder:
+            args = self.arguments(folder)
+            prior, new = self.hang_line(), self.hang_line('15:34:55.123')
+            raw = (prior + '\n' + new + '\n'
+                   '10-20 15:34:56.000    42    43 D GeckoDebugConfig: dom.ipc.reportProcessHangs=true\n')
+            report = {'passed': False, 'lastLoopProcess': '42', 'failureUI': {'captured': True},
+                      'nativeRecovery': [
+                          {'run': 'home', 'processBefore': '42', 'hangReportBaselineLines': [prior]},
+                          {'run': 'address-preparation', 'processBefore': '42'},
+                          {'run': 'unrelated-pid', 'processBefore': '99', 'hangReportBaselineLines': []}]}
+            (args.output / 'report.json').write_text(json.dumps(report))
+            def command(argv, **kwargs):
+                return SimpleNamespace(returncode=0, stdout=raw.encode() if 'logcat' in argv else b'', stderr=b'')
+            with patch.object(SAFETY.subprocess, 'Popen', return_value=SimpleNamespace(pid=123, wait=lambda timeout: 1)), \
+                    patch.object(SAFETY.subprocess, 'run', side_effect=command) as commands:
+                self.assertEqual(SAFETY.supervised(args), 1)
+            proof = json.loads((args.output / 'proof.json').read_text())
+            self.assertEqual(proof['failureHangReportLines'], [new])
+            self.assertTrue(proof['failureHangReportBaselineAvailable'])
+            self.assertEqual(proof['failureHangReportBaselineRun'], 'home')
+            self.assertEqual((args.output / 'failure-hang.logcat.txt').read_text(), raw)
+            logcat = commands.call_args_list[0]
+            self.assertIn('--pid=42', logcat.args[0])
+            self.assertNotIn('-c', logcat.args[0])
+
+    def test_failure_without_pre_arm_baseline_retains_raw_log_without_a_new_event_claim(self):
+        with tempfile.TemporaryDirectory() as folder:
+            args = self.arguments(folder)
+            raw = self.hang_line() + '\n'
+            (args.output / 'report.json').write_text(json.dumps({
+                'passed': False, 'lastLoopProcess': '42', 'failureUI': {'captured': True}}))
+            with patch.object(SAFETY.subprocess, 'Popen', return_value=SimpleNamespace(pid=123, wait=lambda timeout: 1)), \
+                    patch.object(SAFETY.subprocess, 'run', return_value=SimpleNamespace(returncode=0, stdout=raw.encode(), stderr=b'')):
+                self.assertEqual(SAFETY.supervised(args), 1)
+            proof = json.loads((args.output / 'proof.json').read_text())
+            self.assertFalse(proof['failureHangReportBaselineAvailable'])
+            self.assertIsNone(proof['failureHangReportBaselineRun'])
+            self.assertEqual(proof['failureHangReportLines'], [])
+            self.assertIn('without a new-event claim', proof['failureHangReportObservationScope'])
+            self.assertEqual((args.output / 'failure-hang.logcat.txt').read_text(), raw)
 
     @staticmethod
     def policy_text(values=None):

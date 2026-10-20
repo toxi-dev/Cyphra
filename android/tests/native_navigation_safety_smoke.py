@@ -34,12 +34,28 @@ HANG_STARTUP_READBACK = ('processHangMonitor=true reportProcessHangs=true '
                          'maxScriptRunTimeSeconds=20 requireCriticalInput=false verified before browsing')
 RECOVERY_LIMIT_SECONDS = {'Back': 40, 'Home': 20, 'Address': 40}
 HEALTHY_BACK_LIMIT_SECONDS = 20
+HOME_FOLLOWUP_LIMIT_SECONDS = 8
 EMPTY_OVERRIDES = 'No matching persisted overrides'
+HANG_REPORT_SCOPE = ('New exact parent-PID HangReport event lines available since the healthy pre-arm snapshot; '
+                     'not attributed to a target page or compared with host monotonic time.')
 
 
 def need(condition, message):
     if not condition:
         raise AssertionError(message)
+
+
+def hang_report_event_lines(log, process):
+    """Match actual pinned GeckoSession callback messages, not preference text."""
+    need(re.fullmatch(r'\d+', process) is not None, 'Missing parent PID for HangReport observation.')
+    event = re.compile(r'^\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d+\s+' + re.escape(process)
+                       + r'\s+\d+\s+D\s+GeckoSession:\s+handleMessage GeckoView:HangReport uri=.*$')
+    return [line for line in log.splitlines() if event.fullmatch(line)]
+
+
+def new_hang_report_lines(log, process, before):
+    seen = set(before)
+    return [line for line in hang_report_event_lines(log, process) if line not in seen]
 
 
 def typed_preference(value, expected, label):
@@ -432,6 +448,41 @@ class NativeSafety:
         finally:
             self.action_deadline = None
 
+    def home_followup(self, row, process):
+        # Native Home's UI recovery has already been measured. Separately prove
+        # that the user's next ordinary page can execute fresh JavaScript.
+        run = row['run'] + '-home-followup'
+        uri = self.url('sentinel', run)
+        followup = {'run': run, 'expectedURI': uri, 'loadLimitSeconds': HOME_FOLLOWUP_LIMIT_SECONDS,
+                    'processBefore': process, 'completed': False, 'forceStopUsedForRecovery': False}
+        row['homeFreshFollowup'] = followup
+        self.write()
+        started = time.monotonic_ns()
+        followup['openStartedNs'] = started
+        self.action_deadline = min(self.deadline, started / 1_000_000_000 + HOME_FOLLOWUP_LIMIT_SECONDS)
+        try:
+            self.open(uri)
+            ready = self.event(run, 'sentinel-ready', after=started, seconds=HOME_FOLLOWUP_LIMIT_SECONDS)
+            followup['documentReady'] = document_event(ready, 'sentinel-ready', run, uri, started,
+                min(started + HOME_FOLLOWUP_LIMIT_SECONDS * 1_000_000_000, int(self.deadline * 1_000_000_000)))
+            requests = [event for event in self.events(run) if event.get('method') == 'GET']
+            followup['documentFetches'] = len(requests)
+            need(len(requests) == 1, 'Home followup document was fetched more or less than once.')
+            request = requests[0]
+            followup['documentRequest'] = request
+            need(request.get('path') == '/sentinel' and request.get('run') == run
+                 and type(request.get('monotonicNs')) is int
+                 and started < request['monotonicNs'] < ready['monotonicNs'],
+                 'Home followup lacks its fresh exact sentinel request.')
+            self.same_process(process)
+            completed = time.monotonic_ns()
+            elapsed = (completed - started) / 1_000_000_000
+            followup.update(loadCompletedNs=completed, loadSeconds=elapsed, processAfter=process)
+            need(elapsed < HOME_FOLLOWUP_LIMIT_SECONDS, 'Home followup exceeded its total load deadline.')
+            followup['completed'] = True
+        finally:
+            self.action_deadline = None
+
     def recovery(self, control):
         run = 'navloop-' + str(time.time_ns()) + '-' + control.lower()
         sentinel_run = run + '-sentinel'
@@ -462,6 +513,11 @@ class NativeSafety:
         points = {label: self.bound(tree, label) for label in ('Home', 'Back', 'Address and Brave Search', 'Start supervised loop')}
         self.same_process(process)
         row.update(loopReady=loop, capturedHealthyBounds=points)
+        # This diagnostic snapshot is taken while healthy, outside both the
+        # baseline and intentional-hang recovery intervals. Never clear logcat.
+        before_log = self.command('logcat', '-d', '--pid=' + process, '-v', 'threadtime', seconds=6)
+        row['hangReportBaselineLines'] = hang_report_event_lines(before_log, process)
+        row['hangReportObservationScope'] = HANG_REPORT_SCOPE
         self.write()
         armed = time.monotonic_ns()
         self.tap(points['Start supervised loop'])
@@ -503,14 +559,15 @@ class NativeSafety:
             row['recovered'] = True
         finally:
             self.action_deadline = None
+        if control == 'Home':
+            self.home_followup(row, process)
         # Diagnostic collection is outside the measured recovery interval.
         log = self.command('logcat', '-d', '--pid=' + process, '-v', 'threadtime', seconds=6)
         (self.args.output / (run + '-hang.logcat.txt')).write_text(log + '\n')
-        row['hangReportLines'] = [line for line in log.splitlines() if any(word in line for word in ('GeckoView:HangReport', 'HangReport', 'ProcessHang'))]
+        row['hangReportLines'] = new_hang_report_lines(log, process, row['hangReportBaselineLines'])
         row['hangReportObserved'] = bool(row['hangReportLines'])
         self.write()
-        if control != 'Home':
-            self.home(points['Home'])
+        self.home(points['Home'])
 
     def run(self):
         try:
@@ -530,6 +587,7 @@ class NativeSafety:
                 'Each attachment fetched once; Cancel leaves no file and Save retains exact bytes',
                 'Native Back recovers fresh prior-document JS from an intentional infinite loop',
                 'Native Home recovers from an intentional infinite loop in the same Android process',
+                'Native Home opens one fresh ordinary page within eight seconds in the same process',
                 'Native address entry reaches a new URI from an intentional infinite loop with hang monitor enabled',
                 'Direct native taps use bounds captured before hanging; force-stop is failure cleanup only',
             ])
@@ -587,8 +645,14 @@ def supervised(args):
                 log = subprocess.run([*prefix, 'logcat', '-d', '--pid=' + process, '-v', 'threadtime'],
                                      capture_output=True, timeout=min(4, max(.1, deadline - time.monotonic())))
                 (args.output / 'failure-hang.logcat.txt').write_bytes(log.stdout)
-                report['failureHangReportLines'] = [line for line in log.stdout.decode(errors='replace').splitlines()
-                                                     if any(word in line for word in ('GeckoView:HangReport', 'HangReport', 'ProcessHang'))]
+                baseline = next((row for row in reversed(report.get('nativeRecovery', []))
+                                 if row.get('processBefore') == process and 'hangReportBaselineLines' in row), None)
+                report['failureHangReportBaselineAvailable'] = baseline is not None
+                report['failureHangReportBaselineRun'] = baseline.get('run') if baseline is not None else None
+                report['failureHangReportObservationScope'] = (HANG_REPORT_SCOPE if baseline is not None else
+                    'No healthy pre-arm snapshot is available; raw log retained without a new-event claim.')
+                report['failureHangReportLines'] = (new_hang_report_lines(log.stdout.decode(errors='replace'), process,
+                    baseline['hangReportBaselineLines']) if baseline is not None else [])
             except BaseException as error:
                 report['failureLogcatError'] = str(error)
         for label, command in [('forceStop', ['shell', 'am force-stop ' + args.package]),

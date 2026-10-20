@@ -123,6 +123,101 @@ test('GeckoView LoadUri alone supplies the private option and retains all public
   assert.deepEqual(calls.slice(-3), ['stop', ['back', true], ['forward', true]]);
 });
 
+function navigationFixture(browser) {
+  const warnings = [];
+  class GeckoViewModule {
+    static initLogging() { return { debug() {}, warn: (...args) => warnings.push(args) }; }
+    onDestroyBrowser() {}
+  }
+  const context = vm.createContext({
+    GeckoViewModule, console,
+    ChromeUtils: { defineESModuleGetters() {}, defineLazyGetter() {} },
+    Ci: { nsIWebNavigation: navFlags, nsIRemoteTab: { NAVIGATE_URL: 1 } },
+    Services: {
+      io: { newURI: spec => ({ spec, schemeIs: scheme => spec.startsWith(scheme + ':') }) },
+      scriptSecurityManager: { getSystemPrincipal: () => ({ isSystemPrincipal: true }), createNullPrincipal: () => ({}) },
+    },
+  });
+  vm.runInContext(sources['GeckoViewNavigation.sys.mjs']
+    .replace(/^import .*;\n/m, '')
+    .replace('export class GeckoViewNavigation', 'class GeckoViewNavigation')
+    + '\nglobalThis.Navigation = GeckoViewNavigation;', context);
+  const navigation = new context.Navigation();
+  navigation.browser = browser;
+  return { navigation, warnings };
+}
+
+test('window close interrupts through the actual remote wrapper once with its next epoch and no load', async () => {
+  const { calls, remote, browser } = remoteFixture();
+  browser.isRemoteBrowser = true;
+  browser.webNavigation = remote;
+  browser.fixupAndLoadURIString = (...args) => remote.fixupAndLoadURIString(...args);
+  const { navigation, warnings } = navigationFixture(browser);
+  await navigation.onEvent('GeckoView:LoadUri', { uri: 'https://example.test/attachment', flags: 0 });
+  const loaded = calls.find(call => call.name === 'fixupAndLoadURIString');
+  assert.equal(loaded.args[1].cancelContentJSEpoch, 1);
+  assert.equal(calls.filter(call => call.name === 'interrupt').length, 0);
+  navigation.onDestroyBrowser(); // A remoteness change does not abandon this session.
+  assert.equal(calls.filter(call => call.name === 'interrupt').length, 0);
+  const beforeClose = calls.length;
+  navigation.onDestroy();
+  navigation.onDestroy();
+  assert.deepEqual(calls.slice(beforeClose).map(call => call.name), ['interrupt']);
+  const interrupt = calls.at(-1);
+  assert.equal(interrupt.args[0], 1);
+  assert.equal(interrupt.args[1].uri.spec, 'about:blank');
+  assert.equal(interrupt.args[1].epoch, 2);
+  assert.equal(warnings.length, 0);
+});
+
+test('ordinary app URI loads retain their document without invoking session abandonment', async () => {
+  const { calls, remote, browser } = remoteFixture();
+  browser.isRemoteBrowser = true;
+  browser.webNavigation = remote;
+  browser.fixupAndLoadURIString = (...args) => remote.fixupAndLoadURIString(...args);
+  const { navigation } = navigationFixture(browser);
+  for (const uri of ['https://example.test/page', 'https://example.test/attachment']) {
+    await navigation.onEvent('GeckoView:LoadUri', { uri, flags: 0 });
+  }
+  assert.equal(calls.filter(call => call.name === 'interrupt').length, 0);
+  assert.deepEqual(calls.filter(call => call.name === 'fixupAndLoadURIString')
+    .map(call => call.args[1].cancelContentJSEpoch), [1, 2]);
+  const beforeClose = calls.length;
+  navigation.onDestroy();
+  assert.deepEqual(calls.slice(beforeClose).map(call => call.name), ['interrupt']);
+  assert.equal(calls.at(-1).args[1].epoch, 3);
+});
+
+test('close tolerates missing or already destroyed remote tabs without navigating', () => {
+  for (const shape of ['no-browser', 'nonremote', 'no-frame-loader', 'no-remote-tab']) {
+    const { calls, remote, browser } = remoteFixture();
+    browser.isRemoteBrowser = shape !== 'nonremote';
+    browser.webNavigation = remote;
+    if (shape === 'no-frame-loader') browser.frameLoader = null;
+    if (shape === 'no-remote-tab') browser.frameLoader.remoteTab = null;
+    const { navigation, warnings } = navigationFixture(shape === 'no-browser' ? null : browser);
+    assert.doesNotThrow(() => { navigation.onDestroy(); navigation.onDestroy(); });
+    assert.deepEqual(calls, []);
+    assert.equal(warnings.length, 0);
+  }
+});
+
+test('a close-time native exception cannot break teardown or retry the interrupt', () => {
+  const { calls, remote, browser } = remoteFixture();
+  browser.isRemoteBrowser = true;
+  browser.webNavigation = remote;
+  let attempts = 0;
+  browser.frameLoader.remoteTab.maybeCancelContentJSExecution = () => {
+    attempts++;
+    throw new Error('Remote actor already destroyed');
+  };
+  const { navigation, warnings } = navigationFixture(browser);
+  assert.doesNotThrow(() => { navigation.onDestroy(); navigation.onDestroy(); });
+  assert.equal(attempts, 1);
+  assert.equal(warnings.length, 1);
+  assert.deepEqual(calls, []);
+});
+
 test('upstream modules and patch are exact pinned sources; APK overlay and normal hang monitoring are mandatory', () => {
   const sha = bytes => createHash('sha256').update(bytes).digest('hex');
   assert.equal(sha(fs.readFileSync(path.join(root, lock.integration.patchFile))), lock.integration.patchSha256);

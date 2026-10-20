@@ -1,6 +1,32 @@
 --- a/modules/GeckoViewNavigation.sys.mjs
 +++ b/modules/GeckoViewNavigation.sys.mjs
-@@ -278,0 +279,3 @@
+@@ -127,0 +128,25 @@
++  }
++
++  onDestroy() {
++    if (this._cyphraClosing) {
++      return;
++    }
++    this._cyphraClosing = true;
++
++    try {
++      const browser = this.browser;
++      if (!browser?.isRemoteBrowser || !browser.frameLoader?.remoteTab) {
++        return;
++      }
++
++      // Closing abandons this document, including any pending download response.
++      // Use its normal per-tab epoch before the browser is torn down.
++      // about:blank is cancellation metadata; this never loads a document.
++      browser.webNavigation.maybeCancelContentJSExecution(
++        Ci.nsIRemoteTab.NAVIGATE_URL,
++        { uri: Services.io.newURI("about:blank") }
++      );
++    } catch {
++      // A remote tab may already be gone. Continue closing every module.
++      warn`Content interruption was unavailable while closing the session.`;
++    }
+@@ -278,0 +304,3 @@
 +          // A response may be a download, leaving the current document alive.
 +          // Do not abort its running callback before the response is known.
 +          cyphraSkipNavigationJSInterrupt: true,
