@@ -42,12 +42,12 @@ UPGRADE_BASELINES = {
                'size': 116427924, 'sha256': '1f56d7e333250183352df3ce1d120643097c0f51adc306f157c1b459578887d9',
                'sourceCommit': '1732ab90a5fe51eb148b196311c632450e94622d'},
 }
-CURRENT_WINDOWS_API = {'appVersion': '158.0', 'platformVersion': '158.0',
-                       'appBuildId': '20261013185353', 'platformBuildId': '20261013185353'}
-CURRENT_WINDOWS_PACKAGED_INI = {'applicationVersion': '158.0', 'platformMilestone': '158.0',
-    'applicationBuildId': '20261013185353', 'platformBuildId': '20261013200924',
-    'applicationSourceStamp': 'eb9a6e3a736802c8e080a76c44dc81f409d99d54',
-    'platformSourceStamp': 'eb9a6e3a736802c8e080a76c44dc81f409d99d54'}
+CURRENT_WINDOWS_API = {'appVersion': '158.0.1', 'platformVersion': '158.0.1',
+                       'appBuildId': '20261022000451', 'platformBuildId': '20261022000451'}
+CURRENT_WINDOWS_PACKAGED_INI = {'applicationVersion': '158.0.1', 'platformMilestone': '158.0.1',
+    'applicationBuildId': '20261022000451', 'platformBuildId': '20261022011852',
+    'applicationSourceStamp': '48a735cc74a7e6d730f9bf59c3de58f750287a23',
+    'platformSourceStamp': '48a735cc74a7e6d730f9bf59c3de58f750287a23'}
 
 
 def public_environment():
@@ -660,7 +660,7 @@ def packaged_engine_identity(application):
 def current_engine_identity(native_api, packaged_ini):
     # nsXULAppInfo::GetPlatformBuildID returns compiled gToolkitBuildID, not
     # platform.ini's independently generated BuildID. Require both facts.
-    assert native_api == CURRENT_WINDOWS_API, 'The native Windows AppInfo API differs from the pinned Gecko 158 compiled toolkit.'
+    assert native_api == CURRENT_WINDOWS_API, 'The native Windows AppInfo API differs from the pinned Gecko 158.0.1 compiled toolkit.'
     assert packaged_ini == CURRENT_WINDOWS_PACKAGED_INI, 'The installed Windows application/platform INIs differ from the pinned official package.'
 
 
@@ -707,7 +707,7 @@ def qualify_real_upgrade(old_installer, old_identity, installer, new_identity, a
     """Install and restart actual immutable 0.7.2 before migrating its real data."""
     edition = proof['edition']
     assert tuple(map(int, proof['version'].split('.'))) > tuple(map(int, UPGRADE_BASELINE_VERSION.split('.')))
-    assert json.loads((ROOT / 'engine-lock.json').read_text())['geckoVersion'] == '158.0'
+    assert json.loads((ROOT / 'engine-lock.json').read_text())['geckoVersion'] == '158.0.1'
     launcher, engine = application / 'Cyphra.exe', application / 'runtime/librewolf.exe'
     result = proof['newMigrationResult'] = {
         'fromVersion': UPGRADE_BASELINE_VERSION, 'toVersion': proof['version'],

@@ -2,7 +2,7 @@
 """Assemble/verify Cyphra's exact-hash-guarded GeckoView asset overlay (MPL-2.0).
 
 The official Maven AAR is read only. Unmodified ZIP members retain their raw
-compressed bytes; the two changed source modules are stored without compression
+compressed bytes; the changed source modules are stored without compression
 so the output does not depend on the host zlib version. No bytecode is bundled.
 """
 import argparse

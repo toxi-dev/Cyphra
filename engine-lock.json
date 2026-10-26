@@ -1,19 +1,19 @@
 {
   "name": "LibreWolf",
-  "version": "158.0-1",
-  "geckoVersion": "158.0",
-  "releaseUrl": "https://librewolf.dev/librewolf/bsys6/releases/tag/158.0-1",
-  "sourceUrl": "https://librewolf.dev/api/packages/librewolf/generic/librewolf-source/158.0-1/librewolf-158.0-1.source.tar.gz",
+  "version": "158.0.1-2",
+  "geckoVersion": "158.0.1",
+  "releaseUrl": "https://librewolf.dev/librewolf/bsys6/releases/tag/158.0.1-2",
+  "sourceUrl": "https://librewolf.dev/api/packages/librewolf/generic/librewolf-source/158.0.1-2/librewolf-158.0.1-2.source.tar.gz",
   "artifacts": {
     "windows": {
-      "file": "librewolf-158.0-1-windows-x86_64-package.zip",
-      "url": "https://dl.librewolf.net/librewolf/158.0-1/librewolf-158.0-1-windows-x86_64-package.zip",
-      "sha256": "2934abbdf51fd82f60afb29728d82d562eeeeea69a8808d642a5449c3bb67d5f"
+      "file": "librewolf-158.0.1-2-windows-x86_64-package.zip",
+      "url": "https://dl.librewolf.net/librewolf/158.0.1-2/librewolf-158.0.1-2-windows-x86_64-package.zip",
+      "sha256": "c6a13741379b5c44b32ab7cb9b88801506f1b9fd0007f87afa3d0fddc9d97e8b"
     },
     "linux": {
-      "file": "librewolf-158.0-1-linux-x86_64-package.tar.xz",
-      "url": "https://dl.librewolf.net/librewolf/158.0-1/librewolf-158.0-1-linux-x86_64-package.tar.xz",
-      "sha256": "34bb7296feec0c6823abdfaf4fd50e47e9eada9cb4a5ed16e111a951dc9eb16c"
+      "file": "librewolf-158.0.1-2-linux-x86_64-package.tar.xz",
+      "url": "https://dl.librewolf.net/librewolf/158.0.1-2/librewolf-158.0.1-2-linux-x86_64-package.tar.xz",
+      "sha256": "de1522759855e849ba09839749e3871aa06820a2ce1418be4099ce388a93ef02"
     }
   }
 }

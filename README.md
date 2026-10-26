@@ -1,6 +1,6 @@
 # Cyphra
 
-An independent, open-source Gecko browser for Windows and Linux. Version **0.7.3** uses verified LibreWolf 158.0-1 / Gecko 158.0 engine inputs. Cyphra has no Chromium runtime, browser telemetry, advertisements on its home page, or required team account.
+An independent, open-source Gecko browser for Windows and Linux. Version **0.7.3** uses verified LibreWolf 158.0.1-2 / Gecko 158.0.1 engine inputs. Cyphra has no Chromium runtime, browser telemetry, advertisements on its home page, or required team account.
 
 For everyday browsing without the security workspace, [Cyphra Home](https://github.com/toxi-dev/Cyphra-Home) is a separate edition with one Personal profile, a simpler new tab and the same core ad blocking and update checks. This Cyphra edition keeps its Work mode and tools.
 

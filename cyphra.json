@@ -3,7 +3,7 @@
   "team": "",
   "version": "0.7.3",
   "engine": "Gecko",
-  "upstream": "LibreWolf 158.0-1",
+  "upstream": "LibreWolf 158.0.1-2",
   "edition": "public",
   "repository": "toxi-dev/Cyphra"
 }

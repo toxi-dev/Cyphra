@@ -1,0 +1,47 @@
+{
+  "scope": "Candidate-only native Gecko158 production-chain and revocation-storage qualification; no final-package/UI pass",
+  "engine": {
+    "version": "158.0.1",
+    "platformVersion": "158.0.1",
+    "appBuildId": "20261020223222",
+    "platformBuildId": "20261020223222",
+    "pid": 2913589
+  },
+  "packagedPlatformIniBuildID": "20261020233835",
+  "officialArchiveSHA256": "fd7b437f623016bd0ac6036e9c1024bfc3c9a699a33d5af6ed86801e5ec493ac",
+  "officialNativeFiles": {
+    "librewolf": "f0a65bb8fddc2b6ac8fb77aa9d6707936fbf1d5596c7c8330f5a360192af91d6",
+    "libxul.so": "7838fb1011a89d9eb3504e3639bca2d93e644c092c9cade3b39015020974d4ca"
+  },
+  "testedAt": "2026-10-21T13:20:05.870874+00:00",
+  "networkIsolated": true,
+  "signatureAndStorage": {
+    "validProductionRootSignature": true,
+    "timestampTamperRefused": true,
+    "recordTamperRefused": true,
+    "records": 1901,
+    "enabled": 1256,
+    "disabled": 645,
+    "timestamp": 1792274405312,
+    "nativeSetRevocationsResult": 0,
+    "before": {
+      "rv": 0,
+      "out": false
+    },
+    "after": {
+      "rv": 0,
+      "out": true
+    }
+  },
+  "rawLocalReceiptSHA256": "d4764be11a3693901466071809b817c24e58be9a76f3b6b7fbaffbf7bbd2d41c",
+  "snapshotRecheck": {
+    "fetched": "2026-10-21T13:01:15Z",
+    "sameSignedSnapshotAsOctober18": true,
+    "added": 0,
+    "changed": 0,
+    "removed": 0,
+    "snapshotSignedAt": "2026-10-17T22:00:05.312Z",
+    "advisory": "https://www.mozilla.org/en-US/security/advisories/mfsa2026-111/",
+    "advisoryLinkedEnabledRevocations": 6
+  }
+}

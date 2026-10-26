@@ -41,6 +41,7 @@ android {
         versionCode providers.gradleProperty('cyphraVersionCode').getOrElse('4').toInteger()
         versionName providers.gradleProperty('cyphraVersionName').getOrElse('0.1.2')
         buildConfigField 'String', 'GECKOVIEW_OMNI_SHA256', '"' + geckoEngineLock.integration.patchedOmniSha256 + '"'
+        buildConfigField 'String', 'GECKOVIEW_VERSION', '"' + geckoEngineLock.artifact.tokenize(':').last() + '"'
         ndk { abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64' }
         testInstrumentationRunner 'org.cyphra.browser.ServicesSecurityTest'
     }

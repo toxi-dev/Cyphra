@@ -1,0 +1,54 @@
+{
+  "scope": "Candidate-only native Gecko158 production-chain and revocation-storage qualification; no final-package/UI pass",
+  "engine": {
+    "version": "158.0.1",
+    "platformVersion": "158.0.1",
+    "appBuildId": "20261022000330",
+    "platformBuildId": "20261022000330",
+    "pid": 810856
+  },
+  "packagedPlatformIniBuildID": "20261022011640",
+  "officialArchiveSHA256": "de1522759855e849ba09839749e3871aa06820a2ce1418be4099ce388a93ef02",
+  "officialNativeFiles": {
+    "librewolf": "1a8d4266a2dced2c60e3655c5fee93f4ce7efe39c9aa777d6756cdcd5bfa39b2",
+    "libxul.so": "4695c4868c2329edb472c5efe4226fd7ffff3fa65f66e244c7487dfe287113c4"
+  },
+  "testedAt": "2026-10-26T17:45:20.749629+00:00",
+  "networkIsolated": true,
+  "signatureAndStorage": {
+    "validProductionRootSignature": true,
+    "timestampTamperRefused": true,
+    "recordTamperRefused": true,
+    "records": 1907,
+    "enabled": 1262,
+    "disabled": 645,
+    "timestamp": 1792622041776,
+    "nativeSetRevocationsResult": 0,
+    "before": {
+      "rv": 0,
+      "out": true
+    },
+    "after": {
+      "rv": 0,
+      "out": true
+    }
+  },
+  "rawLocalReceiptSHA256": "49a79c6494cdac138714e084cb9ea01dbe2592e9016b0795da056207a2c7eb0d",
+  "snapshotChanges": {
+    "oldTimestamp": 1792274405312,
+    "newTimestamp": 1792622041776,
+    "addedIDs": [
+      "3f07ab6b-0d52-41a3-9a7b-de945502a3b8",
+      "5856b9af-5c14-46e7-b660-04d1cc3f2819",
+      "5ed2b441-a5bf-4f8e-89af-d01fa292a9b8",
+      "adaa1e8d-57cb-4cfb-b647-305aa20f1b04",
+      "f67aff65-7a13-42ef-b818-74bb69053273",
+      "fb4be101-8280-4d4e-866e-fd0213bc3a02"
+    ],
+    "removedIDs": [],
+    "changedIDs": [],
+    "enabled": 1262,
+    "records": 1907
+  },
+  "bundledDataAlreadyPresentAtRawStartup": true
+}

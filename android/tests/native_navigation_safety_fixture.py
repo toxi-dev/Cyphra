@@ -25,7 +25,7 @@ TIMER = r'''<!doctype html><html><head><meta name="viewport" content="width=devi
 <script>
 'use strict';
 const run=__RUN__,token=__TOKEN__;let ticks=0,completed=0,eventSeq=0,inspection=0,timer,clockWarmup=null;
-const ledger=[],clockSamples=[],clockErrors=[],fatalRecordingErrors=[],reportAcknowledgements=[],reportRejections=[],pendingReports=new Map();
+const ledger=[],clockSamples=[],precisionProbes=[],clockErrors=[],fatalRecordingErrors=[],reportAcknowledgements=[],reportRejections=[],pendingReports=new Map();
 const ns=()=>Math.round(performance.now()*1000000);
 const nonce=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('');
 const identity=()=>({token,url:location.href,title:document.title});
@@ -35,7 +35,7 @@ function report(kind,extra={}){
  try{
   const reportNonce=nonce();
   const payload={kind,...identity(),ticks,completed,eventSeq:seq,reportNonce,browserReportedNs:ns(),
-    ledger:[...ledger],clockWarmup,clockSamples:[...clockSamples],clockErrors:[...clockErrors],fatalRecordingErrors:[...fatalRecordingErrors],
+    ledger:[...ledger],clockWarmup,clockSamples:[...clockSamples],precisionProbes:[...precisionProbes],clockErrors:[...clockErrors],fatalRecordingErrors:[...fatalRecordingErrors],
     reportAcknowledgements:[...reportAcknowledgements],reportRejections:[...reportRejections],...extra};
   const body=JSON.stringify(payload);
   if(new TextEncoder().encode(body).length>32768||pendingReports.size>=16){bounded(fatalRecordingErrors,{kind:'recording-bound',seq},8);return;}
@@ -50,10 +50,34 @@ function report(kind,extra={}){
   pendingReports.set(seq,promise);return promise;
  }catch(error){bounded(reportRejections,{seq,name:String(error.name),message:String(error.message).slice(0,160)},16);}
 }
-function observedPrecision(){
- let previous=ns(),minimum=Infinity;
- for(let i=0;i<10000;i++){const current=ns();if(current>previous)minimum=Math.min(minimum,current-previous);previous=current;}
- if(!Number.isFinite(minimum)||minimum<=0||minimum>5000000)throw new Error('Browser monotonic precision exceeds 5ms budget');
+function observedPrecision(phase){
+ // One observation window, never a retry or a choice among clock echoes.
+ // Minimum positive steps are observations, not proof of the model's 5ms error bound.
+ const targetSpanNs=20000000,maximumReads=1000000,precisionBudgetNs=5000000;
+ const valid=value=>Number.isSafeInteger(value)&&value>=0;
+ const first=ns();let previous=first,last=first,readCount=1,positiveStepCount=0,unchangedReadCount=0,
+  backwardStepCount=0,invalidReadCount=valid(first)?0:1,minimum=Infinity,maximum=0;
+ while(!invalidReadCount&&!backwardStepCount&&readCount<maximumReads&&last-first<targetSpanNs){
+  const current=ns();++readCount;last=current;
+  if(!valid(current)){++invalidReadCount;break;}
+  const delta=current-previous;
+  if(delta<0){++backwardStepCount;break;}
+  if(delta===0)++unchangedReadCount;
+  else{++positiveStepCount;minimum=Math.min(minimum,delta);maximum=Math.max(maximum,delta);}
+  previous=current;
+ }
+ const elapsedNs=valid(first)&&valid(last)?last-first:null;
+ let status='observed-compatible-step',message=null;
+ if(invalidReadCount){status='invalid-reading';message='Browser clock produced an invalid timestamp during precision observation';}
+ else if(backwardStepCount){status='backward-step';message='Browser monotonic clock moved backward during precision observation';}
+ else if(!positiveStepCount){status='unmeasured-no-transition';message='Browser clock resolution unmeasured: no positive transition before read cap';}
+ else if(elapsedNs<targetSpanNs){status='unmeasured-window-incomplete';message='Browser clock resolution unmeasured: observation window incomplete at read cap';}
+ else if(minimum>precisionBudgetNs){status='observed-step-over-budget';message='Browser observed minimum positive step exceeds 5ms budget';}
+ bounded(precisionProbes,{schema:'cyphra-clock-observation-v1',phase,targetSpanNs,maximumReads,precisionBudgetNs,
+  readCount,positiveStepCount,unchangedReadCount,backwardStepCount,invalidReadCount,
+  firstBrowserNs:valid(first)?first:null,lastBrowserNs:valid(last)?last:null,elapsedNs,
+  minimumPositiveStepNs:positiveStepCount?minimum:null,maximumObservedGapNs:positiveStepCount?maximum:null,status,message},3);
+ if(message)throw new Error(message);
  return minimum;
 }
 async function warmupClock(){
@@ -70,7 +94,7 @@ async function warmupClock(){
  }finally{clearTimeout(timeout);}
 }
 async function calibrate(phase){
- const observedPrecisionNs=observedPrecision();
+ const observedPrecisionNs=observedPrecision(phase);
  for(let i=0;i<3;i++){
   const challenge=nonce(),controller=new AbortController(),b0Ns=ns();
   const timeout=setTimeout(()=>controller.abort(),2000);

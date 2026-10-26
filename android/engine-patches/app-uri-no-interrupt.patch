@@ -52,3 +52,22 @@
 +        : this.maybeCancelContentJSExecution(Ci.nsIRemoteTab.NAVIGATE_URL, {
 +            uri,
 +          });
+--- a/modules/services-settings/Utils.sys.mjs
++++ b/modules/services-settings/Utils.sys.mjs
+@@ -122,7 +122,3 @@
+-    if (
+-      (lazy.isRunningTests || Cu.isInAutomation) &&
+-      this.SERVER_URL == "data:,#remote-settings-dummy/v1"
+-    ) {
+-      return true;
+-    }
+-    return Services.policies?.isAllowed("remoteSettings") === false;
++    // Cyphra consumes release-packaged Remote Settings data only. Keep the
++    // production SERVER_URL and LOAD_DUMPS behavior so local security dumps load.
++    return true;
+@@ -243,0 +240,5 @@
++    // Direct client/attachment/signature callers can bypass the scheduling
++    // guard. Reject before constructing a request or resolving a remote host.
++    if (Utils.shouldSkipRemoteActivity) {
++      throw new Error("Cyphra disables Remote Settings network activity.");
++    }

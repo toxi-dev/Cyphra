@@ -27,7 +27,7 @@ dialogs and website prompts are not reopened automatically.
 
 ## Shutdown before native startup
 
-Pinned GeckoView `158.0.20261007201254` starts Gecko asynchronously. Its public
+Pinned GeckoView `158.0.20261021001945` starts Gecko asynchronously. Its public
 `GeckoRuntime.shutdown()` directly invokes native `GeckoThread.forceQuit()`;
 calling it before JNI initialization causes an `UnsatisfiedLinkError`.
 

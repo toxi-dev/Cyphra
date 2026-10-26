@@ -75,11 +75,11 @@
     "additionalProperties": false
   },
   "signature": {
-    "ref": "36xcrlmneucre2xflj5ix74kq5",
+    "ref": "dsd9gigcero916s531unsk6j",
     "x5u": "https://content-signature-2.cdn.mozilla.net/g/chains/202402/onecrl.content-signature.mozilla.org-2026-11-25-18-04-25.chain",
     "mode": "p384ecdsa",
     "type": "contentsignaturepki",
-    "signature": "YD7KaGParLPYCpjMU9_64K1c969noOe_aug9SofI5nVAF54E2y7dtfcIN1rfqBuPQLM0rbJbt4RZYp1_kiEzBvAozHFo_Whx0bVbYWtezJsqKnPBPNqG_y_1biVj2qRS",
+    "signature": "_NwzCDnBM7mVBBuyAVXzVgYAOiGMK35AvKJzokbg8VWnOJofk34oxLIgSa6iEcKMpA3ooGimwQ93tQL4-AJ2-3YM2-40Vi30WLPkQ5ksD8eqeITTRDzWBAHyzXpVeJi2",
     "signer_id": "onecrl_202402",
     "public_key": "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEcFqwsEC0b/zb/f6EhULbG1jRUQCyNv6S0hnG7FxwrHOlP163joodTS8os1sirMqS8yq88RI9VI1DdLrYfHvJLUiXb5pH/ONJ6QmFT7bwuN5v2xVKrid+QRHeI8RiJQ86"
   },
@@ -89,11 +89,11 @@
   },
   "signatures": [
     {
-      "ref": "36xcrlmneucre2xflj5ix74kq5",
+      "ref": "dsd9gigcero916s531unsk6j",
       "x5u": "https://content-signature-2.cdn.mozilla.net/g/chains/202402/onecrl.content-signature.mozilla.org-2026-11-25-18-04-25.chain",
       "mode": "p384ecdsa",
       "type": "contentsignaturepki",
-      "signature": "YD7KaGParLPYCpjMU9_64K1c969noOe_aug9SofI5nVAF54E2y7dtfcIN1rfqBuPQLM0rbJbt4RZYp1_kiEzBvAozHFo_Whx0bVbYWtezJsqKnPBPNqG_y_1biVj2qRS",
+      "signature": "_NwzCDnBM7mVBBuyAVXzVgYAOiGMK35AvKJzokbg8VWnOJofk34oxLIgSa6iEcKMpA3ooGimwQ93tQL4-AJ2-3YM2-40Vi30WLPkQ5ksD8eqeITTRDzWBAHyzXpVeJi2",
       "signer_id": "onecrl_202402",
       "public_key": "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEcFqwsEC0b/zb/f6EhULbG1jRUQCyNv6S0hnG7FxwrHOlP163joodTS8os1sirMqS8yq88RI9VI1DdLrYfHvJLUiXb5pH/ONJ6QmFT7bwuN5v2xVKrid+QRHeI8RiJQ86"
     }
@@ -105,5 +105,5 @@
     "subject"
   ],
   "id": "onecrl",
-  "last_modified": 1792274405646
+  "last_modified": 1792622042160
 }

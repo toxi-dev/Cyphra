@@ -1,8 +1,10 @@
 # Android releases
 
-## 0.1.2 — 18 October 2026
+## 0.1.2 — release candidate
 
-- Update the pinned native engine to GeckoView 158 / Gecko 158.0, including Mozilla's 13 October security fixes.
+- Update the pinned native engine to GeckoView 158.0.20261021001945 / Gecko 158.0.2, including Mozilla's October security fixes and packaged certificate-revocation startup installation.
+- Disable Remote Settings polling and reject its transport before request construction, while retaining packaged security data.
+- Interrupt the abandoned content script only when its session closes, so native Home can open a fresh ordinary page promptly.
 - Add the separate Cyphra Home APK with one Personal profile, system DNS by default, optional manual sync and its own installation, signing and update identities. Public and Byte Team keep both modes and their security tools.
 - Refine the native new tab, toolbar, bookmark shortcuts, customization preview and Shields across all three editions, retaining the original logo and measured filtering counters.
 - Explain the actual Gecko connection failure: unresolved hosts, offline connections, timeouts, TLS and proxy failures receive distinct messages. Other failures no longer get labeled as encrypted-DNS failures, and DNS settings remain unchanged.

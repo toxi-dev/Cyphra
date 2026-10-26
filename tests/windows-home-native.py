@@ -24,9 +24,9 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = 'toxi-dev/Cyphra-Home'
 KEY_ID = 'cyphra-home-release-2026-01'
-APP_BUILD = '20261013185353'
-PLATFORM_INI_BUILD = '20261013200924'
-SOURCE_REVISION = 'eb9a6e3a736802c8e080a76c44dc81f409d99d54'
+APP_BUILD = '20261022000451'
+PLATFORM_INI_BUILD = '20261022011852'
+SOURCE_REVISION = '48a735cc74a7e6d730f9bf59c3de58f750287a23'
 CHECKS = (
     'anonymous-pinned-signature-exact-tag-installer-size-and-sha256',
     'actual-current-installer-home-personal-engine-and-protection-identity',
@@ -156,9 +156,9 @@ def main():
         need(installed['edition'] == 'home' and installed['version'] == version, 'The actual installer placed another edition.')
         app = native_ini(application / 'runtime/browser/application.ini')['App']
         platform = native_ini(application / 'runtime/platform.ini')['Build']
-        need(app['Version'] == platform['Milestone'] == '158.0' and app['BuildID'] == APP_BUILD
+        need(app['Version'] == platform['Milestone'] == '158.0.1' and app['BuildID'] == APP_BUILD
              and platform['BuildID'] == PLATFORM_INI_BUILD and platform['SourceStamp'] == SOURCE_REVISION,
-             'The packaged Home engine INI provenance differs from official 158.0-1 inputs.')
+             'The packaged Home engine INI provenance differs from official 158.0.1-2 inputs.')
         proof['packagedEngine'] = {'geckoVersion': app['Version'], 'applicationBuildID': app['BuildID'],
             'platformIniBuildID': platform['BuildID'], 'sourceRevision': platform['SourceStamp']}
         server = HTTPServer(('127.0.0.1', 0), native.Page)
@@ -201,7 +201,7 @@ def main():
         native_engine = driver.execute_script('return {version:Services.appinfo.version,appBuildID:Services.appinfo.appBuildID,platformBuildID:Services.appinfo.platformBuildID};')
         # Gecko's toolkit API uses MOZ_BUILDID, which is the actual application
         # build identity here. The packaged platform.ini BuildID is separate.
-        need(native_engine == {'version': '158.0', 'appBuildID': APP_BUILD, 'platformBuildID': APP_BUILD},
+        need(native_engine == {'version': '158.0.1', 'appBuildID': APP_BUILD, 'platformBuildID': APP_BUILD},
              'The actual Home Windows runtime engine identity differs.')
         proof['nativeEngine'] = native_engine
         initial = native.appearance_security(driver)

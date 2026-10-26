@@ -66,13 +66,49 @@ travel as decimal strings to preserve precision beyond JavaScript's integer
 range. Every echoed nonce and timestamp must match the independent server log.
 
 `native_navigation_clock.py` uses the explicit `cyphra-navigation-clock-v2` model: host/guest
-monotonic rates differ by at most **1,000 ppm**, each browser timestamp has a
-**5ms precision budget**, each echo has a **two-second transport deadline**, and samples
-are at most **30 seconds** from the qualified point. Before/after precision
-probes must observe positive resolution within that budget; all echoes must be
-consistent with the model. This declares a clock-rate assumption, not a claim
-that arbitrary VM pauses, clock discontinuities or unobserved rate excursions
-are qualified. Inconsistent, stale, imprecise or ambiguous measurements fail.
+monotonic **relative host/browser rate** differs by at most **1,000 ppm**,
+each browser timestamp has an assumed **5ms error budget**, each echo has a
+**two-second transport deadline**, and samples are at most **30 seconds** from
+the qualified point. These rate and timestamp-error budgets are explicit model
+assumptions. They are not guaranteed by Web Performance APIs or established by
+a passing probe. The rate bound applies to host elapsed time relative to browser
+elapsed time; independently bounding each clock against ideal time by 1,000 ppm
+would permit about 2,002 ppm differential error and is not this model.
+
+Each before/after calibration runs one synchronous precision observation with a
+**20ms browser-elapsed target** and a hard cap of **1,000,000 total clock reads**.
+It must reach that target and observe a positive minimum step no larger than
+**5ms**. Unlike a fixed 10,000-read loop, this can observe a 1ms clock even when
+the first 10,000 reads complete within one timestamp bucket. Every read counts;
+there is no restart, retry, extra clock echo or selection among echo samples.
+The cap bounds calls, not host wall time: preemption can overshoot 20ms, and a
+slow or frozen VM can stretch execution. The existing host supervisor remains
+the outer execution bound.
+
+Reports retain three immutable per-phase `precisionProbes` diagnostics with
+read, positive-step, unchanged-read, backward-step and invalid-read counts,
+first/last timestamps, elapsed span, minimum positive step, maximum observed
+read gap, and a distinct status/message. A frozen clock or an incomplete span
+at the read cap is unmeasured and fails closed; a 20ms coarse-step clock fails
+the unchanged 5ms step gate. Invalid or backward readings fail immediately.
+Maximum read gaps can include scheduling pauses, timestamp coarsening or clock
+anomalies, so they are retained as observations rather than interpreted as
+resolution or automatically discarded. A large gap spanning the whole window
+may still make the measurement unsuitable and fail; it is never retried.
+
+A small observed step does not prove bounded error, stable quantization or any
+future precision: browsers may coarsen or jitter timestamps. All six echoes
+must still be consistent with the unchanged assumed model. Arbitrary VM pauses,
+clock discontinuities and unobserved rate excursions are not qualified.
+Inconsistent, stale, imprecise or ambiguous measurements fail. These limits
+follow the distinction between the monotonic clock and timestamp coarsening in
+[W3C High Resolution Time](https://www.w3.org/TR/hr-time-3/#dfn-monotonic-clock)
+and its [coarsening algorithm](https://www.w3.org/TR/hr-time-3/#dfn-coarsen-time).
+
+This observation-policy change does not repair or relabel earlier failed runs.
+The third Save failure from the 21 October core run lacks probe diagnostics;
+its common error text cannot distinguish no observed transition from only
+steps over budget. Its historical cause remains unknown.
 
 For each actual browser start/end, causal echo constraints produce lower and
 upper possible host times. Elapsed intervals are expanded for both timestamp

@@ -24,12 +24,12 @@ test('the real Mozilla snapshot authenticates with the qualified pinned P-384 si
   assert.equal(await verifySnapshotSignature(snapshot, metadata, chainURL, canonical, webcrypto.subtle), true);
   const chain = new X509Certificate(await readFile(new URL('onecrl-chain.pem', security)));
   assert.equal(chain.publicKey.export({ type: 'spki', format: 'der' }).toString('base64'), ONECRL_PUBLIC_KEY_SPKI);
-  assert.equal(validateSnapshot(snapshot).data.length, 1901);
+  assert.equal(validateSnapshot(snapshot).data.length, 1907);
 });
 
 test('changing a valid revocation identity or detached signature is rejected', async () => {
   const edited = copy(snapshot);
-  edited.data[0].serialNumber = 'AQIDBA==';
+  edited.data.find(record => Object.hasOwn(record, 'serialNumber')).serialNumber = 'AQIDBA==';
   await assert.rejects(verifySnapshotSignature(edited, metadata, chainURL, canonical, webcrypto.subtle), /signature could not be verified/);
   const badMetadata = copy(metadata);
   const bytes = Buffer.from(badMetadata.signature.signature, 'base64url'); bytes[0] ^= 1;
@@ -40,9 +40,10 @@ test('changing a valid revocation identity or detached signature is rejected', a
 test('snapshot validation rejects duplicate IDs, ambiguous identities and malformed base64', () => {
   const duplicate = copy(snapshot); duplicate.data.push(copy(duplicate.data[0]));
   assert.throws(() => validateSnapshot(duplicate), /record is invalid/);
-  const both = copy(snapshot); Object.assign(both.data[0], { subject: 'AQID', pubKeyHash: 'A'.repeat(43) + '=' });
+  const both = copy(snapshot); Object.assign(both.data.find(record => Object.hasOwn(record, 'issuerName')),
+    { subject: 'AQID', pubKeyHash: 'A'.repeat(43) + '=' });
   assert.throws(() => validateSnapshot(both), /identity is invalid/);
-  const bad = copy(snapshot); bad.data[0].issuerName = 'https://evil.example/certificate';
+  const bad = copy(snapshot); bad.data.find(record => Object.hasOwn(record, 'issuerName')).issuerName = 'https://evil.example/certificate';
   assert.throws(() => validateSnapshot(bad), /identity is invalid/);
   const wrongDate = copy(snapshot); wrongDate.timestamp += 1;
   assert.throws(() => validateSnapshot(wrongDate), /timestamp is inconsistent/);
@@ -50,7 +51,7 @@ test('snapshot validation rejects duplicate IDs, ambiguous identities and malfor
 
 test('revocation mapping enforces active entries and clears disabled issuer and key entries', () => {
   const entries = revocationEntries(snapshot);
-  assert.equal(entries.filter(entry => entry.enforce).length, 1256);
+  assert.equal(entries.filter(entry => entry.enforce).length, 1262);
   assert.equal(entries.filter(entry => !entry.enforce).length, 645);
   assert.ok(entries.some(entry => entry.kind === 'subject' && typeof entry.pubKey === 'string'));
   assert.ok(entries.some(entry => entry.kind === 'issuer' && !entry.enforce && typeof entry.serial === 'string'));

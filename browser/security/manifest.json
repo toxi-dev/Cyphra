@@ -1,21 +1,21 @@
 {
   "schema": 1,
   "source": "https://firefox.settings.services.mozilla.com/v1/buckets/security-state/collections/onecrl",
-  "fetched": "2026-10-18T08:09:24Z",
-  "timestamp": 1792274405312,
-  "records": 1901,
-  "enabled": 1256,
+  "fetched": "2026-10-26T17:44:26Z",
+  "timestamp": 1792622041776,
+  "records": 1907,
+  "enabled": 1262,
   "files": [
     {
       "name": "onecrl.json",
-      "bytes": 1055340,
-      "sha256": "3a3be9712222fff49c6024d469ca6b939854ee5d8aa9448bae1e4ac045272e37",
+      "bytes": 1058412,
+      "sha256": "23a7e66dac3da302c2df8d2e68f6d60402bc2ee6420b929f7e81def45347b019",
       "url": "https://firefox.settings.services.mozilla.com/v1/buckets/security-state/collections/onecrl/records"
     },
     {
       "name": "onecrl-metadata.json",
-      "bytes": 3321,
-      "sha256": "99b73b0c40d2ab422d2c831cf66b8a099044e78eb7bf80d02a67d61068ddbaef",
+      "bytes": 3317,
+      "sha256": "3498b574cbe3f2864c1b20872a9099c51c11042e079dadc7de3931af5b5d8e72",
       "url": "https://firefox.settings.services.mozilla.com/v1/buckets/security-state/collections/onecrl"
     },
     {
@@ -31,23 +31,23 @@
     "signer": "onecrl.content-signature.mozilla.org",
     "leafSPKISHA256": "71dc4a465bcc3895bd8b0fd25174407f1149938353d1fe96049b9a868758bb37",
     "signerValidUntil": "2026-11-25T18:04:25.000Z",
-    "engine": "v22.23.3",
-    "records": 1901,
-    "enabled": 1256,
-    "timestamp": 1792274405312,
-    "verifiedAt": "2026-10-18T08:09:24Z",
+    "engine": "v22.23.4",
+    "records": 1907,
+    "enabled": 1262,
+    "timestamp": 1792622041776,
+    "verifiedAt": "2026-10-26T17:44:26Z",
     "signerProductionQualification": {
       "verifier": "Gecko nsIContentSignatureVerifier ContentSignatureProdRoot",
       "verified": true,
-      "verifiedAt": "2026-10-18T12:25:43.777332+00:00",
+      "verifiedAt": "2026-10-26T17:45:20.749629+00:00",
       "signer": "onecrl.content-signature.mozilla.org",
       "leafSPKISHA256": "71dc4a465bcc3895bd8b0fd25174407f1149938353d1fe96049b9a868758bb37",
       "signerValidUntil": "2026-11-25T18:04:25Z",
-      "engine": "158.0",
-      "applicationBuildID": "20261013185131",
-      "compiledToolkitBuildID": "20261013185131",
-      "records": 1901,
-      "timestamp": 1792274405312
+      "engine": "158.0.1",
+      "applicationBuildID": "20261022000330",
+      "compiledToolkitBuildID": "20261022000330",
+      "records": 1907,
+      "timestamp": 1792622041776
     }
   }
 }

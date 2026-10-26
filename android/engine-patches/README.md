@@ -1,8 +1,8 @@
-# GeckoView navigation and session-close integration
+# GeckoView navigation, session-close and offline settings integration
 
 This is a custom GeckoView source-module overlay, based on official GeckoView
-`158.0.20261007201254`, native Mozilla revision
-`eb9a6e3a736802c8e080a76c44dc81f409d99d54`. Upstream app navigation can interrupt
+`158.0.20261021001945`, native Mozilla revision
+`e4ce606692cd81e6898547e2edd7c552fefcbb04`. Upstream app navigation can interrupt
 a running interval callback before knowing whether the response will be an
 attachment. Gecko then retires that interval although its document remains
 visible. Bounded native comparisons on the previous **Gecko 157.0.1** build
@@ -13,25 +13,17 @@ This integration instead scopes the change to app URI navigation and keeps
 general hang monitoring enabled. Source and diagnostic results alone do not
 qualify a release: the exact signed APK must pass the gates below.
 
-The base engine was updated before publication to include Mozilla's
-[13 October Firefox 158 security fixes](https://www.mozilla.org/en-US/security/advisories/mfsa2026-106/).
-The official POM and bundled `buildconfig.html` both identify the revision above;
-the official Java `BuildConfig` identifies Gecko 158.0 and build
-`20261007201254`. The downloaded AAR matches Maven's published SHA-256.
-The two upstream modules are byte-identical between these 157 and 158 builds,
-so the same source patch applies exactly. The exact 158 native sources still
-interrupt app URI navigation before the response is known, discard an interval
-after an uncatchable callback abort, and use the cancellation epoch guard.
-There is no upstream fix for that mechanism in this pinned build.
-
-The unchanged relevant source paths were rechecked at the 158 revision:
-`TimeoutHandler.cpp:167–169`, `nsGlobalWindowInner.cpp:6593–6603`,
-`TimeoutManager.cpp:1045–1047`, `ProcessHangMonitor.cpp:491–504`,
-`BrowserParent.cpp:3731–3748` and `BrowserChild.cpp:3811–3819`.
-`StaticPrefList.yaml:3674–3678` retains the true, startup-only hang-monitor
-default. The Java shutdown-readiness contract is documented in
-[LIFECYCLE.md](../LIFECYCLE.md). Native library hashes and alignment, the source
-JAR hash, and the generated container hash are newly pinned for 158.
+The base engine includes Mozilla's [20 October security fixes](https://www.mozilla.org/en-US/security/advisories/mfsa2026-111/)
+and [21 October Android certificate-revocation fix](https://www.mozilla.org/en-US/security/advisories/mfsa2026-116/).
+The official POM and bundled `buildconfig.html` identify the revision above;
+the compiled Java `BuildConfig` identifies Gecko 158.0.2 and build
+`20261021001945`. The downloaded AAR matches Maven's published SHA-256.
+The two upstream navigation modules are byte-identical to the earlier 158.0
+inputs, so the existing navigation/session-close patch applies exactly.
+The Java source files are unchanged; build-version constants in three classes
+are updated by upstream. The native libraries, source JAR and generated
+container are newly pinned. Earlier native diagnostics remain historical;
+they do not qualify this signed engine candidate.
 
 ## Scope and preserved behavior
 
@@ -68,8 +60,8 @@ APK must independently prove native Home recovery followed by one exact fresh
 page within a separate eight-second total budget, including same-process
 verification. Source/offline tests alone do not qualify the fix.
 
-Pinned close-order contracts: [GeckoView module manager](https://hg.mozilla.org/releases/mozilla-release/file/eb9a6e3a736802c8e080a76c44dc81f409d99d54/mobile/shared/chrome/geckoview/geckoview.js),
-[docshell destruction](https://hg.mozilla.org/releases/mozilla-release/file/eb9a6e3a736802c8e080a76c44dc81f409d99d54/docshell/base/nsDocShell.cpp),
+Pinned close-order contracts: [GeckoView module manager](https://hg.mozilla.org/releases/mozilla-release/file/e4ce606692cd81e6898547e2edd7c552fefcbb04/mobile/shared/chrome/geckoview/geckoview.js),
+[docshell destruction](https://hg.mozilla.org/releases/mozilla-release/file/e4ce606692cd81e6898547e2edd7c552fefcbb04/docshell/base/nsDocShell.cpp),
 and the browser URI wrapper linked below. The original 20-second content-script
 timeout and process hang reporting remain explicitly enabled and verified before
 browsing. Available report events are compared with a healthy pre-arm snapshot;
@@ -81,25 +73,49 @@ epoch, reducing confidence in protection against stale older interrupts.
 
 Exact pinned source contracts:
 
-- [Browser URI wrapper](https://hg.mozilla.org/releases/mozilla-release/file/eb9a6e3a736802c8e080a76c44dc81f409d99d54/toolkit/content/widgets/browser-custom-element.mjs):
+- [Browser URI wrapper](https://hg.mozilla.org/releases/mozilla-release/file/e4ce606692cd81e6898547e2edd7c552fefcbb04/toolkit/content/widgets/browser-custom-element.mjs):
   `_wrapURIChangeCall` retains nonremote navigation-state handling.
-- [LoadURIOptions](https://hg.mozilla.org/releases/mozilla-release/file/eb9a6e3a736802c8e080a76c44dc81f409d99d54/dom/chrome-webidl/LoadURIOptions.webidl):
+- [LoadURIOptions](https://hg.mozilla.org/releases/mozilla-release/file/e4ce606692cd81e6898547e2edd7c552fefcbb04/dom/chrome-webidl/LoadURIOptions.webidl):
   nonzero `cancelContentJSEpoch` advances the child epoch when initiating a load.
-- [nsDocShellLoadState](https://hg.mozilla.org/releases/mozilla-release/file/eb9a6e3a736802c8e080a76c44dc81f409d99d54/docshell/base/nsDocShellLoadState.cpp):
+- [nsDocShellLoadState](https://hg.mozilla.org/releases/mozilla-release/file/e4ce606692cd81e6898547e2edd7c552fefcbb04/docshell/base/nsDocShellLoadState.cpp):
   `CreateFromLoadURIOptions` consumes flags, principal, referrer, headers, policy
   and cancellation epoch through the original native load path.
-- [BrowserChild](https://hg.mozilla.org/releases/mozilla-release/file/eb9a6e3a736802c8e080a76c44dc81f409d99d54/dom/ipc/BrowserChild.cpp):
+- [BrowserChild](https://hg.mozilla.org/releases/mozilla-release/file/e4ce606692cd81e6898547e2edd7c552fefcbb04/dom/ipc/BrowserChild.cpp):
   `CanCancelContentJS` rejects interruption epochs at or below the current one.
 
-The two exact upstream modules, with MPL headers, are in `upstream/`.
-`app-uri-no-interrupt.patch` contains all Gecko source edits. Both originals,
+The three exact upstream modules, with MPL headers, are in `upstream/`.
+`app-uri-no-interrupt.patch` contains all Gecko source edits. All originals,
 the patch, build tool and notices are included in corresponding source archives;
 the generated engine is not represented as an unmodified Mozilla binary.
+
+## Remote Settings uses local packaged data only
+
+Release Gecko can ignore `services.settings.server=data:,`. The third overlay
+module, `services/settings/Utils.sys.mjs`, therefore returns `true` from
+`shouldSkipRemoteActivity` and rejects `Utils.fetch` before `ServiceRequest`
+construction. Scheduled polling, startup bundles and ordinary sync are skipped;
+direct collection, attachment and signature-chain fetches are also denied.
+This app-scoped source guard does not modify Android or host DNS settings.
+
+The production server identity and `LOAD_DUMPS` semantics remain intact so local
+`resource://` dumps load. The official `RemoteSecuritySettings.init()` startup
+path, OneCRL data and native installation code are unchanged. The packaged list
+contains 1,901 records, including all six enabled advisory-linked eMudhra blocks.
+These records are maintained through signed Cyphra releases; there is no remote
+certificate-list refresh or desktop offline maintenance interface on Android.
+
+The full-module VM regression checks execute the actual patched Utils and pinned
+client/security modules. They cover packaged startup installation, older or
+unreadable local databases, network denial before transport, and an unpatched
+positive control. Mock native storage is not an Android native TLS/storage result.
+Actual package hashes, startup and normal browsing still require final native
+qualification on the signed APK. Upstream local Uptake/Glean call sites remain;
+verified reporting preferences and known-endpoint denial are separate controls.
 
 ## Reproducible assembly and package checks
 
 The official AAR SHA-256 remains
-`b33ab7d20c1361ff54ab793a9395aebc223a3fc2756b82a8c661d9739f566d05`.
+`45c5c4e452ad7b52778c27bc5e7583f3cb182df4c6615e42849afe2b8a2d71ba`.
 It is read only, including when resolved from Maven's cache. No derived AAR is
 written and no global dependency cache is modified. Gradle resolves that same
 artifact separately without transitive dependencies for the overlay task;
@@ -116,8 +132,8 @@ duplicate module entries.
 
 | Container | SHA-256 |
 | --- | --- |
-| Upstream `assets/omni.ja` | `f57a01ec39057d63058018dc36ece9ffade201de99db464c3fe6ff7d536c89f9` |
-| Generated `assets/omni.ja` | `87c1f391e360a3388d3eb3b424b9da5f1875ea96c1dac33db77c4882acd97d26` |
+| Upstream `assets/omni.ja` | `6ae998994528f0f0ff3a86758427dfdc0e29a1b9962dcde9b12ef127c15b7c56` |
+| Generated `assets/omni.ja` | `27af3660805f6a0b9f4d7b22df907178d09d1dac0e349fc321516e1e41cf5c8f` |
 
 Original/final module hashes, patch hash, the official Java bridge JAR hash and
 all 39 official native-library hashes are in `android/engine-lock.json`.
@@ -137,7 +153,7 @@ node --test tests/android-engine-patch.test.mjs
 python3 -m unittest discover -s tests -p test_android_engine_patch.py -v
 ```
 
-`verify-apk` requires the exact generated asset, both modified modules, no
+`verify-apk` requires the exact generated asset, all three modified modules, no
 duplicate entries, and an exact inventory/hash match for all official native
 libraries. It does not verify APK signing, Java DEX identity, installation or
 runtime execution. Existing signing and exact-APK qualification checks remain
@@ -162,9 +178,9 @@ marker is saved only after extension/private/policy startup has succeeded; a
 failed or interrupted initialization retries next launch. Work and Personal
 have independent markers and profiles. Normal later starts reuse compiled cache.
 
-In the pinned [nsAppRunner](https://hg.mozilla.org/releases/mozilla-release/file/eb9a6e3a736802c8e080a76c44dc81f409d99d54/toolkit/xre/nsAppRunner.cpp),
+In the pinned [nsAppRunner](https://hg.mozilla.org/releases/mozilla-release/file/e4ce606692cd81e6898547e2edd7c552fefcbb04/toolkit/xre/nsAppRunner.cpp),
 this startup argument removes the profile-local `startupCache` directory via
-`RemoveComponentRegistries`. The [ScriptPreloader](https://hg.mozilla.org/releases/mozilla-release/file/eb9a6e3a736802c8e080a76c44dc81f409d99d54/js/xpconnect/loader/ScriptPreloader.cpp)
+`RemoveComponentRegistries`. The [ScriptPreloader](https://hg.mozilla.org/releases/mozilla-release/file/e4ce606692cd81e6898547e2edd7c552fefcbb04/js/xpconnect/loader/ScriptPreloader.cpp)
 stores parent/child `scriptCache*.bin` inside that directory. Native startup also
 requests a **soft invalidation of derived quota-cache metadata**; this is a
 side effect of the supported argument and must not be described as literally
@@ -181,10 +197,10 @@ Every derived release must satisfy these checks on its exact signed APKs:
 2. Build in the isolated tree, check merged asset precedence using `verify-apk`
    on each edition, run Java tests/lint, and verify signatures/ABIs/alignment.
 3. Warm the previously published Gecko 157 profiles first. Install the new
-   same-signer Gecko 158 APK without clearing app data; verify first-start cache
+   same-signer Gecko 158.0.2 APK without clearing app data; verify first-start cache
    canary removal, both profiles reach ready, markers match the overlay/package
    update time, subsequent starts reuse cache, and cookies/storage/bookmarks/
-   settings remain intact. This is a **157→158 upgrade**: native build-version
+   settings remain intact. This is a **157→158.0.2 upgrade**: native build-version
    compatibility invalidation also applies. A canary observation does not by
    itself prove which invalidation trigger removed it or that an old compiled
    module executed. For a future overlay update that reuses the native Gecko

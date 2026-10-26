@@ -162,3 +162,27 @@ test('infinite script is armed only by a separate explicit button and the sentin
   await sentinel.callbacks['inspect:click']();
   assert.deepEqual(sentinel.events.map(event => event.kind), ['sentinel-ready', 'sentinel-inspect']);
 });
+
+
+test('precision diagnostics retain one immutable observation per phase without extra echoes or timers', async () => {
+  const timer = await fixture('timer');
+  await timer.callbacks['inspect:click'](); await timer.settle();
+  await timer.callbacks['inspect:click'](); await timer.settle();
+  const inspected = timer.events.findLast(event => event.kind === 'inspect');
+  assert.deepEqual(inspected.precisionProbes.map(probe => probe.phase), ['before', 'after-inspect-1', 'after-inspect-2']);
+  assert.ok(inspected.precisionProbes.every(probe => probe.status === 'observed-compatible-step'
+    && probe.elapsedNs >= 20000000 && probe.readCount <= 1000000 && probe.minimumPositiveStepNs > 0
+    && probe.minimumPositiveStepNs <= 5000000));
+  assert.equal(vm.runInContext('precisionProbes.every(Object.isFrozen)', timer.context), true);
+  assert.equal(inspected.clockSamples.length, 9);
+  for (const sample of inspected.clockSamples) {
+    assert.equal(sample.observedPrecisionNs,
+      inspected.precisionProbes.find(probe => probe.phase === sample.phase).minimumPositiveStepNs);
+  }
+  assert.equal(timer.events.filter(event => event.kind === 'clock-calibration').length, 9);
+  assert.equal(timer.events.filter(event => event.kind === 'clock-warmup').length, 1);
+  assert.equal(timer.intervals.length, 1);
+  assert.equal(timer.intervals[0].milliseconds, 1000);
+  assert.equal(inspected.clockErrors.length, 0);
+  assert.equal(inspected.fatalRecordingErrors.length, 0);
+});

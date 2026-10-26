@@ -1,6 +1,6 @@
 # Cyphra privacy model
 
-Cyphra 0.7.3 uses Gecko from SHA-256-pinned LibreWolf 158.0-1 archives. Native engine flags disable telemetry, data reporting, crash reporting, Normandy and the upstream updater; the content sandbox stays enabled. Cyphra locks related preferences off and blocks known ingestion endpoints before per-site exceptions. Endpoint lists cannot identify every website tracker. No Chromium or Electron runtime is included.
+Cyphra 0.7.3 uses Gecko from SHA-256-pinned LibreWolf 158.0.1-2 archives. Native engine flags disable telemetry, data reporting, crash reporting, Normandy and the upstream updater; the content sandbox stays enabled. Cyphra locks related preferences off and blocks known ingestion endpoints before per-site exceptions. Endpoint lists cannot identify every website tracker. No Chromium or Electron runtime is included.
 
 Trusted local browser chrome loads from a private resource namespace. Only the script-free start page, CSS and logo are content-accessible. The page uses restrictive CSP and Brave Search; it exposes no privileged browser operation to websites. Application-folder write access remains powerful and should be protected as for any desktop software.
 
