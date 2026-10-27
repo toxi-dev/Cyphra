@@ -41,6 +41,8 @@ def validate_case(case, package, mode, scenario, run=None):
     require(mode in modes_for_package(package) and scenario in SCENARIOS,
             'Lifecycle case claims an unshipped mode or unknown scenario.')
     require(case.get('schema') == 'cyphra-android-lifecycle-case-v1', 'Unknown native lifecycle case schema.')
+    require(case.get('diagnosticOnly', False) is False and case.get('releaseQualificationClaimed', True) is True,
+            'Diagnostic evidence cannot satisfy release lifecycle qualification.')
     require(case.get('package') == package and case.get('mode') == mode and case.get('scenario') == scenario, 'Native proof identity mismatch.')
     require(case.get('process') == package+':'+mode and type(case.get('pid')) is int and case['pid'] > 0, 'Proof was produced in the wrong Android process.')
     require(case.get('passed') is True and 'failure' not in case, 'Native lifecycle case failed: '+str(case.get('failure')))
@@ -76,6 +78,27 @@ def validate_case(case, package, mode, scenario, run=None):
             require(re.fullmatch(r'[a-f0-9]{32}', a['token']) and a['form'] == 'input-'+a['token'], 'Missing runtime DOM/form token.')
             require(a['stateToken'] == a['token'] and a['stateStep'] == 2 and a['historyLength'] >= 3, 'Document history was not initialized.')
             require(type(a['sequence']) is int and type(b['sequence']) is int and 0 < a['sequence'] < b['sequence'], 'The live document timer did not advance.')
+            history = observed.get(kind+'HistoryTraversal', {})
+            require(history.get('userInteraction') is False
+                    and all(isinstance(history.get(key), dict) for key in ('before', 'back', 'forward')),
+                    'Scripted history traversal snapshots are missing or use the wrong interaction policy: '+kind)
+            require(history['before'] == after, 'Scripted history baseline differs from the retained document observation: '+kind)
+            snapshots = [history[key] for key in ('before', 'back', 'forward')]
+            require(all(type(snapshot.get('pageRequests')) is int and snapshot['pageRequests'] == 1 and snapshot.get('tokens') == [a['token']]
+                        and isinstance(snapshot.get('latest'), dict) for snapshot in snapshots),
+                    'Scripted history navigation reloaded or changed document requests: '+kind)
+            states = [snapshot['latest'] for snapshot in snapshots]
+            require(all(all(state.get(key) == a[key] for key in ('token', 'form', 'historyLength', 'stateToken'))
+                        for state in states), 'Scripted history navigation changed live document identity or input: '+kind)
+            require(all(type(state.get('stateStep')) is int for state in states)
+                    and [state['stateStep'] for state in states] == [2, 1, 2],
+                    'Scripted history Back and Forward did not report the required actual states: '+kind)
+            base_url = a['href'].rsplit('#', 1)[0]
+            require([state.get('href') for state in states] == [a['href'], base_url+'#one', a['href']]
+                    and a['href'].endswith('#two'), 'Scripted history navigation reported the wrong document URLs: '+kind)
+            require(all(type(state.get('sequence')) is int for state in states)
+                    and 0 < states[0]['sequence'] < states[1]['sequence'] < states[2]['sequence'],
+                    'Scripted history navigation did not advance its actual document sequence: '+kind)
         require(observed['ordinaryDocument']['before']['latest']['token'] != observed['privateDocument']['before']['latest']['token'], 'Ordinary/private document tokens were conflated.')
     elif scenario == 'cold-recreate':
         for key in ('configurationDestroy', 'replacementReady', 'differentActivity'):
@@ -94,6 +117,8 @@ def validate_case(case, package, mode, scenario, run=None):
 
 
 def validate_proof(proof):
+    require(proof.get('diagnosticOnly', False) is False and proof.get('releaseQualificationClaimed', True) is True,
+            'Diagnostic aggregate evidence cannot satisfy release lifecycle qualification.')
     require(proof.get('schema') == SCHEMA and proof.get('kind') == 'recreation'
             and proof.get('passed') is True and 'failure' not in proof, 'Invalid aggregate lifecycle proof.')
     package = proof['package']

@@ -142,6 +142,18 @@ timer sequence. Actual Back and Forward calls must also preserve each document.
 These observations cannot be supplied by setting a test preference or replacing
 the page with an injected result.
 
+The fixture creates its history entries through script without user activation.
+Its retention test therefore calls explicit programmatic `goBack(false)` and
+`goForward(false)`. Production toolbar navigation retains the ordinary no-argument
+API and its user-interaction policy. The test records the actual baseline, Back
+and Forward fixture snapshots; host validation requires one document request,
+identical token/form/history length, the real state sequence 2→1→2, matching
+#two/#one/#two URLs and strictly increasing live sequence numbers. It rejects
+missing traversal observations and any evidence marked `diagnosticOnly: true`
+or `releaseQualificationClaimed: false`. Separate diagnostic comparisons cannot
+satisfy a release gate. Earlier failures remain failed; this fixture correction
+requires fresh qualification rather than reinterpreting an old result.
+
 The cold case requests recreation before the public JNI-readiness barrier
 completes, then requires a different ready Activity in the same process/runtime
 with no shutdown request. The early-finish case requests a legitimate Activity

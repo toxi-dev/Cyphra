@@ -32,10 +32,16 @@ def fixture(edition):
                     observed[key] = True
                 for kind, token in [('ordinary', 'b'*32), ('private', 'c'*32)]:
                     observed[kind+'SessionBefore'] = observed[kind+'SessionAfter'] = kind+'-session'
-                    latest = {'token': token, 'form': 'input-'+token, 'href': 'http://localhost/offline',
+                    latest = {'token': token, 'form': 'input-'+token, 'href': 'http://localhost/offline-'+kind+'#two',
                               'historyLength': 3, 'stateToken': token, 'stateStep': 2, 'sequence': 1}
-                    observed[kind+'Document'] = {'before': {'pageRequests': 1, 'latest': latest},
-                        'after': {'pageRequests': 1, 'latest': {**latest, 'sequence': 2}}}
+                    observed[kind+'Document'] = {'before': {'pageRequests': 1, 'tokens': [token], 'latest': latest},
+                        'after': {'pageRequests': 1, 'tokens': [token], 'latest': {**latest, 'sequence': 2}}}
+                    history_before = copy.deepcopy(observed[kind+'Document']['after'])
+                    history_back = copy.deepcopy(history_before)
+                    history_back['latest'].update(sequence=3, stateStep=1, href='http://localhost/offline-'+kind+'#one')
+                    history_forward = copy.deepcopy(history_before);history_forward['latest']['sequence'] = 4
+                    observed[kind+'HistoryTraversal'] = {'userInteraction': False, 'before': history_before,
+                        'back': history_back, 'forward': history_forward}
             elif scenario == 'cold-recreate':
                 observed.update(barrierReadyAtRequest=False, replacementReady=True, differentActivity=True)
             else:
@@ -54,6 +60,53 @@ def fixture(edition):
 
 
 class LifecycleScopeTest(unittest.TestCase):
+    def test_diagnostic_markers_cannot_satisfy_release_lifecycle(self):
+        for edition in ('team', 'public', 'home'):
+            proof = fixture(edition)
+            for scenario in LIFECYCLE.SCENARIOS:
+                case = proof['modes']['personal'][scenario]
+                LIFECYCLE.validate_case(case, proof['package'], 'personal', scenario)
+                for marker, value in [('diagnosticOnly', True), ('releaseQualificationClaimed', False)]:
+                    bad = copy.deepcopy(case);bad[marker] = value
+                    with self.subTest(edition=edition, scenario=scenario, marker=marker), self.assertRaisesRegex(AssertionError, 'Diagnostic evidence'):
+                        LIFECYCLE.validate_case(bad, proof['package'], 'personal', scenario)
+
+    def test_diagnostic_aggregate_markers_cannot_satisfy_release_lifecycle(self):
+        for edition in ('team', 'public', 'home'):
+            proof = fixture(edition);LIFECYCLE.validate_proof(proof)
+            for marker, value in [('diagnosticOnly', True), ('releaseQualificationClaimed', False)]:
+                bad = copy.deepcopy(proof);bad[marker] = value
+                with self.subTest(edition=edition, marker=marker), self.assertRaisesRegex(AssertionError, 'Diagnostic aggregate evidence'):
+                    LIFECYCLE.validate_proof(bad)
+
+    def test_scripted_history_requires_actual_baseline_back_forward_states(self):
+        for kind in ('ordinary', 'private'):
+            for changed in ('missing', 'interaction', 'baseline', 'back-step', 'forward-step', 'back-token',
+                            'back-input', 'back-url', 'forward-url', 'back-reload', 'back-sequence',
+                            'forward-sequence', 'history-length', 'request-token', 'back-step-boolean',
+                            'request-count-boolean', 'back-sequence-boolean'):
+                proof = fixture('team');case = proof['modes']['personal']['retained']
+                history = case['observations'][kind+'HistoryTraversal']
+                if changed == 'missing': case['observations'].pop(kind+'HistoryTraversal')
+                elif changed == 'interaction': history['userInteraction'] = True
+                elif changed == 'baseline': history['before']['latest']['sequence'] = 1
+                elif changed == 'back-step': history['back']['latest']['stateStep'] = 2
+                elif changed == 'forward-step': history['forward']['latest']['stateStep'] = 1
+                elif changed == 'back-token': history['back']['latest']['token'] = 'f'*32
+                elif changed == 'back-input': history['back']['latest']['form'] = 'lost input'
+                elif changed == 'back-url': history['back']['latest']['href'] = 'http://localhost/other#one'
+                elif changed == 'forward-url': history['forward']['latest']['href'] += '-wrong'
+                elif changed == 'back-reload': history['back']['pageRequests'] = 2
+                elif changed == 'back-sequence': history['back']['latest']['sequence'] = 2
+                elif changed == 'forward-sequence': history['forward']['latest']['sequence'] = 3
+                elif changed == 'history-length': history['back']['latest']['historyLength'] = 2
+                elif changed == 'request-token': history['forward']['tokens'].append('f'*32)
+                elif changed == 'back-step-boolean': history['back']['latest']['stateStep'] = True
+                elif changed == 'request-count-boolean': history['back']['pageRequests'] = True
+                else: history['back']['latest']['sequence'] = True
+                with self.subTest(kind=kind, changed=changed), self.assertRaisesRegex(AssertionError, '[Hh]istory'):
+                    LIFECYCLE.validate_case(case, proof['package'], 'personal', 'retained')
+
     def test_home_requires_exactly_three_actual_personal_scenarios(self):
         proof = fixture('home')
         self.assertIs(LIFECYCLE.validate_proof(proof), proof)

@@ -202,8 +202,13 @@ public abstract class LifecycleQualificationTest extends Instrumentation {
 
     private void history(GeckoSession session,String kind,JSONObject baseline)throws Exception{
         String token=baseline.getJSONObject("latest").getString("token");long sequence=baseline.getJSONObject("latest").getLong("sequence");
-        ui(()->{session.goBack();return null;});JSONObject back=awaitDocument(kind,token,sequence,1);
-        ui(()->{session.goForward();return null;});JSONObject forward=awaitDocument(kind,token,back.getJSONObject("latest").getLong("sequence"),2);
+        // These pushState entries were created without user activation. Exercise
+        // programmatic traversal; production toolbar Back keeps its normal API.
+        observe(kind+"HistoryTraversal",new JSONObject().put("userInteraction",false).put("before",baseline));
+        ui(()->{session.goBack(false);return null;});JSONObject back=awaitDocument(kind,token,sequence,1);
+        observe(kind+"HistoryTraversal",new JSONObject().put("userInteraction",false).put("before",baseline).put("back",back));
+        ui(()->{session.goForward(false);return null;});JSONObject forward=awaitDocument(kind,token,back.getJSONObject("latest").getLong("sequence"),2);
+        observe(kind+"HistoryTraversal",new JSONObject().put("userInteraction",false).put("before",baseline).put("back",back).put("forward",forward));
         require(baseline.getInt("pageRequests")==forward.getInt("pageRequests"),"History navigation reloaded the document.");
         require(baseline.getJSONObject("latest").getString("form").equals(forward.getJSONObject("latest").getString("form")),"History navigation lost runtime form input.");
     }
