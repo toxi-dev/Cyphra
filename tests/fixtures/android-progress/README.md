@@ -1,4 +1,4 @@
-# Isolated progress enable-transition regression proposal
+# Pinned progress enable-transition regression
 
 Run `node --experimental-vm-modules --test progress-enable-transition.test.mjs`.
 

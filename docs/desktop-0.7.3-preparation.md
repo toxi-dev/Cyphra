@@ -75,7 +75,7 @@ certificate individually or qualify the final UI/packages. The historical
 [18 October](security-data-2026-10-18.json) and
 [21 October](security-data-2026-10-21.json) observations retain their original scope.
 
-Android separately pins GeckoView 158.0.2 and retains that AAR's official packaged
+Android separately pins GeckoView 159.0 and retains that AAR's official packaged
 OneCRL startup data. The desktop maintenance snapshot and its UI are not ported
 to Android. No platform claims a continuously current revocation service.
 

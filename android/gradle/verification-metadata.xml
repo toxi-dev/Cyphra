@@ -1933,5 +1933,37 @@
             <sha256 value="0a812557737e3103a20a93c2fe65214b13b777b935a0ffa55a01696a212dd971" origin="Verified official Mozilla Maven SHA-256" />
          </artifact>
       </component>
+      <component group="org.mozilla.geckoview" name="geckoview" version="159.0.20261022150525">
+         <artifact name="geckoview-159.0.20261022150525.aar">
+            <sha256 value="11f0dd1b030370e29e47030d1269943361f751c5220aff24dca3232e36646c90" origin="Verified official Maven bytes for Cyphra159 engine upgrade" />
+         </artifact>
+         <artifact name="geckoview-159.0.20261022150525.module">
+            <sha256 value="18102f5bc2f075b229ff00cbfd1b78b6c6c561cc9ef22154021ad5e0dd8e02b5" origin="Verified official Maven bytes for Cyphra159 engine upgrade" />
+         </artifact>
+         <artifact name="geckoview-159.0.20261022150525.pom">
+            <sha256 value="760b60b556283f897c7258b04bf314f9c02cc5de26845d569c6d7a42d99d8c76" origin="Verified official Maven bytes for Cyphra159 engine upgrade" />
+         </artifact>
+      </component>
+      <component group="androidx.annotation" name="annotation" version="1.11.0">
+         <artifact name="annotation-1.11.0.module">
+            <sha256 value="ac8410bea7adaabc9e71285f0627c9cb929c5addd00cfc6d0ebd421dc2da1ee0" origin="Verified official Maven bytes for Cyphra159 engine upgrade" />
+         </artifact>
+      </component>
+      <component group="androidx.annotation" name="annotation-jvm" version="1.11.0">
+         <artifact name="annotation-jvm-1.11.0.module">
+            <sha256 value="0c8a86f2a8e20120cc13544f101047f42284de1f1dd7ca26c90056901de4c2da" origin="Verified official Maven bytes for Cyphra159 engine upgrade" />
+         </artifact>
+         <artifact name="annotation-jvm-1.11.0.jar">
+            <sha256 value="a83b827cc17fd6b41c7bf5e7a2a2b40a0895b00b3e30fdfdb820b49dc7b667f3" origin="Verified official Maven bytes for Cyphra159 engine upgrade" />
+         </artifact>
+      </component>
+      <component group="androidx.core" name="core" version="1.19.1">
+         <artifact name="core-1.19.1.module">
+            <sha256 value="0d8ca728e53e1b694b9a14f0b68824085919500bc123684746f1f43e9f7ea8cd" origin="Verified official Maven bytes for Cyphra159 engine upgrade" />
+         </artifact>
+         <artifact name="core-1.19.1.aar">
+            <sha256 value="08108ea780205bd54603088a62a6dd5378f63bd25542674be24cd4cdb8191a09" origin="Verified official Maven bytes for Cyphra159 engine upgrade" />
+         </artifact>
+      </component>
    </components>
 </verification-metadata>

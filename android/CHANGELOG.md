@@ -2,7 +2,7 @@
 
 ## 0.1.2 — release candidate
 
-- Update the pinned native engine to GeckoView 158.0.20261021001945 / Gecko 158.0.2, including Mozilla's October security fixes and packaged certificate-revocation startup installation.
+- Update the pinned native engine to GeckoView 159.0.20261022150525 / Gecko 159.0, including Mozilla's 27 October Android release/security fixes and packaged certificate-revocation startup installation.
 - Disable Remote Settings polling and reject its transport before request construction, while retaining packaged security data.
 - Interrupt the abandoned content script only when its session closes, so native Home can open a fresh ordinary page promptly.
 - Add the separate Cyphra Home APK with one Personal profile, system DNS by default, optional manual sync and its own installation, signing and update identities. Public and Byte Team keep both modes and their security tools.

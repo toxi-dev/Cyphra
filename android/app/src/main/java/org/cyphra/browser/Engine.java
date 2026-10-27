@@ -151,7 +151,7 @@ public final class Engine {
             shutdown.onExited();
             if(!closing)fail("The Gecko engine stopped. Restart Cyphra to continue browsing.");
         });
-        // GeckoView 158's shutdown calls native forceQuit directly, even while
+        // Pinned GeckoView's shutdown calls native forceQuit directly, even while
         // GeckoRuntime.create is still loading JNI. This read-only query is
         // queued until Gecko is RUNNING. Either Gecko reply proves native
         // startup reached that state; only the delegate above proves exit.

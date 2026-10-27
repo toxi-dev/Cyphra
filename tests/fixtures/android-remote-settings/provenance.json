@@ -1,66 +1,66 @@
 {
   "schema": 1,
   "license": "MPL-2.0",
-  "sourceRevision": "e4ce606692cd81e6898547e2edd7c552fefcbb04",
-  "artifact": "org.mozilla.geckoview:geckoview:158.0.20261021001945",
-  "aarURL": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/158.0.20261021001945/geckoview-158.0.20261021001945.aar",
-  "aarSHA256": "45c5c4e452ad7b52778c27bc5e7583f3cb182df4c6615e42849afe2b8a2d71ba",
+  "sourceRevision": "5add844c26613d7e4d84c799d6e23cf987b1240d",
+  "artifact": "org.mozilla.geckoview:geckoview:159.0.20261022150525",
+  "aarURL": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/159.0.20261022150525/geckoview-159.0.20261022150525.aar",
+  "aarSHA256": "11f0dd1b030370e29e47030d1269943361f751c5220aff24dca3232e36646c90",
   "modules": {
     "Utils.sys.mjs": {
       "bytes": 20620,
       "sha256": "bf35186d47f27cdee1f27dc95d64a37fd0b7ade9cda3c05270990c0cf66a8718",
       "archivePath": "modules/services-settings/Utils.sys.mjs",
       "sourcePath": "services/settings/Utils.sys.mjs",
-      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/e4ce606692cd81e6898547e2edd7c552fefcbb04/services/settings/Utils.sys.mjs"
+      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/services/settings/Utils.sys.mjs"
     },
     "SharedUtils.sys.mjs": {
       "bytes": 1827,
       "sha256": "b304c8c9c23ec1d2d97cde0677bdd9b64017aeac6d86001a653f33682f3d86ee",
       "archivePath": "modules/services-settings/SharedUtils.sys.mjs",
       "sourcePath": "services/settings/SharedUtils.sys.mjs",
-      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/e4ce606692cd81e6898547e2edd7c552fefcbb04/services/settings/SharedUtils.sys.mjs"
+      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/services/settings/SharedUtils.sys.mjs"
     },
     "Attachments.sys.mjs": {
       "bytes": 23064,
       "sha256": "9fc987bab2abce441f033673fe9f03ab9babc9c208e43d34e26336ff3d0366bb",
       "archivePath": "modules/services-settings/Attachments.sys.mjs",
       "sourcePath": "services/settings/Attachments.sys.mjs",
-      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/e4ce606692cd81e6898547e2edd7c552fefcbb04/services/settings/Attachments.sys.mjs"
+      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/services/settings/Attachments.sys.mjs"
     },
     "RemoteSettingsClient.sys.mjs": {
       "bytes": 50562,
       "sha256": "125c37930a98b6537a7e12fe63e22a85b309de0e5973d4c5d0e2d1312584e894",
       "archivePath": "modules/services-settings/RemoteSettingsClient.sys.mjs",
       "sourcePath": "services/settings/RemoteSettingsClient.sys.mjs",
-      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/e4ce606692cd81e6898547e2edd7c552fefcbb04/services/settings/RemoteSettingsClient.sys.mjs"
+      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/services/settings/RemoteSettingsClient.sys.mjs"
     },
     "remote-settings.sys.mjs": {
       "bytes": 28331,
       "sha256": "3a0ce51b813738b8f372c31b8b4264dd228fc330eb38f066a66d89125cf293da",
       "archivePath": "modules/services-settings/remote-settings.sys.mjs",
       "sourcePath": "services/settings/remote-settings.sys.mjs",
-      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/e4ce606692cd81e6898547e2edd7c552fefcbb04/services/settings/remote-settings.sys.mjs"
+      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/services/settings/remote-settings.sys.mjs"
     },
     "RemoteSecuritySettings.sys.mjs": {
       "bytes": 24164,
       "sha256": "d67f8eda81e48ea775d666b290070119db1aea5a0113c032f4cefee45ccf117b",
       "archivePath": "modules/psm/RemoteSecuritySettings.sys.mjs",
       "sourcePath": "security/manager/ssl/RemoteSecuritySettings.sys.mjs",
-      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/e4ce606692cd81e6898547e2edd7c552fefcbb04/security/manager/ssl/RemoteSecuritySettings.sys.mjs"
+      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/security/manager/ssl/RemoteSecuritySettings.sys.mjs"
     }
   },
   "onecrl": {
     "archivePath": "defaults/settings/security-state/onecrl.json",
-    "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/e4ce606692cd81e6898547e2edd7c552fefcbb04/services/settings/dumps/security-state/onecrl.json",
-    "wholeDumpBytes": 1055340,
-    "wholeDumpSHA256": "3a3be9712222fff49c6024d469ca6b939854ee5d8aa9448bae1e4ac045272e37",
-    "wholeDumpRecords": 1901,
-    "wholeDumpEnabledRecords": 1256,
-    "timestamp": 1792274405312,
+    "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/services/settings/dumps/security-state/onecrl.json",
+    "wholeDumpBytes": 1058412,
+    "wholeDumpSHA256": "23a7e66dac3da302c2df8d2e68f6d60402bc2ee6420b929f7e81def45347b019",
+    "wholeDumpRecords": 1907,
+    "wholeDumpEnabledRecords": 1262,
+    "timestamp": 1792622041776,
     "fixtureFile": "onecrl-advisory-records.json",
     "fixtureBytes": 3211,
-    "fixtureSHA256": "265eb65b41a1c698e5291f1817991e8137922b055915203e4936255b2c6f6644",
-    "selection": "All enabled records whose details.bug equals https://bugzilla.mozilla.org/show_bug.cgi?id=2083382; field values preserved from the pinned official AAR; JSON formatting changed.",
+    "fixtureSHA256": "6301fb4709b823f7a76671b809ff57cd7648b5adefc50b3102083373e0f978bd",
+    "selection": "Retain the six previously pinned Bug2083382 advisory records, verified field-for-field against official 159 AAR; the full packaged dataset is tested separately.",
     "selectedRecords": [
       {
         "id": "dfebe454-5411-4f64-bd26-ff0346cad020",
@@ -86,6 +86,10 @@
         "id": "bd595f9a-0da9-4980-bcc2-ef1e1bf70c7b",
         "canonicalJSONSHA256": "98b8465b9c575c379f1a8e1da7da308fdba75c2df1a6c594c2884797d1874d2d"
       }
-    ]
+    ],
+    "wholeDumpMetadataFalseRecords": 645,
+    "wholeDumpUniqueIdentities": 1903,
+    "fullFixtureFile": "onecrl-packaged.json",
+    "fullFixtureScope": "Exact official AAR member, test-only. Full-module VM verifies all records regardless of enabled metadata; mocked cert storage is not native TLS qualification."
   }
 }

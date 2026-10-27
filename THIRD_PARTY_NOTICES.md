@@ -14,6 +14,8 @@ The checksum-verified upstream Windows and Linux archives both identify Mozilla 
 
 The corresponding source code for the unmodified engine is available at the exact upstream source location above. Cyphra's matching source archive contains all original integration modifications, configuration changes, and build instructions. Provide both the Cyphra archive and this engine source location to binary recipients. Cyphra has not rebuilt or re-signed the inherited engine; installed interface resources and application metadata are rebranded as Cyphra. Upstream legal attribution, source identifiers, compatibility identifiers and original binary filenames remain.
 
+Android uses the separate official GeckoView 159.0 engine with three disclosed source-module changes. Its matching native/Java source locations, hashes and reporting-code limitations are in [Android notices](android/THIRD_PARTY_NOTICES.md) and [159 engine provenance](docs/android-engine-159-provenance.json). Cyphra leaves the official native libraries and Java bridge unmodified.
+
 ## Local filter matcher
 
 `@ghostery/adblocker` and its MPL-2.0 helpers are used as a bundled local JavaScript parser/matcher, not as the Ghostery extension or analytics service. MIT domain-parsing dependencies retain their notices. Full runtime matcher dependency license texts are bundled in `browser/vendor/LICENSES.txt`; exact versions/resolved source archives are pinned in `package-lock.json`. Generated legal comments are preserved in `browser/vendor/adblock.js.LEGAL.txt`.

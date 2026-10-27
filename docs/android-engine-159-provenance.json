@@ -1,0 +1,224 @@
+{
+  "schema": 1,
+  "verifiedAt": "2026-10-27T18:00:41.930270+00:00",
+  "status": "EXACT_OFFICIAL_INPUTS_AND_OFFLINE_MODULE_TEST_CANDIDATE; NATIVE_RELEASE_QUALIFICATION_PENDING",
+  "artifact": "org.mozilla.geckoview:geckoview:159.0.20261022150525",
+  "geckoVersion": "159.0",
+  "buildId": "20261022150525",
+  "sourceRevision": "5add844c26613d7e4d84c799d6e23cf987b1240d",
+  "nativeSourceURL": "https://hg.mozilla.org/releases/mozilla-release/rev/5add844c26613d7e4d84c799d6e23cf987b1240d",
+  "officialAAR": {
+    "url": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/159.0.20261022150525/geckoview-159.0.20261022150525.aar",
+    "size": 244466182,
+    "sha256": "11f0dd1b030370e29e47030d1269943361f751c5220aff24dca3232e36646c90",
+    "publisherSHA256Compared": true
+  },
+  "officialJavaSource": {
+    "url": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/159.0.20261022150525/geckoview-159.0.20261022150525-sources.jar",
+    "size": 889313,
+    "sha256": "6e41ab3bdadd75f0ba0daaca1b62fd39239c85be254056754e7fb9a02dba52c1",
+    "publisherSHA256Compared": false,
+    "officialSHA256SidecarStatus": 404,
+    "responseETagMD5Matches": true
+  },
+  "compiledJavaBridgeSHA256": "a2ab9d73eb9d0bf585ba29e5b21964fc0de50b1c27b5029de6ce3b881edc4be5",
+  "compiledBuildConstants": {
+    "version": "159.0",
+    "buildId": "20261022150525",
+    "updateChannel": "release",
+    "debugBuild": false
+  },
+  "integration": {
+    "id": "cyphra-app-uri-no-interrupt-v3",
+    "kind": "generated-apk-asset-override",
+    "modifiedUpstreamEngine": true,
+    "patchFile": "android/engine-patches/app-uri-no-interrupt.patch",
+    "patchSha256": "8dddd8fe04e7f7569aa8a42639e7f9ea34fb303d99acb5a80e894b037b59d194",
+    "upstreamOmniSha256": "38fad169a65d064137bda9c9ff3a9099ec548b36781b9feb6d27e5fa4336c21b",
+    "patchedOmniSha256": "16d1c2fe7eca01911197a756d5399f03fdb72fafae340844cf365defd98f5652",
+    "modules": [
+      {
+        "archivePath": "modules/GeckoViewNavigation.sys.mjs",
+        "upstreamSource": "android/engine-patches/upstream/GeckoViewNavigation.sys.mjs",
+        "upstreamSha256": "fb5926acbf81a405929309b39076f1ef86c4e407795f8903963d3f15158f208c",
+        "patchedSha256": "b39381a6f9bc5feca7fc98c4726a8c885170d0323ae69a0d9b82e83040fc1d64",
+        "sourcePath": "mobile/shared/modules/geckoview/GeckoViewNavigation.sys.mjs",
+        "sourceUrl": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/mobile/shared/modules/geckoview/GeckoViewNavigation.sys.mjs"
+      },
+      {
+        "archivePath": "moz-src/toolkit/components/remotebrowserutils/RemoteWebNavigation.sys.mjs",
+        "upstreamSource": "android/engine-patches/upstream/RemoteWebNavigation.sys.mjs",
+        "upstreamSha256": "2cce97678f39a0bb86bcc4a5270a396a6ccc81eddf37dbb286c7791dd54b20ca",
+        "patchedSha256": "69b8986d16a2480ba7caed6afd70b4726f8c4dffaa33085224dcf33e564fd67b",
+        "sourcePath": "toolkit/components/remotebrowserutils/RemoteWebNavigation.sys.mjs",
+        "sourceUrl": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/toolkit/components/remotebrowserutils/RemoteWebNavigation.sys.mjs"
+      },
+      {
+        "archivePath": "modules/services-settings/Utils.sys.mjs",
+        "upstreamSource": "android/engine-patches/upstream/Utils.sys.mjs",
+        "upstreamSha256": "bf35186d47f27cdee1f27dc95d64a37fd0b7ade9cda3c05270990c0cf66a8718",
+        "patchedSha256": "133f3efc065b8e478f06daa40ac5624721ae34da64a4f9d67d77956ee071f8b6",
+        "sourcePath": "services/settings/Utils.sys.mjs",
+        "sourceUrl": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/services/settings/Utils.sys.mjs"
+      }
+    ],
+    "startupCachePolicy": "Pass -purgecaches per profile until a protected startup records this overlay SHA-256 and installed APK update time; removes compiled startupCache and requests native soft invalidation of derived quota-cache metadata, without clearing site data or settings.",
+    "embeddedStartupBytecode": false,
+    "processHangMonitor": true,
+    "remoteSettingsNetworkPolicy": "Release-packaged and existing local Remote Settings data only. Cyphra Utils overlay unconditionally suppresses remote polling/startup/sync and rejects central network fetch before request construction. Production dump loading and native OneCRL startup installation remain enabled."
+  },
+  "nativeLibraries": {
+    "count": 39,
+    "abis": [
+      "arm64-v8a",
+      "armeabi-v7a",
+      "x86_64"
+    ],
+    "modifiedByCyphra": false,
+    "allNativeHashesIn": "../android/engine-lock.json",
+    "minimumELFLoadAlignment": {
+      "arm64-v8a": 16384,
+      "x86_64": 16384,
+      "armeabi-v7a": 4096
+    },
+    "physicalDevicesQualified": false
+  },
+  "packagedOneCRL": {
+    "bytes": 1058412,
+    "sha256": "23a7e66dac3da302c2df8d2e68f6d60402bc2ee6420b929f7e81def45347b019",
+    "records": 1907,
+    "metadataTrue": 1262,
+    "metadataFalse": 645,
+    "timestamp": 1792622041776,
+    "equalsCurrentDesktopMaintainedDataset": true
+  },
+  "sourceCompatibility": {
+    "javaSourceFiles": 317,
+    "changedFrom15802": 8,
+    "criticalUnchangedClassHashes": [
+      {
+        "sourcePath": "org/mozilla/geckoview/WebExtensionController.java",
+        "bytes": 73357,
+        "sha256": "2ee72e61c328ed96f8b870333b421560aa4a2edc36cc15b19855c779ddd52cc3",
+        "byteIdentical": true,
+        "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/mobile/android/geckoview/src/main/java/org/mozilla/geckoview/WebExtensionController.java"
+      },
+      {
+        "sourcePath": "org/mozilla/gecko/EventDispatcher.java",
+        "bytes": 18841,
+        "sha256": "9cf745bdf68336505c9feb978fc47bf2b3bf75fb000e887804733afea15c5621",
+        "byteIdentical": true,
+        "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/mobile/android/geckoview/src/main/java/org/mozilla/gecko/EventDispatcher.java"
+      },
+      {
+        "sourcePath": "org/mozilla/gecko/NativeQueue.java",
+        "bytes": 7899,
+        "sha256": "a574e4b142c8615de61b61f48997a86db0bdbfc740132eb6430dd3e1ee7b6777",
+        "byteIdentical": true,
+        "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/mobile/android/geckoview/src/main/java/org/mozilla/gecko/NativeQueue.java"
+      },
+      {
+        "sourcePath": "org/mozilla/gecko/util/EventCallback.java",
+        "bytes": 1870,
+        "sha256": "b9e45a45302a4d42c71e3249013a3b90e10bfab6d1521e21a89d66a906f8db9f",
+        "byteIdentical": true,
+        "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/mobile/android/geckoview/src/main/java/org/mozilla/gecko/util/EventCallback.java"
+      },
+      {
+        "sourcePath": "org/mozilla/geckoview/GeckoResult.java",
+        "bytes": 38576,
+        "sha256": "261642d6f846fd474d2fc82fd0bc3691bcc966c25b7093b3aa6b48ae8ec678a3",
+        "byteIdentical": true,
+        "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/mobile/android/geckoview/src/main/java/org/mozilla/geckoview/GeckoResult.java"
+      },
+      {
+        "sourcePath": "org/mozilla/geckoview/GeckoSessionHandler.java",
+        "bytes": 2977,
+        "sha256": "05f38665813d4958bfc3e2f77f3aec7483ff5d6f6e500a89143de4b6df12aab0",
+        "byteIdentical": true,
+        "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/mobile/android/geckoview/src/main/java/org/mozilla/geckoview/GeckoSessionHandler.java"
+      },
+      {
+        "sourcePath": "org/mozilla/geckoview/GeckoView.java",
+        "bytes": 46972,
+        "sha256": "081378f36c19f826cb3842d0b1e31326f20545ce1b7ce59d13702a008da1d2d1",
+        "byteIdentical": true,
+        "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/mobile/android/geckoview/src/main/java/org/mozilla/geckoview/GeckoView.java"
+      }
+    ],
+    "criticalUnchangedMethodHashes": [
+      {
+        "sourcePath": "org/mozilla/geckoview/GeckoRuntime.java",
+        "method": "public void shutdown()",
+        "sha256": "a66bb60014d82fb7e4c413389220c6e886d6aa5a1706841b4b19644f0231ed4b",
+        "bytes": 259,
+        "byteIdentical": true
+      },
+      {
+        "sourcePath": "org/mozilla/geckoview/GeckoRuntime.java",
+        "method": "public void setDelegate(final @Nullable Delegate delegate)",
+        "sha256": "a1296be1855af49d979c1e9e27f8ae721dff22d3ec40e28b46aba232364a3bb9",
+        "bytes": 128,
+        "byteIdentical": true
+      },
+      {
+        "sourcePath": "org/mozilla/geckoview/GeckoSession.java",
+        "method": "public void goBack()",
+        "sha256": "31dd7619a6200a83cd7113ff3e57a3f1ab71f8c11a20c2e406852b6bf0e945ea",
+        "bytes": 46,
+        "byteIdentical": true
+      },
+      {
+        "sourcePath": "org/mozilla/geckoview/GeckoSession.java",
+        "method": "public void goBack(final boolean userInteraction)",
+        "sha256": "ce98388e8e4205992b34f16907607e39af9220c3549c071643120bcb56d2810b",
+        "bytes": 217,
+        "byteIdentical": true
+      },
+      {
+        "sourcePath": "org/mozilla/geckoview/GeckoSession.java",
+        "method": "public void goForward()",
+        "sha256": "904a60dbb7eeded448e09752593bd9d2a9c8bbee02da59b44291ec600ec5e4af",
+        "bytes": 52,
+        "byteIdentical": true
+      },
+      {
+        "sourcePath": "org/mozilla/geckoview/GeckoSession.java",
+        "method": "public void goForward(final boolean userInteraction)",
+        "sha256": "6b15f52cdeab64b0eeff8f27f66257305270d9cd69c104c5d3e34dfc5e8d327a",
+        "bytes": 223,
+        "byteIdentical": true
+      },
+      {
+        "sourcePath": "org/mozilla/geckoview/GeckoSession.java",
+        "method": "public void setProgressDelegate(final @Nullable ProgressDelegate delegate)",
+        "sha256": "1c64efd791624cb33694af9f161dfc9b3dc0528d9a50a3212b797481280ad504",
+        "bytes": 168,
+        "byteIdentical": true
+      },
+      {
+        "sourcePath": "org/mozilla/geckoview/GeckoSession.java",
+        "method": "public void setNavigationDelegate(final @Nullable NavigationDelegate delegate)",
+        "sha256": "62be0bf03bd93c1237b7a3d02a73ff25b89e001075b53081fa663a85387d419e",
+        "bytes": 174,
+        "byteIdentical": true
+      },
+      {
+        "sourcePath": "org/mozilla/geckoview/GeckoSession.java",
+        "method": "public void close()",
+        "sha256": "e22ae21d1569e24aae88e2113ca34cd8c92b1bf4820db23db545cfbc325c7479",
+        "bytes": 582,
+        "byteIdentical": true
+      }
+    ],
+    "scope": "Source observations only; real initialization, retained/cold/early-exit, navigation, DNS and upgrades remain mandatory."
+  },
+  "offlineTests": {
+    "navigationCases": 8,
+    "remoteSettingsCases": 10,
+    "progressEnableTransitionCases": 3,
+    "pythonOverlayGuardCases": 5,
+    "fullRemoteSettingsAssertions": "1,907 submitted records / 1,903 unique identities; all 1,262 true and 645 false metadata records ENFORCE, zero UNSET; no request construction/open/send. Real modules with mocked native/DB/network boundaries, not native certificate proof."
+  },
+  "releaseScope": "This source provenance establishes no signed159 APK, native run or release publication."
+}

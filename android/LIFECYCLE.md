@@ -39,7 +39,7 @@ the earlier failed run remains a failure.
 
 ## Shutdown before native startup
 
-Pinned GeckoView `158.0.20261021001945` starts Gecko asynchronously. Its public
+Pinned GeckoView `159.0.20261022150525` starts Gecko asynchronously. Its public
 `GeckoRuntime.shutdown()` directly invokes native `GeckoThread.forceQuit()`;
 calling it before JNI initialization causes an `UnsatisfiedLinkError`.
 
@@ -53,13 +53,16 @@ the pinned Maven source JAR, in `GeckoRuntime`, `WebExtensionController`,
 GeckoView. This is an indirect readiness barrier, not a general promise about
 every GeckoResult or a new Gecko initialization API.
 
-The exact official 158 source JAR was compared with the earlier 157 JAR:
+The official 159 source JAR was compared with 158.0.2. The query/queue files
 `WebExtensionController`, `EventDispatcher`, `NativeQueue`, `EventCallback`,
-`GeckoResult` and `GeckoRuntime` are byte-identical. `GeckoThread` adds only a
-lint-suppression import/annotation around locale initialization. The queued
-`list()` barrier, JNI readiness ordering, direct native shutdown and actual
-exit event contracts are unchanged. This source comparison does not replace
-native lifecycle qualification of the new signed APKs.
+`GeckoResult` and `GeckoSessionHandler` are byte-identical. `GeckoThread` exposes
+its existing environment-extraction helper for runtime initialization;159 applies
+an isolation environment override before startup. Cyphra still explicitly enables
+isolated content processes. `GeckoSession` removes an unused private native
+transfer declaration. Public history/delegate/session-close methods, JNI state
+ordering, direct shutdown and the actual exit callback are unchanged. These
+source observations preserve the reason for the queued `list()` barrier and
+static progress handoff; they do not replace native159 lifecycle qualification.
 
 `RuntimeShutdown` queues a shutdown request until this barrier completes and
 issues native shutdown once. Privacy failure and legitimate Activity/profile
