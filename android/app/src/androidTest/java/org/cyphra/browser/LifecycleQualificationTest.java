@@ -139,13 +139,18 @@ public abstract class LifecycleQualificationTest extends Instrumentation {
         require(((List<?>)ui(()->field(initial,"tabs"))).size()<=18,"The disposable profile needs two free tab slots.");
         Object ordinary=ui(()->{invoke(initial,"newTab",new Class<?>[]{boolean.class,String.class},false,page("ordinary"));return field(initial,"current");});
         JSONObject ordinaryBefore=awaitDocument("ordinary",null,-1,2);
+        observe("ordinaryDocumentBeforeRecreation",ordinaryBefore);
         Object privateTab=ui(()->{invoke(initial,"newTab",new Class<?>[]{boolean.class,String.class},true,page("private"));return field(initial,"current");});
         JSONObject privateBefore=awaitDocument("private",null,-1,2);
+        observe("privateDocumentBeforeRecreation",privateBefore);
         GeckoSession ordinarySession=(GeckoSession)field(ordinary,"session"),privateSession=(GeckoSession)field(privateTab,"session");
         Object ordinaryNavigation=field(ordinary,"navigation"),privateNavigation=field(privateTab,"navigation");
         Object ordinaryDelegate=ui(ordinarySession::getNavigationDelegate),privateDelegate=ui(privateSession::getNavigationDelegate);
         Engine engine=(Engine)field(initial,"engine");Object oldListener=field(initial,"engineListener");
+        observe("retainedStage","requesting-recreation");
         event("recreate-requested");ui(()->{initial.recreate();return null;});MainActivity replacement=replacement();awaitReady(replacement);
+        observe("retainedStage","replacement-ready");
+        retainedURLs("retainedURLsAfterReplacementReady",ordinary,privateTab,ordinaryBefore,privateBefore);
         ui(()->{
             require(field(replacement,"engine")==engine,"Recreation replaced the runtime.");
             require(field(replacement,"current")==privateTab&&field(replacement,"lastOrdinary")==ordinary,"Private/ordinary selection was lost.");
@@ -160,7 +165,10 @@ public abstract class LifecycleQualificationTest extends Instrumentation {
         });
         JSONObject privateAfter=awaitDocument("private",privateBefore.getJSONObject("latest").getString("token"),privateBefore.getJSONObject("latest").getLong("sequence"),2);
         sameDocument(privateBefore,privateAfter);
+        observe("retainedStage","private-document-live-after-recreation");
+        retainedURLs("retainedURLsBeforeOrdinarySelection",ordinary,privateTab,ordinaryBefore,privateBefore);
         ui(()->{invoke(replacement,"select",new Class<?>[]{ordinary.getClass()},ordinary);return null;});
+        observe("retainedStage","ordinary-selected-after-recreation");
         JSONObject ordinaryAfter=awaitDocument("ordinary",ordinaryBefore.getJSONObject("latest").getString("token"),ordinaryBefore.getJSONObject("latest").getLong("sequence"),2);
         sameDocument(ordinaryBefore,ordinaryAfter);history(ordinarySession,"ordinary",ordinaryAfter);
         ui(()->{invoke(replacement,"select",new Class<?>[]{privateTab.getClass()},privateTab);return null;});history(privateSession,"private",privateAfter);
@@ -175,6 +183,21 @@ public abstract class LifecycleQualificationTest extends Instrumentation {
         observe("ordinaryDocument",new JSONObject().put("before",ordinaryBefore).put("after",ordinaryAfter));
         observe("privateDocument",new JSONObject().put("before",privateBefore).put("after",privateAfter));
         observe("runtimeAfter",identity(engine.runtime));observe("pidAfter",Process.myPid());
+    }
+
+    private void retainedURLs(String checkpoint,Object ordinary,Object privateTab,JSONObject ordinaryDocument,JSONObject privateDocument)throws Exception{
+        String expectedOrdinary=ordinaryDocument.getJSONObject("latest").getString("href");
+        String expectedPrivate=privateDocument.getJSONObject("latest").getString("href");
+        JSONObject urls=ui(()->new JSONObject()
+            .put("expectedOrdinary",expectedOrdinary).put("expectedPrivate",expectedPrivate)
+            .put("ordinaryTab",field(ordinary,"url")).put("ordinaryNavigation",field(field(ordinary,"navigation"),"documentUrl"))
+            .put("privateTab",field(privateTab,"url")).put("privateNavigation",field(field(privateTab,"navigation"),"documentUrl")));
+        // Persist all four actual values before any assertion can abort the case.
+        observe(checkpoint,urls);
+        require(expectedOrdinary.equals(urls.getString("ordinaryTab")),checkpoint+": the retained ordinary tab URL changed.");
+        require(expectedOrdinary.equals(urls.getString("ordinaryNavigation")),checkpoint+": the retained ordinary navigation URL changed.");
+        require(expectedPrivate.equals(urls.getString("privateTab")),checkpoint+": the retained private tab URL changed.");
+        require(expectedPrivate.equals(urls.getString("privateNavigation")),checkpoint+": the retained private navigation URL changed.");
     }
 
     private void history(GeckoSession session,String kind,JSONObject baseline)throws Exception{
@@ -204,9 +227,12 @@ public abstract class LifecycleQualificationTest extends Instrumentation {
     private String page(String kind){return fixture+"/page?run="+run+"&kind="+kind+"&marker="+kind+"-"+run;}
     private JSONObject awaitDocument(String kind,String token,long previous,int step)throws Exception{
         AtomicReference<JSONObject> found=new AtomicReference<>();
-        await(()->{JSONObject snapshot=getJSON(fixture+"/snapshot?run="+run+"&kind="+kind);JSONObject latest=snapshot.optJSONObject("latest");
-            if(latest==null)return false;require(token==null||token.equals(latest.getString("token")),"The live document token changed.");
-            if(latest.getLong("sequence")>previous&&latest.getInt("stateStep")==step){found.set(snapshot);return true;}return false;},"The document did not report the required live state.");return found.get();
+        observe("documentWait",new JSONObject().put("kind",kind).put("stateStep",step).put("previousSequence",previous)
+            .put("expectedToken",token==null?JSONObject.NULL:token));
+        await(()->{JSONObject snapshot=getJSON(fixture+"/snapshot?run="+run+"&kind="+kind);observe("lastDocumentSnapshot",snapshot);JSONObject latest=snapshot.optJSONObject("latest");
+            if(latest==null)return false;require(token==null||token.equals(latest.getString("token")),"The "+kind+" live document token changed.");
+            if(latest.getLong("sequence")>previous&&latest.getInt("stateStep")==step){found.set(snapshot);return true;}return false;},
+            "The "+kind+" document did not report the required live state (stateStep="+step+", sequence>"+previous+").");return found.get();
     }
     private JSONObject getJSON(String url)throws Exception{
         HttpURLConnection connection=(HttpURLConnection)new java.net.URL(url).openConnection();connection.setConnectTimeout(3000);connection.setReadTimeout(3000);

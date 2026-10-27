@@ -24,6 +24,10 @@ import org.mozilla.geckoview.*;
 
 /** Native Android browser chrome. Work and Personal run in separate processes. */
 public abstract class MainActivity extends Activity {
+    // Keep Gecko's progress module enabled while ownership crosses Activities.
+    // Re-enabling it emits an initial about:blank event even for a live tab.
+    // This inert delegate holds no Activity or private-document references.
+    private static final GeckoSession.ProgressDelegate RETAINED_PROGRESS = new GeckoSession.ProgressDelegate() {};
     private int BG,PANEL,LINE,TEXT,MUTED;
     private final ExecutorService jobs=Executors.newSingleThreadExecutor();
     private final ArrayList<Tab> tabs=new ArrayList<>();
@@ -314,7 +318,9 @@ public abstract class MainActivity extends Activity {
         if(gecko!=null)gecko.releaseSession();
         for(Tab tab:tabs)if(tab.session!=null&&tab.delegateOwner==sessionOwner){
             tab.delegateOwner=null;
-            tab.session.setNavigationDelegate(null);tab.session.setProgressDelegate(null);tab.session.setContentDelegate(null);
+            tab.session.setNavigationDelegate(null);
+            tab.session.setProgressDelegate(isChangingConfigurations()&&!shuttingDown?RETAINED_PROGRESS:null);
+            tab.session.setContentDelegate(null);
             tab.session.setPromptDelegate(null);tab.session.setPermissionDelegate(null);tab.session.setSelectionActionDelegate(null);
         }
     }

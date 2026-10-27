@@ -39,7 +39,7 @@
     "signerProductionQualification": {
       "verifier": "Gecko nsIContentSignatureVerifier ContentSignatureProdRoot",
       "verified": true,
-      "verifiedAt": "2026-10-26T17:45:20.749629+00:00",
+      "verifiedAt": "2026-10-27T07:28:02.912029+00:00",
       "signer": "onecrl.content-signature.mozilla.org",
       "leafSPKISHA256": "71dc4a465bcc3895bd8b0fd25174407f1149938353d1fe96049b9a868758bb37",
       "signerValidUntil": "2026-11-25T18:04:25Z",

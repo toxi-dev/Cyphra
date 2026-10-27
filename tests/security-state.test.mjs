@@ -49,13 +49,97 @@ test('snapshot validation rejects duplicate IDs, ambiguous identities and malfor
   assert.throws(() => validateSnapshot(wrongDate), /timestamp is inconsistent/);
 });
 
-test('revocation mapping enforces active entries and clears disabled issuer and key entries', () => {
+test('all authenticated published identities are enforced regardless of the enabled metadata field', () => {
   const entries = revocationEntries(snapshot);
-  assert.equal(entries.filter(entry => entry.enforce).length, 1262);
-  assert.equal(entries.filter(entry => !entry.enforce).length, 645);
+  assert.equal(snapshot.data.filter(record => record.enabled === false).length, 645);
+  assert.equal(entries.length, 1907);
+  assert.equal(entries.filter(entry => entry.enforce).length, 1907);
+  assert.equal(entries.filter(entry => !entry.enforce).length, 0);
   assert.ok(entries.some(entry => entry.kind === 'subject' && typeof entry.pubKey === 'string'));
-  assert.ok(entries.some(entry => entry.kind === 'issuer' && !entry.enforce && typeof entry.serial === 'string'));
+  assert.ok(entries.some(entry => entry.kind === 'issuer' && typeof entry.serial === 'string'));
   assert.ok(entries.every(entry => !Object.hasOwn(entry, 'details') && !Object.hasOwn(entry, 'url')));
+});
+
+test('false enabled metadata never clears either supported revocation identity shape', () => {
+  const synthetic = { timestamp: 2, data: [
+    { id: '00000000-0000-0000-0000-000000000001', schema: 1,
+      enabled: false, last_modified: 1, issuerName: 'AQID', serialNumber: 'BA==' },
+    { id: '00000000-0000-0000-0000-000000000002', schema: 1,
+      enabled: false, last_modified: 2, subject: 'BQY=', pubKeyHash: Buffer.alloc(32, 7).toString('base64') },
+  ] };
+  assert.deepEqual(revocationEntries(synthetic), [
+    { kind: 'issuer', issuer: 'AQID', serial: 'BA==', enforce: true },
+    { kind: 'subject', subject: 'BQY=', pubKey: Buffer.alloc(32, 7).toString('base64'), enforce: true },
+  ]);
+  // This count describes signed source metadata, not revocation eligibility.
+  assert.equal(validateSecurityManifest({ ...copy(manifest), enabled: 0 }).enabled, 0);
+});
+
+test('the authenticated loader sends every actual record to native storage as ENFORCE and reports the installed count', async () => {
+  const files = new Map();
+  for (const name of ['manifest.json', ...manifest.files.map(entry => entry.name)]) {
+    files.set('/native-mapping-fixture/browser/security/' + name,
+      new Uint8Array(await readFile(new URL(name, security))));
+  }
+  class LocalFile {
+    constructor(path) { this.path = path; }
+    clone() { return new LocalFile(this.path); }
+    append(name) { this.path += '/' + name; }
+    isFile() { return files.has(this.path); }
+    isSymlink() { return false; }
+    get fileSize() { return files.get(this.path)?.length || 0; }
+  }
+  let installed;
+  const interfaces = {
+    nsICertStorage: { STATE_UNSET: 0, STATE_ENFORCE: 1 },
+    nsIContentSignatureVerifier: { ContentSignatureProdRoot: 1 },
+  };
+  const mocks = {
+    Components: {
+      interfaces, results: { NS_OK: 0 },
+      classes: {
+        '@mozilla.org/security/contentsignatureverifier;1': {
+          createInstance() { return { async asyncVerifyContentSignature() { return true; } }; },
+        },
+        '@mozilla.org/security/certstorage;1': {
+          getService() { return { setRevocations(states, callback) { installed = states; callback(0); } }; },
+        },
+      },
+    },
+    ChromeUtils: {
+      generateQI() { return function () {}; },
+      importESModule(uri) {
+        assert.equal(uri, 'resource://gre/modules/CanonicalJSON.sys.mjs');
+        return { CanonicalJSON: { stringify: canonical } };
+      },
+    },
+    IOUtils: { async read(path) { assert.ok(files.has(path)); return files.get(path); } },
+    crypto: webcrypto,
+  };
+  const originals = new Map(Object.keys(mocks).map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  try {
+    for (const [name, value] of Object.entries(mocks)) {
+      Object.defineProperty(globalThis, name, { configurable: true, writable: true, value });
+    }
+    // Actual module, actual data hashes and pinned-key verification; only the
+    // native interfaces are mocked. Native NSS qualification remains separate.
+    const { SecurityState } = await import('../browser/modules/security-state.sys.mjs?native-mapping-regression');
+    const info = await SecurityState.start(new LocalFile('/native-mapping-fixture'));
+    assert.equal(installed.length, 1907);
+    assert.equal(installed.filter(state => state.state === interfaces.nsICertStorage.STATE_UNSET).length, 0);
+    assert.ok(installed.every(state => state.state === interfaces.nsICertStorage.STATE_ENFORCE));
+    for (const record of snapshot.data.filter(record => record.enabled === false)) {
+      assert.ok(installed.some(state => state.issuer === record.issuerName
+        && state.serial === record.serialNumber && state.state === interfaces.nsICertStorage.STATE_ENFORCE), record.id);
+    }
+    assert.equal(info.ready, true);
+    assert.equal(info.revocationEntries, 1907);
+  } finally {
+    for (const [name, descriptor] of originals) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
+  }
 });
 
 test('local source files match bounded manifest hashes and trusted provenance', async () => {

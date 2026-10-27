@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "createdAt": "2026-10-27T07:26:35.529105+00:00",
+  "license": "MPL-2.0; Mozilla copyright/source notices preserved in all reference members.",
+  "officialAAR": {
+    "url": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/158.0.20261021001945/geckoview-158.0.20261021001945.aar",
+    "sha256": "45c5c4e452ad7b52778c27bc5e7583f3cb182df4c6615e42849afe2b8a2d71ba",
+    "sha256Basis": "Previously independently verified full AAR digest; this proposal verifies actual AAR omni bytes against retained upstream omni without streaming another full AAR hash.",
+    "sourceRevision": "e4ce606692cd81e6898547e2edd7c552fefcbb04"
+  },
+  "upstreamOmniSHA256": "6ae998994528f0f0ff3a86758427dfdc0e29a1b9962dcde9b12ef127c15b7c56",
+  "members": {
+    "GeckoViewProgress.sys.mjs": {
+      "archivePath": "modules/GeckoViewProgress.sys.mjs",
+      "bytes": 18599,
+      "sha256": "810e1e003534fc2e81b8b3f50f9a105e67cfb18a6936c3f0bfeef857cde5ef1a",
+      "exactActualAARMember": true,
+      "sourcePath": "mobile/shared/modules/geckoview/GeckoViewProgress.sys.mjs",
+      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/e4ce606692cd81e6898547e2edd7c552fefcbb04/mobile/shared/modules/geckoview/GeckoViewProgress.sys.mjs"
+    },
+    "GeckoViewModule.sys.mjs": {
+      "archivePath": "modules/GeckoViewModule.sys.mjs",
+      "bytes": 3583,
+      "sha256": "c1005c78ac3201d2ff9c851e92d624f085ff1d0e8446963b2209cdca60368cf5",
+      "exactActualAARMember": true,
+      "sourcePath": "mobile/shared/modules/geckoview/GeckoViewModule.sys.mjs",
+      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/e4ce606692cd81e6898547e2edd7c552fefcbb04/mobile/shared/modules/geckoview/GeckoViewModule.sys.mjs"
+    },
+    "geckoview.js": {
+      "archivePath": "chrome/geckoview/content/geckoview.js",
+      "bytes": 25610,
+      "sha256": "c1c6a45af2e95046ba3dcf617f73797381782e8a875cc12f909b5bf6746aded0",
+      "exactActualAARMember": true,
+      "sourcePath": "mobile/shared/chrome/geckoview/geckoview.js",
+      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/e4ce606692cd81e6898547e2edd7c552fefcbb04/mobile/shared/chrome/geckoview/geckoview.js"
+    }
+  },
+  "contracts": {
+    "GeckoViewProgress.onEnable": "Calls _fireInitialLoad and sends synthetic about:blank PageStart, LocationChange and PageStop regardless of the retained browser current URI.",
+    "ModuleInfo.enabled": "Repeated enabled=true does not run onEnable; false-to-true runs onEnable, and true-to-false runs onDisable.",
+    "ModuleManager.onEvent": "Routes GeckoView:UpdateModuleState to the actual ModuleInfo enabled setter.",
+    "JavaBoundary": "The test supplies enabled=(delegate!==null) as an explicit Java/native boundary stub. It does not execute GeckoSessionHandler or MainActivity.",
+    "JavaSourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/e4ce606692cd81e6898547e2edd7c552fefcbb04/mobile/android/geckoview/src/main/java/org/mozilla/geckoview/GeckoSessionHandler.java"
+  }
+}

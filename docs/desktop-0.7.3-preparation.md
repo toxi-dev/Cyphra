@@ -49,8 +49,11 @@ source link and Cyphra's integration source must accompany releases.
 
 ## Authenticated certificate data
 
-The desktop snapshot fetched 26 October contains 1,907 records, with 1,262 enabled
-revocations, signed 21 October at 22:34:01.776 UTC. Six enabled records were added;
+The desktop snapshot fetched 26 October contains 1,907 published revocation
+records, signed 21 October at 22:34:01.776 UTC. The signed source metadata has
+1,262 records with `enabled: true`; this count does not control enforcement.
+Cyphra installs every published identity as revoked, matching Gecko, including
+the 645 records with `enabled: false`. Six records with `enabled: true` were added;
 none of the earlier records changed or disappeared. The pinned P-384 signature
 and signer were verified through the existing strict preparation process.
 
@@ -60,7 +63,15 @@ the snapshot and rejected timestamp/record tampering. Native revocation storage
 already had the bundled startup data; installation of the newly fetched snapshot
 returned `NS_OK`. This is candidate-only engine/security evidence, without a
 final Cyphra package, UI or Windows pass. [The dated observation](security-data-2026-10-26.json)
-records exact engine, data and report hashes. The historical
+records exact engine, data and report hashes. That earlier storage-completion
+observation does not establish the corrected all-record mapping or a native
+per-identity result. The [27 October candidate check](security-data-2026-10-27.json)
+subsequently ran the corrected actual loader: all 1,907 published records
+(1,903 unique identities) were submitted as enforced, with none unset. Synthetic
+issuer/serial and subject/key targets changed from valid to revoked while an
+untouched control remained valid, including after repeat installation. This
+proves the tested identity mechanisms; it does not validate every real-world
+certificate individually or qualify the final UI/packages. The historical
 [18 October](security-data-2026-10-18.json) and
 [21 October](security-data-2026-10-21.json) observations retain their original scope.
 

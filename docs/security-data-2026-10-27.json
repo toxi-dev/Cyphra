@@ -1,0 +1,65 @@
+{
+  "scope": "Actual signed loader and native submission counts, plus synthetic NSS per-identity revocation proof; no final Cyphra package/UI or all-real-certificate validation claim",
+  "testedAt": "2026-10-27T07:28:02.912029+00:00",
+  "baseCommitAtExecution": "d86b82e27e3374328da8ef321cbd87df0bdde082",
+  "testedWorkingTreeModuleSHA256": "75ffbbec19350b7c140a933ac0f2e8b27c81de5c7ba00a354b8c359126474692",
+  "engine": {
+    "version": "158.0.1",
+    "platformVersion": "158.0.1",
+    "appBuildID": "20261022000330",
+    "platformBuildID": "20261022000330",
+    "pid": 2206058
+  },
+  "officialArchiveSHA256": "de1522759855e849ba09839749e3871aa06820a2ce1418be4099ce388a93ef02",
+  "officialNativeFiles": {
+    "librewolf": "1a8d4266a2dced2c60e3655c5fee93f4ce7efe39c9aa777d6756cdcd5bfa39b2",
+    "libxul.so": "4695c4868c2329edb472c5efe4226fd7ffff3fa65f66e244c7487dfe287113c4"
+  },
+  "networkIsolated": true,
+  "externalRoutes": false,
+  "hostTrustStoreChanged": false,
+  "userProfilesAccessed": false,
+  "actualProductionLoader": {
+    "ready": true,
+    "revocationEntries": 1907,
+    "snapshotDate": "2026-10-21T22:34:01.776Z",
+    "fetched": "2026-10-26T17:44:26Z",
+    "source": "https://firefox.settings.services.mozilla.com/v1/buckets/security-state/collections/onecrl",
+    "authentication": "Mozilla production chain and pinned key"
+  },
+  "signedDataSubmission": {
+    "label": "explicit actual-production mapping of signed snapshot",
+    "recordsSubmitted": 1907,
+    "uniqueIdentities": 1903,
+    "enforceStates": 1907,
+    "unsetStates": 0,
+    "nativeResult": 0,
+    "enabledTrueSourceMetadata": 1262,
+    "enabledFalseSourceMetadata": 645,
+    "timestamp": 1792622041776,
+    "individualRealCertificateValidationClaimed": false
+  },
+  "syntheticCertificateChecks": {
+    "before": {
+      "issuer": 0,
+      "subject": 0,
+      "control": 0
+    },
+    "after": {
+      "issuer": -8180,
+      "subject": -8180,
+      "control": 0
+    },
+    "repeat": {
+      "issuer": -8180,
+      "subject": -8180,
+      "control": 0
+    },
+    "testTrust": "Synthetic owned CA imported into this disposable profile only with CT,,; no host trust change",
+    "nativeCertificateBypasses": false,
+    "mainThreadGetRevocationStateUsed": false,
+    "privateKeysImported": false
+  },
+  "ownedProcessesAndScratchRemoved": true,
+  "rawLocalReceiptSHA256": "d72322b0dfa91723a1f66b58991fae5c1d2bc66218c38bd9ff0bc8b8ec18fd47"
+}

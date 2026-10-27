@@ -62,7 +62,7 @@ export function validateSecurityManifest(manifest) {
   if (!manifest || manifest.schema !== 1 || manifest.source !== ONECRL_SOURCE
       || !Number.isFinite(Date.parse(manifest.fetched)) || !Number.isSafeInteger(manifest.timestamp) || manifest.timestamp < 1
       || !Number.isSafeInteger(manifest.records) || manifest.records < 1 || manifest.records > MAX_RECORDS
-      || !Number.isSafeInteger(manifest.enabled) || manifest.enabled < 1 || manifest.enabled > manifest.records
+      || !Number.isSafeInteger(manifest.enabled) || manifest.enabled < 0 || manifest.enabled > manifest.records
       || !Array.isArray(manifest.files) || manifest.files.length !== FILE_NAMES.length) {
     throw new Error('The bundled certificate revocation manifest is invalid.');
   }
@@ -95,9 +95,12 @@ export function validateSignatureMetadata(metadata, chainURL) {
 
 export function revocationEntries(snapshot) {
   validateSnapshot(snapshot);
+  // Match Gecko RemoteSecuritySettings: every identity in the authenticated
+  // published collection is revoked. The enabled field is retained source
+  // metadata; it does not clear an identity from native certificate storage.
   return snapshot.data.map(record => record.issuerName
-    ? { kind: 'issuer', issuer: record.issuerName, serial: record.serialNumber, enforce: record.enabled }
-    : { kind: 'subject', subject: record.subject, pubKey: record.pubKeyHash, enforce: record.enabled });
+    ? { kind: 'issuer', issuer: record.issuerName, serial: record.serialNumber, enforce: true }
+    : { kind: 'subject', subject: record.subject, pubKey: record.pubKeyHash, enforce: true });
 }
 
 export async function verifySnapshotSignature(snapshot, metadata, chainURL, stringify, subtle = crypto.subtle) {
@@ -176,7 +179,7 @@ export const SecurityState = (() => {
       if (result === Cr.NS_OK) resolve();
       else reject(new Error('Native certificate revocation data could not be installed.'));
     }));
-    info = Object.freeze({ ready: true, revocationEntries: manifest.enabled,
+    info = Object.freeze({ ready: true, revocationEntries: manifest.records,
       snapshotDate: new Date(snapshot.timestamp).toISOString(), fetched: manifest.fetched, source: ONECRL_SOURCE,
       authentication: chainCurrentlyValid ? 'Mozilla production chain and pinned key' : 'Pinned historical Mozilla signing key' });
     return info;

@@ -14,7 +14,10 @@ only; this handoff adds no private data to a Bundle, file or preferences.
 
 The outgoing GeckoView releases its session, including its display, text-input,
 accessibility and owner references. Application delegates are removed only while
-their owner token still matches the outgoing Activity. Engine listener removal
+their owner token still matches the outgoing Activity. During configuration
+handoff, the progress delegate becomes a static inert delegate instead of null.
+It holds no Activity or document references and keeps Gecko's progress module
+enabled until the replacement installs its new delegate. Engine listener removal
 also checks ownership. Native dialogs close, and website prompt callbacks are
 rejected. Only the occupancy of pending Android permission/file requests is
 transferred, so their eventual system results cannot complete a different
@@ -24,6 +27,15 @@ Settings keeps its APK and offer in the same process-local handoff.
 Background I/O already accepted by the user may finish during recreation. Its
 old Activity cannot display completion/error UI after destruction. In-progress
 dialogs and website prompts are not reopened automatically.
+
+The pinned `GeckoViewProgress.onEnable()` emits initial `about:blank` progress
+and location events. Clearing then re-enabling that delegate during recreation
+can overwrite a retained tab's address even though its document still exists.
+The failed 26 October native run retained the same sessions, but recorded two
+such blank-event sequences and then failed its live-document assertion. The
+static handoff prevents that enable transition. Normal destruction still clears
+the delegate. This source repair requires fresh signed-APK lifecycle checks;
+the earlier failed run remains a failure.
 
 ## Shutdown before native startup
 

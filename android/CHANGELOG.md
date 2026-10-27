@@ -17,7 +17,7 @@
 - Keep the active GeckoView attached during ordinary navigation, avoiding unnecessary display-surface teardown.
 - Cross-host attachments preserve the live document's site exceptions and measured Shields counts; late responses cannot replace a newer page's protection context.
 - A pinned, reproducible Gecko source-module overlay preserves running page timers when an app-initiated navigation becomes an attachment. General script hang protection remains enabled and verified.
-- Keep live ordinary and private sessions through Android Activity recreation; wait for native initialization before requesting runtime shutdown.
+- Keep live ordinary and private sessions through Android Activity recreation; retain an inert progress delegate during handoff to avoid synthetic blank-page events replacing their addresses. Wait for native initialization before requesting runtime shutdown.
 - Add strict bounded-clock navigation evidence and Home's three Personal lifecycle cases; Public and Byte Team retain all six lifecycle cases. Source tests do not establish native behavior.
 
 These notes describe the prepared source. Final APK qualification and publication are tracked separately in the release evidence. The desktop OneCRL snapshot refresh is not an Android feature.
