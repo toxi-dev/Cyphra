@@ -71,6 +71,24 @@ the actual `Gecko:Exited` event, completes an exit callback. Readiness, errors,
 repeated requests and elapsed time never substitute for exit. If startup never
 reaches the query or an actual exit, its request remains pending.
 
+## Release Gecko shutdown policy
+
+The pinned release engine defaults `toolkit.shutdown.fastShutdownStage` to `1`.
+That native fast-shutdown path can call `_exit(0)` before `nativeRun()` returns,
+so Java cannot dispatch `Gecko:Exited` and the runtime delegate cannot complete
+the mode handoff. Cyphra sets the preference to integer `0` in its private
+startup configuration, retaining Gecko's normal teardown and exit event.
+This applies to every shipped profile, including Home's single Personal mode.
+
+The existing privileged preference query reads this value back before browsing
+can become ready. A missing value, wrong type or nonzero value fails the same
+startup verification as the other required engine preferences. After successful
+readback, the current process emits the fixed local trace
+`fastShutdownStage=0 verified before browsing`; it contains no browsing data.
+This readback does not substitute for the readiness barrier or actual exit.
+The original early-finish scenario must still observe the real shutdown delegate
+and spontaneous process loss on the final signed APK, without a profile override.
+
 ## Validation
 
 `RuntimeShutdownTest` covers exit requested before readiness, readiness before

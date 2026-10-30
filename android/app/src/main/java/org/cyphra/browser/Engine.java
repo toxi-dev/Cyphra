@@ -380,6 +380,7 @@ public final class Engine {
     private void verifyPreferences(){
         Map<String,Object> expected=new LinkedHashMap<>();
         expected.put("cyphra.android.policy",1);
+        expected.put("toolkit.shutdown.fastShutdownStage",0);
         expected.put("dom.ipc.processHangMonitor",true);
         expected.put("dom.ipc.reportProcessHangs",true);
         expected.put("dom.max_script_run_time",20);
@@ -404,6 +405,7 @@ public final class Engine {
             // This fixed policy trace proves live startup readback without
             // recording URLs, script names or profile data.
             android.util.Log.i("CyphraEngine","processHangMonitor=true reportProcessHangs=true maxScriptRunTimeSeconds=20 requireCriticalInput=false verified before browsing");
+            android.util.Log.i("CyphraEngine","fastShutdownStage=0 verified before browsing");
             preferencesVerified=true;maybeReady();
         },e->fail("Gecko's privacy policy could not be verified."));
     }
@@ -436,6 +438,9 @@ public final class Engine {
     private void writeConfiguration()throws IOException{
         Map<String,Object> prefs=new LinkedHashMap<>();
         prefs.put("cyphra.android.policy",1);
+        // Release Gecko can _exit before Java receives Gecko:Exited. Full
+        // teardown lets the actual exit delegate complete the mode handoff.
+        prefs.put("toolkit.shutdown.fastShutdownStage",0);
         prefs.put("dom.ipc.processHangMonitor",true);
         prefs.put("dom.ipc.reportProcessHangs",true);
         prefs.put("dom.max_script_run_time",20);
