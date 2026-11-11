@@ -1,14 +1,14 @@
 {
   "schema": 1,
-  "createdAt": "2026-10-27T17:55:38.110070+00:00",
+  "createdAt": "2026-11-11T14:00:32.434666+00:00",
   "license": "MPL-2.0; Mozilla copyright/source notices preserved in all reference members.",
   "officialAAR": {
-    "url": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/159.0.20261022150525/geckoview-159.0.20261022150525.aar",
-    "sha256": "11f0dd1b030370e29e47030d1269943361f751c5220aff24dca3232e36646c90",
-    "sha256Basis": "Whole downloaded official 159 AAR verified by Root against published SHA256; exact actual members independently compared in the159 port audit.",
-    "sourceRevision": "5add844c26613d7e4d84c799d6e23cf987b1240d"
+    "url": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/160.0.20261104181552/geckoview-160.0.20261104181552.aar",
+    "sha256": "edb6b8ec37c329c070a4827d4910d2022a332a334a9421f6a87e3903eb5a8a12",
+    "sha256Basis": "Whole official160 AAR verified against published SHA256; exact fixture members compared with that actual archive.",
+    "sourceRevision": "d84e7a6936554efe26097d9d9b24a0e11330e630"
   },
-  "upstreamOmniSHA256": "38fad169a65d064137bda9c9ff3a9099ec548b36781b9feb6d27e5fa4336c21b",
+  "upstreamOmniSHA256": "4506be1908815185563a8d300e96bb33fa2d0fe899faafa34da77378612b3e77",
   "members": {
     "GeckoViewProgress.sys.mjs": {
       "archivePath": "modules/GeckoViewProgress.sys.mjs",
@@ -16,7 +16,7 @@
       "sha256": "810e1e003534fc2e81b8b3f50f9a105e67cfb18a6936c3f0bfeef857cde5ef1a",
       "exactActualAARMember": true,
       "sourcePath": "mobile/shared/modules/geckoview/GeckoViewProgress.sys.mjs",
-      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/mobile/shared/modules/geckoview/GeckoViewProgress.sys.mjs"
+      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/d84e7a6936554efe26097d9d9b24a0e11330e630/mobile/shared/modules/geckoview/GeckoViewProgress.sys.mjs"
     },
     "GeckoViewModule.sys.mjs": {
       "archivePath": "modules/GeckoViewModule.sys.mjs",
@@ -24,15 +24,15 @@
       "sha256": "c1005c78ac3201d2ff9c851e92d624f085ff1d0e8446963b2209cdca60368cf5",
       "exactActualAARMember": true,
       "sourcePath": "mobile/shared/modules/geckoview/GeckoViewModule.sys.mjs",
-      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/mobile/shared/modules/geckoview/GeckoViewModule.sys.mjs"
+      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/d84e7a6936554efe26097d9d9b24a0e11330e630/mobile/shared/modules/geckoview/GeckoViewModule.sys.mjs"
     },
     "geckoview.js": {
       "archivePath": "chrome/geckoview/content/geckoview.js",
-      "bytes": 25610,
-      "sha256": "c1c6a45af2e95046ba3dcf617f73797381782e8a875cc12f909b5bf6746aded0",
+      "bytes": 27488,
+      "sha256": "73cf22570f06bdd1d6750e5483817e274fe87ba58043e915b847a6e476eac36b",
       "exactActualAARMember": true,
       "sourcePath": "mobile/shared/chrome/geckoview/geckoview.js",
-      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/mobile/shared/chrome/geckoview/geckoview.js"
+      "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/d84e7a6936554efe26097d9d9b24a0e11330e630/mobile/shared/chrome/geckoview/geckoview.js"
     }
   },
   "contracts": {
@@ -40,6 +40,6 @@
     "ModuleInfo.enabled": "Repeated enabled=true does not run onEnable; false-to-true runs onEnable, and true-to-false runs onDisable.",
     "ModuleManager.onEvent": "Routes GeckoView:UpdateModuleState to the actual ModuleInfo enabled setter.",
     "JavaBoundary": "The test supplies enabled=(delegate!==null) as an explicit Java/native boundary stub. It does not execute GeckoSessionHandler or MainActivity.",
-    "JavaSourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/5add844c26613d7e4d84c799d6e23cf987b1240d/mobile/android/geckoview/src/main/java/org/mozilla/geckoview/GeckoSessionHandler.java"
+    "JavaSourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/d84e7a6936554efe26097d9d9b24a0e11330e630/mobile/android/geckoview/src/main/java/org/mozilla/geckoview/GeckoSessionHandler.java"
   }
 }

@@ -44,7 +44,7 @@ const fullDump = JSON.parse(fullDumpBytes);
 assert.equal(fullDump.timestamp, dump.timestamp);
 assert.equal(fullDump.data.length, manifest.onecrl.wholeDumpRecords);
 assert.equal(fullDump.data.filter(record => record.enabled === true).length, 1262);
-assert.equal(fullDump.data.filter(record => record.enabled === false).length, 645);
+assert.equal(fullDump.data.filter(record => record.enabled === false).length, 656);
 assert.equal(dump.timestamp, manifest.onecrl.timestamp);
 assert.equal(dump.data.length, 6);
 const advisoryRecords = dump.data.filter(record => record.enabled
@@ -366,10 +366,10 @@ test('actual attachment and signature-chain paths fail before network; local att
   noNetwork(value);
 });
 
-// Execute the real collection/client/security path with every official 159 record.
+// Execute the real collection/client/security path with every official160 record.
 function fullPackagedRevocations(value) {
-  assert.equal(value.network.nativeStates.length, 1907, 'All published records submitted, including duplicate identities');
-  assert.equal(value.network.nativeStates.filter(state => state.state === 1).length, 1907);
+  assert.equal(value.network.nativeStates.length, 1918, 'All published records submitted, including duplicate identities');
+  assert.equal(value.network.nativeStates.filter(state => state.state === 1).length, 1918);
   assert.equal(value.network.nativeStates.filter(state => state.state === 0).length, 0);
   const expected = fullDump.data.map(record => JSON.stringify(record.issuerName && record.serialNumber
     ? ['issuer', record.issuerName, record.serialNumber, 1]
@@ -378,20 +378,20 @@ function fullPackagedRevocations(value) {
     ? ['issuer', state.issuer, state.serial, state.state]
     : ['subject', state.subject, state.pubKey, state.state])).sort();
   assert.deepEqual(actual, expected, 'Exact multiset of all metadata-true and metadata-false identities');
-  assert.equal(new Set(actual).size, 1903, 'Submitted records and unique identities are distinct counts');
+  assert.equal(new Set(actual).size, 1914, 'Submitted records and unique identities are distinct counts');
   assert.equal(value.network.kintoExecutions, 0);
   assert.ok(value.network.resourceRequests.includes('resource://app/defaults/settings/security-state/onecrl.json'));
   noNetwork(value);
 }
 
-test('full official 159 packaged startup enforces 1907 records including 645 metadata-false records without network', async () => {
+test('full official160 packaged startup enforces 1918 records including 656 metadata-false records without network', async () => {
   const value = await harness({ packagedDumpBytes: fullDumpBytes }); await startBundle(value);
   fullPackagedRevocations(value);
   assert.deepEqual(value.network.imports, ['security-state/onecrl']);
   assert.equal(value.network.localUptake.length, 0);
 });
 
-test('full official 159 packaged fallback enforces 1907 records when the local database is unreadable', async () => {
+test('full official160 packaged fallback enforces 1918 records when the local database is unreadable', async () => {
   const value = await harness({ databaseFailure: true, packagedDumpBytes: fullDumpBytes }); await startBundle(value);
   fullPackagedRevocations(value);
 });

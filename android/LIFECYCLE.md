@@ -39,7 +39,7 @@ the earlier failed run remains a failure.
 
 ## Shutdown before native startup
 
-Pinned GeckoView `159.0.20261022150525` starts Gecko asynchronously. Its public
+Pinned GeckoView `160.0.20261104181552` starts Gecko asynchronously. Its public
 `GeckoRuntime.shutdown()` directly invokes native `GeckoThread.forceQuit()`;
 calling it before JNI initialization causes an `UnsatisfiedLinkError`.
 
@@ -53,16 +53,13 @@ the pinned Maven source JAR, in `GeckoRuntime`, `WebExtensionController`,
 GeckoView. This is an indirect readiness barrier, not a general promise about
 every GeckoResult or a new Gecko initialization API.
 
-The official 159 source JAR was compared with 158.0.2. The query/queue files
-`WebExtensionController`, `EventDispatcher`, `NativeQueue`, `EventCallback`,
-`GeckoResult` and `GeckoSessionHandler` are byte-identical. `GeckoThread` exposes
-its existing environment-extraction helper for runtime initialization;159 applies
-an isolation environment override before startup. Cyphra still explicitly enables
-isolated content processes. `GeckoSession` removes an unused private native
-transfer declaration. Public history/delegate/session-close methods, JNI state
-ordering, direct shutdown and the actual exit callback are unchanged. These
-source observations preserve the reason for the queued `list()` barrier and
-static progress handoff; they do not replace native159 lifecycle qualification.
+The official160 source JAR retains the exact Runtime, Thread, query/queue and
+preference-controller sources used by159. Public permission constants for local
+network and device access already exist in Cyphra's origin-labelled Allow/Block
+prompts; new160 protection is not disabled or automatically granted. Session and
+view additions are reviewed separately. These source observations preserve the
+queued `list()` barrier and static progress handoff; native160 qualification on
+the exact final APK remains mandatory.
 
 `RuntimeShutdown` queues a shutdown request until this barrier completes and
 issues native shutdown once. Privacy failure and legitimate Activity/profile

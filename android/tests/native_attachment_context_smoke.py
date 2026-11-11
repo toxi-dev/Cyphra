@@ -37,18 +37,28 @@ def set_shields(package, host, enabled):
 def measured_total(expected):
     click('Cyphra Shields')
     found = None
-    for _ in range(20):
-        tree = nodes()
-        parents = {child: parent for parent in tree for child in parent}
-        title = next((node for node in tree if node.get('text') == 'Requests blocked in this page'), None)
-        assert title is not None, 'Native Shields summary is missing.'
-        summary = parents[parents[title]]
-        value = next(node for node in summary if node.get('class') == 'android.widget.TextView')
-        found = int(value.get('text'))
-        if found == expected:
-            break
-        time.sleep(.25)
-    shell('input keyevent 4')
+    try:
+        for _ in range(20):
+            tree = nodes()
+            parents = {child: parent for parent in tree for child in parent}
+            titles = [node for node in tree if node.get('class') == 'android.widget.TextView'
+                      and node.get('text') == 'Requests blocked']
+            assert len(titles) == 1, 'Expected one native Shields summary.'
+            description = parents[titles[0]]
+            assert any(node.get('text') == 'On this page · actual cancelled requests' for node in description), 'Native request summary description is missing.'
+            summary = parents[description]
+            values = [node for node in summary if node.get('class') == 'android.widget.TextView']
+            assert len(values) == 1, 'Expected one actual request total beside its native description.'
+            value = values[0].get('text', '')
+            assert re.fullmatch(r'0|[1-9][0-9]*', value), 'Native request total is not a nonnegative integer.'
+            found = int(value)
+            if found == expected:
+                break
+            time.sleep(.25)
+    finally:
+        # Close the sheet even when an assertion fails, so fixture cleanup can
+        # restore site choices without hiding the original counter/UI failure.
+        shell('input keyevent 4')
     assert found == expected, 'Actual summary cancellation total: expected ' + str(expected) + ', got ' + str(found)
     return found
 

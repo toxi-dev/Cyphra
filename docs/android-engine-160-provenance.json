@@ -1,0 +1,115 @@
+{
+  "schema": 1,
+  "preparedAt": "2026-11-11T14:00:32.475771+00:00",
+  "status": "OFFICIAL_INPUTS_AND_OFFLINE_SOURCE_PREPARATION; NATIVE_RELEASE_QUALIFICATION_PENDING",
+  "artifact": "org.mozilla.geckoview:geckoview:160.0.20261104181552",
+  "geckoVersion": "160.0",
+  "buildId": "20261104181552",
+  "sourceRevision": "d84e7a6936554efe26097d9d9b24a0e11330e630",
+  "officialDownloads": {
+    "aar": {
+      "url": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/160.0.20261104181552/geckoview-160.0.20261104181552.aar",
+      "status": 200,
+      "size": 244581941,
+      "sha256": "edb6b8ec37c329c070a4827d4910d2022a332a334a9421f6a87e3903eb5a8a12",
+      "publisherSHA256Verified": true
+    },
+    "sourceJAR": {
+      "url": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/160.0.20261104181552/geckoview-160.0.20261104181552-sources.jar",
+      "status": 200,
+      "size": 896201,
+      "sha256": "56ccba8d381688917a8ee28364ddbdfab34f5526e5aca1b44ac5f5440d870d67",
+      "publisherSHA256SidecarStatus": 404,
+      "sha256Basis": "computed from whole official HTTPS source JAR; SHA256 sidecar unavailable",
+      "etagMD5Matches": true
+    },
+    "pom": {
+      "url": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/160.0.20261104181552/geckoview-160.0.20261104181552.pom",
+      "size": 3917,
+      "sha256": "dc74deb29d24cc7c809f1d320e9d6e9a84c3177ffc53daca4f8ede8a893aeda5",
+      "publisherSHA256Verified": true
+    },
+    "module": {
+      "url": "https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/160.0.20261104181552/geckoview-160.0.20261104181552.module",
+      "size": 4818,
+      "sha256": "2e8400fe13312fca6920ef637c4cd1d81b055a37545403ca7d7111d5abb929da",
+      "publisherSHA256Verified": true
+    }
+  },
+  "integration": {
+    "id": "cyphra-app-uri-no-interrupt-v3",
+    "kind": "generated-apk-asset-override",
+    "modifiedUpstreamEngine": true,
+    "patchFile": "android/engine-patches/app-uri-no-interrupt.patch",
+    "patchSha256": "d0232038eba58c2e7361c84e6bbffbc7113b9f6b1c4b3c4cfd3bb073f1f67b40",
+    "upstreamOmniSha256": "4506be1908815185563a8d300e96bb33fa2d0fe899faafa34da77378612b3e77",
+    "patchedOmniSha256": "2bedae9992da89391fa331ad0a5b67019fbb40b099a1dea1f0e62e208ff7ec29",
+    "modules": [
+      {
+        "archivePath": "modules/GeckoViewNavigation.sys.mjs",
+        "upstreamSource": "android/engine-patches/upstream/GeckoViewNavigation.sys.mjs",
+        "upstreamSha256": "fb5926acbf81a405929309b39076f1ef86c4e407795f8903963d3f15158f208c",
+        "patchedSha256": "b39381a6f9bc5feca7fc98c4726a8c885170d0323ae69a0d9b82e83040fc1d64",
+        "sourcePath": "mobile/shared/modules/geckoview/GeckoViewNavigation.sys.mjs",
+        "sourceUrl": "https://hg.mozilla.org/releases/mozilla-release/raw-file/d84e7a6936554efe26097d9d9b24a0e11330e630/mobile/shared/modules/geckoview/GeckoViewNavigation.sys.mjs"
+      },
+      {
+        "archivePath": "moz-src/toolkit/components/remotebrowserutils/RemoteWebNavigation.sys.mjs",
+        "upstreamSource": "android/engine-patches/upstream/RemoteWebNavigation.sys.mjs",
+        "upstreamSha256": "2cce97678f39a0bb86bcc4a5270a396a6ccc81eddf37dbb286c7791dd54b20ca",
+        "patchedSha256": "69b8986d16a2480ba7caed6afd70b4726f8c4dffaa33085224dcf33e564fd67b",
+        "sourcePath": "toolkit/components/remotebrowserutils/RemoteWebNavigation.sys.mjs",
+        "sourceUrl": "https://hg.mozilla.org/releases/mozilla-release/raw-file/d84e7a6936554efe26097d9d9b24a0e11330e630/toolkit/components/remotebrowserutils/RemoteWebNavigation.sys.mjs"
+      },
+      {
+        "archivePath": "modules/services-settings/Utils.sys.mjs",
+        "upstreamSource": "android/engine-patches/upstream/Utils.sys.mjs",
+        "upstreamSha256": "5b96afb3d51e928f4dc36cce7ab783d068be28c63b50d408d2f5cfaadbcc869c",
+        "patchedSha256": "93cbdce0a70f5d5a128b3c901b5965f0adbcbb3f132a9cac6889c8e80af91a01",
+        "sourcePath": "services/settings/Utils.sys.mjs",
+        "sourceUrl": "https://hg.mozilla.org/releases/mozilla-release/raw-file/d84e7a6936554efe26097d9d9b24a0e11330e630/services/settings/Utils.sys.mjs"
+      }
+    ],
+    "startupCachePolicy": "Pass -purgecaches per profile until a protected startup records this overlay SHA-256 and installed APK update time; removes compiled startupCache and requests native soft invalidation of derived quota-cache metadata, without clearing site data or settings.",
+    "embeddedStartupBytecode": false,
+    "processHangMonitor": true,
+    "remoteSettingsNetworkPolicy": "Release-packaged and existing local Remote Settings data only. Cyphra Utils overlay unconditionally suppresses remote polling/startup/sync and rejects central network fetch before request construction. Production dump loading and native OneCRL startup installation remain enabled."
+  },
+  "nativeLibraries": {
+    "count": 39,
+    "modifiedByCyphra": false,
+    "hashesIn": "../android/engine-lock.json",
+    "minimumELFLoadAlignment": {
+      "arm64-v8a": 16384,
+      "x86_64": 16384,
+      "armeabi-v7a": 4096
+    },
+    "physicalDevicesQualified": false
+  },
+  "packagedOneCRL": {
+    "wholeDumpBytes": 1064378,
+    "wholeDumpSHA256": "b84242151ddcc432834cde764b43c78ae0b1e7a81d490f020ac607f43c5c882d",
+    "wholeDumpRecords": 1918,
+    "wholeDumpEnabledRecords": 1262,
+    "wholeDumpMetadataFalseRecords": 656,
+    "wholeDumpUniqueIdentities": 1914,
+    "timestamp": 1793208925525
+  },
+  "javaSourceReview": "Runtime, Thread and readiness sources checked separately; native qualification required.",
+  "dependencyDelta": {
+    "kotlin-stdlib": [
+      "2.4.20",
+      "2.4.21"
+    ],
+    "androidx.collection": [
+      "1.6.0",
+      "1.7.0"
+    ],
+    "transitiveVerification": "Requires separately reviewed official artifact pins and actual strict materialized closure preflight."
+  },
+  "securityReleaseNotes": "https://www.firefox.com/en-US/firefox/android/160.0/releasenotes/",
+  "limits": [
+    "Reporting classes remain compiled in; runtime reporting prefs disabled and critical values read back before browsing.",
+    "No final signed APK or physical-device qualification is claimed by source preparation."
+  ]
+}

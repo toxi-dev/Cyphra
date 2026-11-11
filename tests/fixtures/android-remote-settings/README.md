@@ -1,8 +1,8 @@
 # Pinned Remote Settings regression fixtures
 
 The six `.sys.mjs` files are unmodified Mozilla source from the official
-GeckoView `159.0.20261022150525` AAR, revision
-`5add844c26613d7e4d84c799d6e23cf987b1240d`. Their original MPL-2.0 notices are
+GeckoView `160.0.20261104181552` AAR, revision
+`d84e7a6936554efe26097d9d9b24a0e11330e630`. Their original MPL-2.0 notices are
 preserved. `provenance.json` records each archive path, exact byte count,
 SHA-256, corresponding source URL, and the official AAR SHA-256.
 
@@ -34,11 +34,11 @@ HTTP listener or live network is used. These tests establish module behavior
 with stubs; they do not qualify native certificate enforcement or observed
 runtime network suppression.
 
-`onecrl-packaged.json` is the complete exact official 159 AAR dump (test data
+`onecrl-packaged.json` is the complete exact official160 AAR dump (test data
 only). Two additional full-module cases exercise normal startup and unreadable
-database fallback with all 1,907 records. They require 1,907 ENFORCE submissions,
+database fallback with all 1,918 records. They require 1,918 ENFORCE submissions,
 zero UNSET submissions, the exact identity multiset including all 645 records with
-false `enabled` metadata, and 1,903 unique identities. Network construction,
+false `enabled` metadata, and 1,914 unique identities. Network construction,
 opening and sending stay at zero. Mock certificate storage establishes the
 submitted states; actual native certificate enforcement and physical devices
 remain outside this VM test's scope. The fixture is separate from the desktop
