@@ -194,12 +194,31 @@ class NativeSafety:
 
     def wait(self, callback, label, seconds=10):
         end = min(self.deadline, self.action_deadline or self.deadline, time.monotonic() + seconds)
-        while time.monotonic() < end:
-            result = callback()
-            if result and time.monotonic() < end:
-                return result
-            time.sleep(.05)
-        raise AssertionError(label)
+        previous_deadline = self.action_deadline
+        # Every read shares the original absolute polling budget. An ADB
+        # accessibility timeout is an observation, not a browser/test restart.
+        self.action_deadline = end
+        last_timeout = None
+        try:
+            while time.monotonic() < end:
+                try:
+                    result = callback()
+                except subprocess.TimeoutExpired as error:
+                    last_timeout = error
+                    self.report.setdefault('pollTimeouts', []).append({
+                        'label': label, 'observedAtMonotonic': time.monotonic(),
+                        'absoluteDeadline': end, 'command': list(error.cmd),
+                        'timeoutSeconds': error.timeout})
+                    self.write()
+                    result = None
+                if result and time.monotonic() < end:
+                    return result
+                remaining = end - time.monotonic()
+                if remaining > 0:
+                    time.sleep(.05)
+            raise AssertionError(label) from last_timeout
+        finally:
+            self.action_deadline = previous_deadline
 
     def nodes(self):
         # Never call this between loop-start and the direct native recovery tap.

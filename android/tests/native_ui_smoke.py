@@ -99,7 +99,22 @@ def main():
         'Cookie/localStorage values are isolated and survive returning to the original profile']
     click('Home');tree=nodes();assert any(n.get('text')=='Security reading' for n in tree)
     subprocess.run(['adb','exec-out','screencap','-p'],stdout=(args.output/'home.png').open('wb'),check=True)
-    click('Cyphra Shields');assert any(n.get('text')=='No website in this tab' for n in nodes());shell('input keyevent 4')
+    click('Cyphra Shields')
+    # The native sheet animates into the accessibility tree. Observe its final
+    # empty state within one bounded wait; retain every observation on failure.
+    home_shields=[];opened=time.monotonic();deadline=opened+5
+    while True:
+        tree=nodes();labels=[n.get('text','') for n in tree]
+        home_shields.append({'elapsedSeconds':time.monotonic()-opened,'nodes':[dict(n.attrib) for n in tree]})
+        (args.output/'home-shields-observations.json').write_text(json.dumps(home_shields,indent=2)+'\n')
+        assert time.monotonic()<deadline, 'Native Home Shields empty state did not appear within 5s.'
+        if 'No website in this tab' in labels:break
+        time.sleep(.1)
+    assert labels.count('—')==5, 'Native Home must show five unavailable counters, never stale website totals.'
+    assert 'Open a website to see its activity' in labels
+    assert 'Shields for this site' not in labels, 'Native Home must have no site exception switch.'
+    proof['homeShieldsObservations']='home-shields-observations.json'
+    shell('input keyevent 4')
     proof['checks'].append('Native Home closes the old document and shows no website statistics')
     proof['passed']=True;(args.output/'proof.json').write_text(json.dumps(proof,indent=2)+'\n')
     print('PASS native browsing, real blocking, mode isolation and guarded passkeys: '+args.package)

@@ -564,5 +564,87 @@ class NavigationSafetyTest(unittest.TestCase):
             self.assertEqual(proof['error'], 'Original failure')
 
 
+class PollingDeadlineTest(unittest.TestCase):
+    def worker(self, folder):
+        args = SimpleNamespace(output=Path(folder), adb='never-execute-adb', serial='test',
+                               package='org.cyphra.browser.home', timeout=300, trials=3,
+                               apk=Path(folder) / 'never-open.apk')
+        worker = SAFETY.NativeSafety(args)
+        worker.deadline = 100
+        return worker
+
+    @contextmanager
+    def clock(self, now):
+        with patch.object(SAFETY.time, 'monotonic', side_effect=lambda: now[0]), \
+                patch.object(SAFETY.time, 'sleep',
+                             side_effect=lambda seconds: now.__setitem__(0, now[0] + seconds)):
+            yield
+
+    def test_timeout_read_can_complete_inside_original_budget(self):
+        with tempfile.TemporaryDirectory() as folder:
+            worker = self.worker(folder)
+            now, calls = [0.0], []
+
+            def read():
+                calls.append(worker.action_deadline)
+                if len(calls) == 1:
+                    now[0] += 6
+                    raise subprocess.TimeoutExpired(['adb', 'uiautomator'], 6)
+                now[0] += 1
+                return 'ready'
+
+            with self.clock(now):
+                self.assertEqual(worker.wait(read, 'dialog', 12), 'ready')
+            self.assertEqual(calls, [12.0, 12.0])
+            self.assertLess(now[0], 12)
+            self.assertIsNone(worker.action_deadline)
+            self.assertEqual(len(worker.report['pollTimeouts']), 1)
+            self.assertEqual(worker.report['pollTimeouts'][0]['absoluteDeadline'], 12)
+
+    def test_timeouts_never_restart_absolute_budget(self):
+        with tempfile.TemporaryDirectory() as folder:
+            worker = self.worker(folder)
+            now, calls = [0.0], []
+
+            def read():
+                calls.append(worker.action_deadline)
+                seconds = min(6, worker.action_deadline - now[0])
+                now[0] += seconds
+                raise subprocess.TimeoutExpired(['adb', 'uiautomator'], seconds)
+
+            with self.clock(now), self.assertRaisesRegex(AssertionError, 'dialog'):
+                worker.wait(read, 'dialog', 12)
+            self.assertEqual(calls, [12.0, 12.0])
+            self.assertEqual(now[0], 12)
+            self.assertIsNone(worker.action_deadline)
+            self.assertEqual(len(worker.report['pollTimeouts']), 2)
+
+    def test_adb_read_is_capped_by_existing_action_deadline(self):
+        with tempfile.TemporaryDirectory() as folder:
+            worker = self.worker(folder)
+            worker.action_deadline = 4
+            with patch.object(SAFETY.time, 'monotonic', return_value=0), \
+                    patch.object(SAFETY.subprocess, 'check_output', return_value=b'ready') as command:
+                result = worker.wait(lambda: worker.command('exec-out', 'uiautomator', seconds=6),
+                                     'dialog', 12)
+            self.assertEqual(result, 'ready')
+            self.assertEqual(command.call_args.kwargs['timeout'], 4)
+            self.assertEqual(worker.action_deadline, 4)
+
+    def test_assertion_errors_remain_fatal_and_restore_prior_deadline(self):
+        with tempfile.TemporaryDirectory() as folder:
+            worker = self.worker(folder)
+            worker.action_deadline = 20
+
+            def read():
+                raise AssertionError('wrong document token')
+
+            with patch.object(SAFETY.time, 'monotonic', return_value=0), \
+                    self.assertRaisesRegex(AssertionError, 'wrong document token'):
+                worker.wait(read, 'dialog', 12)
+            self.assertEqual(worker.action_deadline, 20)
+            self.assertNotIn('pollTimeouts', worker.report)
+
+
 if __name__ == '__main__':
     unittest.main()
