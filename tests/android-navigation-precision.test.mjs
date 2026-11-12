@@ -60,13 +60,37 @@ test('precision window retains a large observed gap without confusing it with mi
   consistentCounts(observed);
 });
 
+test('precision window observes a second transition after an initial scheduling gap', () => {
+  const values = [0, 32000000, 32000000, 33000000];
+  const observed = observe(read => values[read - 1]);
+  assert.equal(observed.error, undefined);
+  assert.equal(observed.result, 1000000);
+  assert.equal(observed.reads, 4);
+  assert.equal(observed.observation.positiveStepCount, 2);
+  assert.equal(observed.observation.unchangedReadCount, 1);
+  assert.equal(observed.observation.maximumObservedGapNs, 32000000);
+  assert.equal(observed.observation.elapsedNs, 33000000);
+  consistentCounts(observed);
+});
+
+test('precision window still rejects a coarse clock after two 32ms transitions', () => {
+  const observed = observe(read => (read - 1) * 32000000);
+  assert.match(observed.error.message, /minimum positive step exceeds 5ms budget/);
+  assert.equal(observed.observation.status, 'observed-step-over-budget');
+  assert.equal(observed.observation.minimumPositiveStepNs, 32000000);
+  assert.equal(observed.observation.maximumObservedGapNs, 32000000);
+  assert.equal(observed.observation.positiveStepCount, 2);
+  assert.equal(observed.reads, 3);
+  consistentCounts(observed);
+});
+
 test('precision window rejects an actually coarse 20ms-step clock', () => {
   const observed = observe(read => (read - 1) * 20000000);
   assert.match(observed.error.message, /minimum positive step exceeds 5ms budget/);
   assert.equal(observed.observation.status, 'observed-step-over-budget');
   assert.equal(observed.observation.minimumPositiveStepNs, 20000000);
   assert.equal(observed.observation.maximumObservedGapNs, 20000000);
-  assert.equal(observed.reads, 2);
+  assert.equal(observed.reads, 3);
   consistentCounts(observed);
 });
 

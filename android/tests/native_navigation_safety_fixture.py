@@ -53,11 +53,12 @@ function report(kind,extra={}){
 function observedPrecision(phase){
  // One observation window, never a retry or a choice among clock echoes.
  // Minimum positive steps are observations, not proof of the model's 5ms error bound.
+ // Observe at least two transitions: a single scheduling pause cannot measure resolution.
  const targetSpanNs=20000000,maximumReads=1000000,precisionBudgetNs=5000000;
  const valid=value=>Number.isSafeInteger(value)&&value>=0;
  const first=ns();let previous=first,last=first,readCount=1,positiveStepCount=0,unchangedReadCount=0,
   backwardStepCount=0,invalidReadCount=valid(first)?0:1,minimum=Infinity,maximum=0;
- while(!invalidReadCount&&!backwardStepCount&&readCount<maximumReads&&last-first<targetSpanNs){
+ while(!invalidReadCount&&!backwardStepCount&&readCount<maximumReads&&(last-first<targetSpanNs||positiveStepCount<2)){
   const current=ns();++readCount;last=current;
   if(!valid(current)){++invalidReadCount;break;}
   const delta=current-previous;
