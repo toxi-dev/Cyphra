@@ -31,8 +31,7 @@ OutFile "${OUTPUT_FILE}"
 InstallDir "$LOCALAPPDATA\Programs\${INSTALL_FOLDER}"
 InstallDirRegKey HKCU "${SETTINGS_KEY}" "InstallLocation"
 RequestExecutionLevel user
-SetCompressor /SOLID lzma
-SetCompressorDictSize 32
+SetCompressor zlib
 CRCCheck force
 ShowInstDetails show
 ShowUninstDetails show
