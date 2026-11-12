@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "scope": "Native candidate signer and NSS revocation mapping qualification, not final package/UI qualification.",
+  "snapshot": {
+    "timestamp": 1794348206673,
+    "records": 1959,
+    "metadataEnabledFalse": 697,
+    "uniqueIdentities": 1955,
+    "source": "https://firefox.settings.services.mozilla.com/v1/buckets/security-state/collections/onecrl",
+    "fetched": "2026-11-11T14:10:18Z"
+  },
+  "authentication": {
+    "verified": true,
+    "verifier": "Cyphra pinned P-384 detached signature (Node WebCrypto)",
+    "signer": "onecrl.content-signature.mozilla.org",
+    "leafSPKISHA256": "07973e675a43faccd0a28ab66cb8a87b1818ba8414ea7bfa9b3722bceaa0d2a0",
+    "signerValidUntil": "2026-12-15T22:12:40.000Z",
+    "engine": "v22.23.4",
+    "records": 1959,
+    "enabled": 1262,
+    "timestamp": 1794348206673,
+    "verifiedAt": "2026-11-12T14:51:12.903733+00:00",
+    "signerProductionQualification": {
+      "verifier": "Gecko nsIContentSignatureVerifier ContentSignatureProdRoot",
+      "verified": true,
+      "verifiedAt": "2026-11-12T14:43:46.277062+00:00",
+      "signer": "onecrl.content-signature.mozilla.org",
+      "leafSPKISHA256": "07973e675a43faccd0a28ab66cb8a87b1818ba8414ea7bfa9b3722bceaa0d2a0",
+      "signerValidUntil": "2026-12-15T22:12:40Z",
+      "engine": "160.0",
+      "applicationBuildID": "20261110235326",
+      "compiledToolkitBuildID": "20261110235326",
+      "records": 1959,
+      "timestamp": 1794348206673
+    }
+  },
+  "nativeChecks": {
+    "productionRootSignatureAccepted": true,
+    "changedTimestampRejected": true,
+    "changedRecordRejected": true,
+    "nativeEnforceStates": 1959,
+    "nativeUnsetStates": 0,
+    "syntheticIssuerAndSubjectErrorsAfter": -8180,
+    "syntheticControlErrorAfter": 0,
+    "repeatPreserved": true,
+    "allOfficial160PackagedIdentitiesPresent": true,
+    "individualRealCertificateValidationClaimed": false
+  },
+  "productionActivationRequires": "Apply after Android preservation and frozen-source transition; then final branded native and release qualification."
+}

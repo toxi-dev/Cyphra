@@ -55,6 +55,29 @@ def brave_config(source):
     return (json.dumps(data, indent=2) + '\n').encode('utf-8')
 
 
+
+def local_search_utils(source):
+    """Bind native search to Cyphra's bundled v2 schema and collection.
+
+    Gecko 160 can select a new v3 schema via a saved preference. Cyphra ships
+    its own v2 configuration, so both the schema gate and collection getter
+    must agree even when an older profile has a different feature preference.
+    Refuse an unfamiliar getter instead of accidentally using upstream data.
+    """
+    if 'get SETTINGS_KEY()' in source:
+        gate = r'(get configV3FeatureGate\(\)\s*\{)\s*return lazy\.configV3FeatureGate;\s*}'
+        key = r'(get SETTINGS_KEY\(\)\s*\{)\s*return lazy\.configV3FeatureGate \? "search-config-v3" : "search-config-v2";\s*}'
+        if len(re.findall(gate, source)) != 1 or len(re.findall(key, source)) != 1:
+            raise ValueError('Native search schema/collection getters changed; review the engine integration.')
+        source = re.sub(gate, r'\1\n    // The release contains the single-provider Cyphra v2 schema.\n    return false;\n  }', source)
+        source = re.sub(key, r'\1\n    return "cyphra-search-config-v1";\n  }', source)
+    for original, cyphra in SEARCH_NAMES.items():
+        source = source.replace('"' + original + '"', '"' + cyphra + '"')
+    if '"cyphra-search-config-v1"' not in source or '"search-config-v3"' in source:
+        raise ValueError('Native search was not bound to the single bundled provider.')
+    return source
+
+
 def search_policy():
     """Policies work together with the single bundled provider."""
     return {'Default': 'Brave Search', 'DefaultPrivate': 'Brave Search',
@@ -137,9 +160,7 @@ def rewrite_jar(path, version, platform, edition=None):
                 data['data'] = []
                 replacement = (json.dumps(data, indent=2) + '\n').encode('utf-8')
             elif name == 'moz-src/toolkit/components/search/SearchUtils.sys.mjs':
-                replacement = raw
-                for original, cyphra in SEARCH_NAMES.items():
-                    replacement = replacement.replace(('"' + original + '"').encode(), ('"' + cyphra + '"').encode())
+                replacement = local_search_utils(raw.decode('utf-8')).encode('utf-8')
             if name == 'modules/AppConstants.sys.mjs':
                 # These constants are explicitly static, user-visible names.
                 text = raw.decode('utf-8')

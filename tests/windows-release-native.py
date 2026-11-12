@@ -42,12 +42,12 @@ UPGRADE_BASELINES = {
                'size': 116427924, 'sha256': '1f56d7e333250183352df3ce1d120643097c0f51adc306f157c1b459578887d9',
                'sourceCommit': '1732ab90a5fe51eb148b196311c632450e94622d'},
 }
-CURRENT_WINDOWS_API = {'appVersion': '158.0.1', 'platformVersion': '158.0.1',
-                       'appBuildId': '20261022000451', 'platformBuildId': '20261022000451'}
-CURRENT_WINDOWS_PACKAGED_INI = {'applicationVersion': '158.0.1', 'platformMilestone': '158.0.1',
-    'applicationBuildId': '20261022000451', 'platformBuildId': '20261022011852',
-    'applicationSourceStamp': '48a735cc74a7e6d730f9bf59c3de58f750287a23',
-    'platformSourceStamp': '48a735cc74a7e6d730f9bf59c3de58f750287a23'}
+CURRENT_WINDOWS_API = {'appVersion': '160.0', 'platformVersion': '160.0',
+                       'appBuildId': '20261111005253', 'platformBuildId': '20261110235730'}
+CURRENT_WINDOWS_PACKAGED_INI = {'applicationVersion': '160.0', 'platformMilestone': '160.0',
+    'applicationBuildId': '20261111005253', 'platformBuildId': '20261111005253',
+    'applicationSourceStamp': 'd84e7a6936554efe26097d9d9b24a0e11330e630',
+    'platformSourceStamp': 'd84e7a6936554efe26097d9d9b24a0e11330e630'}
 
 
 def public_environment():
@@ -660,7 +660,7 @@ def packaged_engine_identity(application):
 def current_engine_identity(native_api, packaged_ini):
     # nsXULAppInfo::GetPlatformBuildID returns compiled gToolkitBuildID, not
     # platform.ini's independently generated BuildID. Require both facts.
-    assert native_api == CURRENT_WINDOWS_API, 'The native Windows AppInfo API differs from the pinned Gecko 158.0.1 compiled toolkit.'
+    assert native_api == CURRENT_WINDOWS_API, 'The native Windows AppInfo API differs from the pinned Gecko 160.0 compiled toolkit.'
     assert packaged_ini == CURRENT_WINDOWS_PACKAGED_INI, 'The installed Windows application/platform INIs differ from the pinned official package.'
 
 
@@ -671,7 +671,7 @@ def migration_identity(driver, mode, edition, profile, engine_major, packaged_in
     for name in ('appVersion', 'platformVersion'):
         assert re.match(r'^' + str(engine_major) + r'(?:\.|$)', observed['engine'][name]), \
             'The migration did not run the genuine expected Gecko engine generation.'
-    if engine_major == 158:
+    if engine_major == 160:
         current_engine_identity(observed['engine'], packaged_ini)
     assert observed['defaultShield'] == ('strict' if mode == 'work' else 'standard')
     assert observed['rfp'] == (mode == 'work') and observed['webglDisabled'] == (mode == 'work')
@@ -707,13 +707,13 @@ def qualify_real_upgrade(old_installer, old_identity, installer, new_identity, a
     """Install and restart actual immutable 0.7.2 before migrating its real data."""
     edition = proof['edition']
     assert tuple(map(int, proof['version'].split('.'))) > tuple(map(int, UPGRADE_BASELINE_VERSION.split('.')))
-    assert json.loads((ROOT / 'engine-lock.json').read_text())['geckoVersion'] == '158.0.1'
+    assert json.loads((ROOT / 'engine-lock.json').read_text())['geckoVersion'] == '160.0'
     launcher, engine = application / 'Cyphra.exe', application / 'runtime/librewolf.exe'
     result = proof['newMigrationResult'] = {
         'fromVersion': UPGRADE_BASELINE_VERSION, 'toVersion': proof['version'],
         'fromSourceCommit': old_identity['sourceCommit'], 'toSourceCommit': new_identity['sourceCommit'],
         'sourceInstallerSha256': old_identity['sha256'], 'targetInstallerSha256': new_identity['sha256'],
-        'oldEngineMajor': 157, 'newEngineMajor': 158, 'modes': {},
+        'oldEngineMajor': 157, 'newEngineMajor': 160, 'modes': {},
     }
     native_command([str(old_installer), '/S', '/D=' + str(application)], 240)
     old_metadata = json.loads((application / 'cyphra.json').read_text())
@@ -777,7 +777,7 @@ def qualify_real_upgrade(old_installer, old_identity, installer, new_identity, a
     for mode, profile in profiles.items():
         subprocess.run([str(launcher), '--' + mode, url + mode + '-new-reopen'], env=environment, timeout=20, check=True)
         driver = drivers[mode] = connect(ports[mode])
-        result['modes'][mode]['newEngine'] = migration_identity(driver, mode, edition, profile, 158, result['newPackagedEngine'])
+        result['modes'][mode]['newEngine'] = migration_identity(driver, mode, edition, profile, 160, result['newPackagedEngine'])
         verify_migration_data(driver, mode, url, retained[mode])
         result['modes'][mode].update({
             'profileIdentityPreserved': True, 'bookmarksPreserved': True,
@@ -789,7 +789,7 @@ def qualify_real_upgrade(old_installer, old_identity, installer, new_identity, a
     close_drivers(drivers, engine)
     result['passed'] = True
     proof['checks'].append('real-immutable-0.7.2-to-current-native-engine-profile-migration-both-modes')
-    print('PASS genuine Windows upgrade: signed immutable 0.7.2/Gecko 157, durable old close/reopen, complete profiles unchanged before new launch, actual Gecko 158 preserving both modes and DNS/settings/bookmarks/cookies/storage.', flush=True)
+    print('PASS genuine Windows upgrade: signed immutable 0.7.2/Gecko 157, durable old close/reopen, complete profiles unchanged before new launch, actual Gecko 160 preserving both modes and DNS/settings/bookmarks/cookies/storage.', flush=True)
 
 
 class Page(BaseHTTPRequestHandler):
