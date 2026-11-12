@@ -1,53 +1,53 @@
 {
   "schema": 1,
   "source": "https://firefox.settings.services.mozilla.com/v1/buckets/security-state/collections/onecrl",
-  "fetched": "2026-10-26T17:44:26Z",
-  "timestamp": 1792622041776,
-  "records": 1907,
+  "fetched": "2026-11-11T14:10:18Z",
+  "timestamp": 1794348206673,
+  "records": 1959,
   "enabled": 1262,
   "files": [
     {
       "name": "onecrl.json",
-      "bytes": 1058412,
-      "sha256": "23a7e66dac3da302c2df8d2e68f6d60402bc2ee6420b929f7e81def45347b019",
+      "bytes": 1085980,
+      "sha256": "8796b7257f09d084beadeb2e100c57f6b36955f387f62e8fab9ccd8e795bb539",
       "url": "https://firefox.settings.services.mozilla.com/v1/buckets/security-state/collections/onecrl/records"
     },
     {
       "name": "onecrl-metadata.json",
-      "bytes": 3317,
-      "sha256": "3498b574cbe3f2864c1b20872a9099c51c11042e079dadc7de3931af5b5d8e72",
+      "bytes": 3321,
+      "sha256": "5d1dd997b0ed912a8fd270ed83120f26b74d71600858a7b854b69135187b8e29",
       "url": "https://firefox.settings.services.mozilla.com/v1/buckets/security-state/collections/onecrl"
     },
     {
       "name": "onecrl-chain.pem",
       "bytes": 5279,
-      "sha256": "0b50b46b3052c490513fe309dfbaad203726399665de2a95c359c87acd1de308",
-      "url": "https://content-signature-2.cdn.mozilla.net/g/chains/202402/onecrl.content-signature.mozilla.org-2026-11-25-18-04-25.chain"
+      "sha256": "342052b4751e33e2c27828fc59f682d5abbd4743886e88df90c26c39ffd8e0d1",
+      "url": "https://content-signature-2.cdn.mozilla.net/g/chains/202402/onecrl.content-signature.mozilla.org-2026-12-15-22-12-40.chain"
     }
   ],
   "verification": {
     "verified": true,
     "verifier": "Cyphra pinned P-384 detached signature (Node WebCrypto)",
     "signer": "onecrl.content-signature.mozilla.org",
-    "leafSPKISHA256": "71dc4a465bcc3895bd8b0fd25174407f1149938353d1fe96049b9a868758bb37",
-    "signerValidUntil": "2026-11-25T18:04:25.000Z",
+    "leafSPKISHA256": "07973e675a43faccd0a28ab66cb8a87b1818ba8414ea7bfa9b3722bceaa0d2a0",
+    "signerValidUntil": "2026-12-15T22:12:40.000Z",
     "engine": "v22.23.4",
-    "records": 1907,
+    "records": 1959,
     "enabled": 1262,
-    "timestamp": 1792622041776,
-    "verifiedAt": "2026-10-26T17:44:26Z",
+    "timestamp": 1794348206673,
+    "verifiedAt": "2026-11-12T14:51:12.903733+00:00",
     "signerProductionQualification": {
       "verifier": "Gecko nsIContentSignatureVerifier ContentSignatureProdRoot",
       "verified": true,
-      "verifiedAt": "2026-10-27T07:28:02.912029+00:00",
+      "verifiedAt": "2026-11-12T14:43:46.277062+00:00",
       "signer": "onecrl.content-signature.mozilla.org",
-      "leafSPKISHA256": "71dc4a465bcc3895bd8b0fd25174407f1149938353d1fe96049b9a868758bb37",
-      "signerValidUntil": "2026-11-25T18:04:25Z",
-      "engine": "158.0.1",
-      "applicationBuildID": "20261022000330",
-      "compiledToolkitBuildID": "20261022000330",
-      "records": 1907,
-      "timestamp": 1792622041776
+      "leafSPKISHA256": "07973e675a43faccd0a28ab66cb8a87b1818ba8414ea7bfa9b3722bceaa0d2a0",
+      "signerValidUntil": "2026-12-15T22:12:40Z",
+      "engine": "160.0",
+      "applicationBuildID": "20261110235326",
+      "compiledToolkitBuildID": "20261110235326",
+      "records": 1959,
+      "timestamp": 1794348206673
     }
   }
 }

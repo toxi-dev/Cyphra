@@ -1,0 +1,20 @@
+{
+  "engine": "LibreWolf160.0-1 / Gecko160.0",
+  "mozillaSourceStamp": "d84e7a6936554efe26097d9d9b24a0e11330e630",
+  "officialWindowsArchiveSHA256": "c5a0de0c0ebe7d95659cbf2c4b2a012963d0587a8337b1ac19a7f870fdade5c3",
+  "scope": "Unmodified selected resources from the full official hash-verified archive; actual native search qualification remains required.",
+  "files": [
+    {
+      "name": "SearchUtils.sys.mjs",
+      "archivePath": "moz-src/toolkit/components/search/SearchUtils.sys.mjs",
+      "sha256": "624a950cd54fc217e16396fe4f5eaddfb85d3f6f5fb1e33ca3571721917a3abb",
+      "size": 21656
+    },
+    {
+      "name": "SearchEngineSelector.sys.mjs",
+      "archivePath": "moz-src/toolkit/components/search/SearchEngineSelector.sys.mjs",
+      "sha256": "2434c6e1736f2140f3b891182a4adbb5fb4524483d0713a0e8ec56b588bbdacd",
+      "size": 15162
+    }
+  ]
+}

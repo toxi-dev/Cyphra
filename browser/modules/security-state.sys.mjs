@@ -6,11 +6,11 @@
 export const ONECRL_SOURCE = 'https://firefox.settings.services.mozilla.com/v1/buckets/security-state/collections/onecrl';
 const SIGNER = 'onecrl.content-signature.mozilla.org';
 // This exact signing key was extracted from the bundled Mozilla chain and
-// qualified by Gecko's production-root verifier on 10 October 2026. A signer
+// qualified by Gecko's production-root verifier on 12 November 2026. A signer
 // rotation requires a reviewed source change and a fresh production-root test.
 // Verify historical signatures after the signing certificate expires; its date
 // limits new signing, not the authenticity of an already authenticated snapshot.
-export const ONECRL_PUBLIC_KEY_SPKI = 'MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEcFqwsEC0b/zb/f6EhULbG1jRUQCyNv6S0hnG7FxwrHOlP163joodTS8os1sirMqS8yq88RI9VI1DdLrYfHvJLUiXb5pH/ONJ6QmFT7bwuN5v2xVKrid+QRHeI8RiJQ86';
+export const ONECRL_PUBLIC_KEY_SPKI = 'MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEkJUFlAJRO2TNaH6jrhmrJmngzlTRp1WDZWrbGcGVVj7+2UBCNkBAu+Np8sv5Kc+9vgMRxRCJc8gQqPXFyklau1hfZe7OM9ImMZTAt1oGEmuAvRQ+HtZ8QXIfKNIMJCpS';
 const FILE_NAMES = Object.freeze(['onecrl.json', 'onecrl-metadata.json', 'onecrl-chain.pem']);
 const MAX_BYTES = 2 * 1024 * 1024;
 const MAX_RECORDS = 10000;

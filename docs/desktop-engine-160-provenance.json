@@ -1,0 +1,260 @@
+{
+  "schema": 1,
+  "engine": "LibreWolf 160.0-1 / Gecko 160.0",
+  "preparedUTC": "2026-11-12",
+  "scope": "Verified original archive/source preparation and candidate-only native signer/revocation qualification. Final branded package, UI, updater and Windows/Linux compatibility qualification remain pending.",
+  "release": {
+    "version": "160.0-1",
+    "geckoVersion": "160.0",
+    "url": "https://librewolf.dev/librewolf/bsys6/releases/tag/160.0-1",
+    "publishedAtUTC": "2026-11-11T02:28:59Z",
+    "buildSystemCommit": "2941a0f72e69863aae1c31e87ca542f34dea727d",
+    "mozillaSourceRepository": "https://hg.mozilla.org/releases/mozilla-release",
+    "mozillaSourceStamp": "d84e7a6936554efe26097d9d9b24a0e11330e630",
+    "securityAdvisory": "https://www.mozilla.org/en-US/security/advisories/mfsa2026-125/"
+  },
+  "platforms": {
+    "windows": {
+      "archive": {
+        "file": "librewolf-160.0-1-windows-x86_64-package.zip",
+        "url": "https://dl.librewolf.net/librewolf/160.0-1/librewolf-160.0-1-windows-x86_64-package.zip",
+        "size": 173346524,
+        "sha256": "c5a0de0c0ebe7d95659cbf2c4b2a012963d0587a8337b1ac19a7f870fdade5c3"
+      },
+      "archiveSHA256Verified": true,
+      "independentPersistedFullReadbackVerified": true,
+      "metadata": {
+        "application.ini": {
+          "archiveMember": "librewolf/application.ini",
+          "size": 557,
+          "sha256": "08c6800a92bcdb80d0539b0c9424cd3d38c5bec5aaa59e9467c01d71f3078ec5",
+          "sections": {
+            "App": {
+              "Vendor": "Mozilla",
+              "Name": "LibreWolf",
+              "RemotingName": "librewolf",
+              "Version": "160.0",
+              "Profile": "librewolf",
+              "BuildID": "20261111005253",
+              "SourceRepository": "https://hg.mozilla.org/releases/mozilla-release",
+              "SourceStamp": "d84e7a6936554efe26097d9d9b24a0e11330e630",
+              "ID": "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}"
+            },
+            "Gecko": {
+              "MinVersion": "160.0",
+              "MaxVersion": "160.0"
+            },
+            "XRE": {
+              "EnableProfileMigrator": "1"
+            }
+          }
+        },
+        "platform.ini": {
+          "archiveMember": "librewolf/platform.ini",
+          "size": 165,
+          "sha256": "13eb76b3a5bc3bc80dc112eef10a310c5d19dfc9cc1a41fd849713f7fdd38239",
+          "sections": {
+            "Build": {
+              "BuildID": "20261111005253",
+              "Milestone": "160.0",
+              "SourceRepository": "https://hg.mozilla.org/releases/mozilla-release",
+              "SourceStamp": "d84e7a6936554efe26097d9d9b24a0e11330e630"
+            }
+          }
+        }
+      },
+      "nativeFiles": {
+        "librewolf.exe": {
+          "nativeArchiveMember": "librewolf/librewolf.exe",
+          "nativeBytes": 893440,
+          "nativeSHA256": "939938e9df9b3658a041614520599505f80ee704f8facb8d46ae49a383bb0ee7"
+        },
+        "xul.dll": {
+          "nativeArchiveMember": "librewolf/xul.dll",
+          "nativeBytes": 195113472,
+          "nativeSHA256": "50d6f1d4b16a8e87cf0a129376c76284585a7a650007c6882ff4161514c778f6"
+        }
+      },
+      "compiledToolkit": {
+        "kind": "Windows PE mozbldid section; unique complete-file-scanned BuildID at section start",
+        "rawOffset": 194189824,
+        "rawSize": 512,
+        "buildIDOffset": 194189824,
+        "buildID": "20261110235730"
+      },
+      "actualRuntime": {
+        "state": "pending; no native runtime launch during this inspection",
+        "version": null,
+        "platformVersion": null,
+        "appBuildID": null,
+        "platformBuildID": null
+      }
+    },
+    "linux": {
+      "archive": {
+        "file": "librewolf-160.0-1-linux-x86_64-package.tar.xz",
+        "url": "https://dl.librewolf.net/librewolf/160.0-1/librewolf-160.0-1-linux-x86_64-package.tar.xz",
+        "size": 105279732,
+        "sha256": "7c751d4d279f05a2514298599ad3c43d4e85dd011ad2ecc07319c5a8c34a72e5"
+      },
+      "archiveSHA256Verified": true,
+      "independentPersistedFullReadbackVerified": true,
+      "metadata": {
+        "application.ini": {
+          "archiveMember": "librewolf/application.ini",
+          "size": 557,
+          "sha256": "a57ca6193cf80671307cf510cc36dfd3bbcd89e78e70b2cf25cb136edfa67ce1",
+          "sections": {
+            "App": {
+              "Vendor": "Mozilla",
+              "Name": "LibreWolf",
+              "RemotingName": "librewolf",
+              "Version": "160.0",
+              "Profile": "librewolf",
+              "BuildID": "20261111003723",
+              "SourceRepository": "https://hg.mozilla.org/releases/mozilla-release",
+              "SourceStamp": "d84e7a6936554efe26097d9d9b24a0e11330e630",
+              "ID": "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}"
+            },
+            "Gecko": {
+              "MinVersion": "160.0",
+              "MaxVersion": "160.0"
+            },
+            "XRE": {
+              "EnableProfileMigrator": "1"
+            }
+          }
+        },
+        "platform.ini": {
+          "archiveMember": "librewolf/platform.ini",
+          "size": 165,
+          "sha256": "0e1b127f3905ac0f536655b386a705a757ee4d35ecc889767eedf0456432cb06",
+          "sections": {
+            "Build": {
+              "BuildID": "20261111003723",
+              "Milestone": "160.0",
+              "SourceRepository": "https://hg.mozilla.org/releases/mozilla-release",
+              "SourceStamp": "d84e7a6936554efe26097d9d9b24a0e11330e630"
+            }
+          }
+        }
+      },
+      "nativeFiles": {
+        "librewolf": {
+          "nativeArchiveMember": "librewolf/librewolf",
+          "nativeBytes": 738088,
+          "nativeSHA256": "e6cd910f64cd43e2dcb55138c56ba83a4786db8977229046e8e07cbb4a88ef64"
+        },
+        "libxul.so": {
+          "nativeArchiveMember": "librewolf/libxul.so",
+          "nativeBytes": 207183008,
+          "nativeSHA256": "227a3937f93e9fda4073f66a3a10ac65a685893832e7894be742a668f8f3171f"
+        }
+      },
+      "compiledToolkit": {
+        "kind": "Linux ELF mzbldid note",
+        "noteOffset": 680,
+        "descriptorHex": "323032363131313032333533323600",
+        "buildID": "20261110235326"
+      },
+      "actualRuntime": {
+        "state": "pending; no native runtime launch during this inspection",
+        "version": null,
+        "platformVersion": null,
+        "appBuildID": null,
+        "platformBuildID": null
+      },
+      "rawCandidateRuntimeObservation": {
+        "version": "160.0",
+        "platformVersion": "160.0",
+        "appBuildID": "20261110235326",
+        "platformBuildID": "20261110235326",
+        "launchContext": "Original binary without -app; disposable nobody profile, isolated loopback network namespace. Branded runtime with explicit -app application metadata remains separately unqualified."
+      }
+    }
+  },
+  "identitySemantics": {
+    "appBuildID": "Services.appinfo.appBuildID returns gAppData->buildID from application metadata in the parent process.",
+    "platformBuildID": "Services.appinfo.platformBuildID returns compiled gToolkitBuildID, generated by toolkit/library/gen_buildid.py and build/variables.py. It does not read platform.ini BuildID.",
+    "platformIniBuildID": "Packaged platform.ini BuildID is a separate original archive input fact.",
+    "exactSourceFiles": [
+      {
+        "sourcePath": "toolkit/xre/nsAppRunner.cpp",
+        "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/d84e7a6936554efe26097d9d9b24a0e11330e630/toolkit/xre/nsAppRunner.cpp",
+        "size": 233555,
+        "sha256": "b89f02e580cf020092d0ea837ee537357b625671a4712f3c27b28cca627d7642"
+      },
+      {
+        "sourcePath": "toolkit/library/gen_buildid.py",
+        "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/d84e7a6936554efe26097d9d9b24a0e11330e630/toolkit/library/gen_buildid.py",
+        "size": 2415,
+        "sha256": "bc2133c383ab3ff58e439c3d5363f0f0e6c82115534607963171092246a3b22a"
+      },
+      {
+        "sourcePath": "toolkit/library/buildid_section.h",
+        "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/d84e7a6936554efe26097d9d9b24a0e11330e630/toolkit/library/buildid_section.h",
+        "size": 501,
+        "sha256": "42ee43adc5b5b549c227dc8ce81f8f7ced7272143af21663050c1f1997a1aa7b"
+      },
+      {
+        "sourcePath": "build/variables.py",
+        "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/d84e7a6936554efe26097d9d9b24a0e11330e630/build/variables.py",
+        "size": 4292,
+        "sha256": "c12ba37b125afef59f70d973b029150e96542398180a5420d1b43998b3c545cd"
+      },
+      {
+        "sourcePath": "toolkit/library/moz.build",
+        "sourceURL": "https://hg.mozilla.org/releases/mozilla-release/raw-file/d84e7a6936554efe26097d9d9b24a0e11330e630/toolkit/library/moz.build",
+        "size": 11259,
+        "sha256": "5d73d56c9c2f16a58dc24007fc81fc79af2c678b5a811334633c74fd7a793b05"
+      }
+    ]
+  },
+  "correspondingSource": {
+    "url": "https://librewolf.dev/api/packages/librewolf/generic/librewolf-source/160.0-1/librewolf-160.0-1.source.tar.gz",
+    "publishedSizeBytes": 1189768011,
+    "publishedSHA256": "a2901ce211dce6c250cbe04a1324f239f9bb99d87b288cfa8e09da206e684e38",
+    "availability": {
+      "method": "HEAD",
+      "status": 200,
+      "archiveBodyBytesRead": 0
+    },
+    "verificationScope": "Official package API and checksum sidecar agree; source archive endpoint available. Source body not downloaded or hashed; no complete corresponding-source/license verification claimed."
+  },
+  "retainedPrivacy": {
+    "officialAppConstants": {
+      "MOZ_DATA_REPORTING": false,
+      "MOZ_TELEMETRY_REPORTING": false,
+      "MOZ_CRASHREPORTER": false,
+      "MOZ_NORMANDY": false,
+      "MOZ_UPDATER": false,
+      "MOZ_SANDBOX": true
+    },
+    "packagedRemoteSettingsUtilsSHA256": "691de459018909d7a4a77c5d53d6681d9b1ae5b9547ddd47c9c279d70e11b8f0",
+    "packagedRemoteSettingsEntrySHA256": "76025407471f0c520a2a620c4d85e000ff308bc5a0ad18fd837c9dab4840b793",
+    "remoteSettingsModulesByteIdenticalTo158012": false,
+    "packagedOneCRLSHA256": "b84242151ddcc432834cde764b43c78ae0b1e7a81d490f020ac607f43c5c882d",
+    "packagedOneCRLRecords": 1918,
+    "packagedOneCRLMetadataFalseRecords": 656,
+    "desktopAllPublishedRecordsEnforced": true,
+    "desktopMaintenanceSnapshotUnchanged": false,
+    "androidSourcesOrOverlayChanged": false,
+    "desktopMaintenanceSnapshotRecords": 1959,
+    "remoteSettingsDelta": "Utils adds MOZ_REMOTE_SETTINGS_DISABLED environment guard; client entry remains identical. Managed Cyphra privacy/startup gate remains required.",
+    "desktopMaintenanceSignerQualification": {
+      "signer": "onecrl.content-signature.mozilla.org",
+      "leafSPKISHA256": "07973e675a43faccd0a28ab66cb8a87b1818ba8414ea7bfa9b3722bceaa0d2a0",
+      "nativeProductionRootVerified": "2026-11-12",
+      "record": "docs/security-data-2026-11-12.json"
+    }
+  },
+  "searchIntegration": {
+    "schema": "Bundled v2 single-provider data",
+    "collection": "cyphra-search-config-v1",
+    "nativeConfigV3FeatureGate": false,
+    "storedUpstreamFeaturePreferenceCanSelectV3": false,
+    "nativeSelectorModified": false,
+    "v2Overrides": "Upstream160 selector explicitly supplies empty overrides",
+    "sourceTests": "Actual160 utility and unchanged selector in isolated VM test both upstream control choices and corrected local routing; native search initialization remains pending."
+  }
+}

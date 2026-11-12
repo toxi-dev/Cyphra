@@ -24,7 +24,7 @@ test('the real Mozilla snapshot authenticates with the qualified pinned P-384 si
   assert.equal(await verifySnapshotSignature(snapshot, metadata, chainURL, canonical, webcrypto.subtle), true);
   const chain = new X509Certificate(await readFile(new URL('onecrl-chain.pem', security)));
   assert.equal(chain.publicKey.export({ type: 'spki', format: 'der' }).toString('base64'), ONECRL_PUBLIC_KEY_SPKI);
-  assert.equal(validateSnapshot(snapshot).data.length, 1907);
+  assert.equal(validateSnapshot(snapshot).data.length, 1959);
 });
 
 test('changing a valid revocation identity or detached signature is rejected', async () => {
@@ -51,9 +51,9 @@ test('snapshot validation rejects duplicate IDs, ambiguous identities and malfor
 
 test('all authenticated published identities are enforced regardless of the enabled metadata field', () => {
   const entries = revocationEntries(snapshot);
-  assert.equal(snapshot.data.filter(record => record.enabled === false).length, 645);
-  assert.equal(entries.length, 1907);
-  assert.equal(entries.filter(entry => entry.enforce).length, 1907);
+  assert.equal(snapshot.data.filter(record => record.enabled === false).length, 697);
+  assert.equal(entries.length, 1959);
+  assert.equal(entries.filter(entry => entry.enforce).length, 1959);
   assert.equal(entries.filter(entry => !entry.enforce).length, 0);
   assert.ok(entries.some(entry => entry.kind === 'subject' && typeof entry.pubKey === 'string'));
   assert.ok(entries.some(entry => entry.kind === 'issuer' && typeof entry.serial === 'string'));
@@ -125,15 +125,17 @@ test('the authenticated loader sends every actual record to native storage as EN
     // native interfaces are mocked. Native NSS qualification remains separate.
     const { SecurityState } = await import('../browser/modules/security-state.sys.mjs?native-mapping-regression');
     const info = await SecurityState.start(new LocalFile('/native-mapping-fixture'));
-    assert.equal(installed.length, 1907);
+    assert.equal(installed.length, 1959);
     assert.equal(installed.filter(state => state.state === interfaces.nsICertStorage.STATE_UNSET).length, 0);
     assert.ok(installed.every(state => state.state === interfaces.nsICertStorage.STATE_ENFORCE));
     for (const record of snapshot.data.filter(record => record.enabled === false)) {
-      assert.ok(installed.some(state => state.issuer === record.issuerName
-        && state.serial === record.serialNumber && state.state === interfaces.nsICertStorage.STATE_ENFORCE), record.id);
+      assert.ok(installed.some(state => state.state === interfaces.nsICertStorage.STATE_ENFORCE
+        && (Object.hasOwn(record, 'issuerName')
+          ? state.issuer === record.issuerName && state.serial === record.serialNumber
+          : state.subject === record.subject && state.pubKey === record.pubKeyHash)), record.id);
     }
     assert.equal(info.ready, true);
-    assert.equal(info.revocationEntries, 1907);
+    assert.equal(info.revocationEntries, 1959);
   } finally {
     for (const [name, descriptor] of originals) {
       if (descriptor) Object.defineProperty(globalThis, name, descriptor);

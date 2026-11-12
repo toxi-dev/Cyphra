@@ -41,6 +41,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_updates.py -v
       - name: Test strict OneCRL metadata envelopes without network access
         run: python3 -m unittest discover -s tests -p test_refresh_security_data.py -v
+      - name: Test native desktop search schema and local collection routing
+        run: python3 -m unittest discover -s tests -p test_desktop_search_branding.py -v
       - name: Test pinned Android engine overlay assembly and package guards
         run: python3 -m unittest discover -s tests -p test_android_engine_patch.py -v
       - name: Test native navigation safety supervisor without ADB or services

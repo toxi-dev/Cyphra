@@ -75,13 +75,13 @@
     "additionalProperties": false
   },
   "signature": {
-    "ref": "dsd9gigcero916s531unsk6j",
-    "x5u": "https://content-signature-2.cdn.mozilla.net/g/chains/202402/onecrl.content-signature.mozilla.org-2026-11-25-18-04-25.chain",
+    "ref": "3dkg45i3jhux433oro4ds2aycu",
+    "x5u": "https://content-signature-2.cdn.mozilla.net/g/chains/202402/onecrl.content-signature.mozilla.org-2026-12-15-22-12-40.chain",
     "mode": "p384ecdsa",
     "type": "contentsignaturepki",
-    "signature": "_NwzCDnBM7mVBBuyAVXzVgYAOiGMK35AvKJzokbg8VWnOJofk34oxLIgSa6iEcKMpA3ooGimwQ93tQL4-AJ2-3YM2-40Vi30WLPkQ5ksD8eqeITTRDzWBAHyzXpVeJi2",
+    "signature": "Wx-GkyRDXAXFi7q0Oxh3nKj7yIVy1hJ-6Y7EPJwUXa_yI2RKnxPcRrh3Pd4tzFybyae5IcwYn5rKe0MvU4LqPJkRRDRznoE5I3eDxiJfDZVtUTzCyxxNEOJapKAu0zKo",
     "signer_id": "onecrl_202402",
-    "public_key": "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEcFqwsEC0b/zb/f6EhULbG1jRUQCyNv6S0hnG7FxwrHOlP163joodTS8os1sirMqS8yq88RI9VI1DdLrYfHvJLUiXb5pH/ONJ6QmFT7bwuN5v2xVKrid+QRHeI8RiJQ86"
+    "public_key": "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEkJUFlAJRO2TNaH6jrhmrJmngzlTRp1WDZWrbGcGVVj7+2UBCNkBAu+Np8sv5Kc+9vgMRxRCJc8gQqPXFyklau1hfZe7OM9ImMZTAt1oGEmuAvRQ+HtZ8QXIfKNIMJCpS"
   },
   "attachment": {
     "enabled": false,
@@ -89,13 +89,13 @@
   },
   "signatures": [
     {
-      "ref": "dsd9gigcero916s531unsk6j",
-      "x5u": "https://content-signature-2.cdn.mozilla.net/g/chains/202402/onecrl.content-signature.mozilla.org-2026-11-25-18-04-25.chain",
+      "ref": "3dkg45i3jhux433oro4ds2aycu",
+      "x5u": "https://content-signature-2.cdn.mozilla.net/g/chains/202402/onecrl.content-signature.mozilla.org-2026-12-15-22-12-40.chain",
       "mode": "p384ecdsa",
       "type": "contentsignaturepki",
-      "signature": "_NwzCDnBM7mVBBuyAVXzVgYAOiGMK35AvKJzokbg8VWnOJofk34oxLIgSa6iEcKMpA3ooGimwQ93tQL4-AJ2-3YM2-40Vi30WLPkQ5ksD8eqeITTRDzWBAHyzXpVeJi2",
+      "signature": "Wx-GkyRDXAXFi7q0Oxh3nKj7yIVy1hJ-6Y7EPJwUXa_yI2RKnxPcRrh3Pd4tzFybyae5IcwYn5rKe0MvU4LqPJkRRDRznoE5I3eDxiJfDZVtUTzCyxxNEOJapKAu0zKo",
       "signer_id": "onecrl_202402",
-      "public_key": "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEcFqwsEC0b/zb/f6EhULbG1jRUQCyNv6S0hnG7FxwrHOlP163joodTS8os1sirMqS8yq88RI9VI1DdLrYfHvJLUiXb5pH/ONJ6QmFT7bwuN5v2xVKrid+QRHeI8RiJQ86"
+      "public_key": "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEkJUFlAJRO2TNaH6jrhmrJmngzlTRp1WDZWrbGcGVVj7+2UBCNkBAu+Np8sv5Kc+9vgMRxRCJc8gQqPXFyklau1hfZe7OM9ImMZTAt1oGEmuAvRQ+HtZ8QXIfKNIMJCpS"
     }
   ],
   "displayFields": [
@@ -105,5 +105,5 @@
     "subject"
   ],
   "id": "onecrl",
-  "last_modified": 1792622042160
+  "last_modified": 1794348207047
 }
